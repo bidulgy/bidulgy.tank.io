@@ -78,23 +78,23 @@ const CANNONS=Object.freeze({
   },
   plasma:{
     id:'plasma',name:'플라즈마포',rarity:'legendary',rarityLabel:'전설',
-    chance:3,desc:'큰 에너지 구체가 명중 지점에 범위 피해를 줍니다.'
+    chance:3,desc:'플라즈마 구체와 전기 연결선으로 공격합니다.',skill:'전류 폭주 · 8방향 플라즈마 전기망'
   },
   rocket:{
     id:'rocket',name:'로켓포',rarity:'mythic',rarityLabel:'신화',
-    chance:1.2,desc:'느리지만 강력한 로켓이 넓은 폭발 피해를 줍니다.'
+    chance:1.2,desc:'중장갑 로켓이 넓은 폭발 피해를 줍니다.',skill:'미사일 폭격 · 전방 다연장 로켓 일제사'
   },
   ring:{
     id:'ring',name:'링 캐논',rarity:'secret',rarityLabel:'시크릿',
-    chance:.5,desc:'에너지 링이 적들을 연속으로 꿰뚫으며 공격합니다.'
+    chance:.5,desc:'차원 에너지 링이 적들을 연속 관통합니다.',skill:'차원 절단 · 16방향 관통 링 방출'
   },
   nova:{
     id:'nova',name:'노바 캐논',rarity:'galaxy',rarityLabel:'갤럭시',
-    chance:.25,desc:'별 모양 노바탄 3발이 퍼지며 관통과 소형 폭발을 동시에 일으킵니다.'
+    chance:.25,desc:'별 모양 노바탄이 관통과 폭발을 동시에 일으킵니다.',skill:'초신성 · 광역 폭발 + 노바탄 전방위 방출'
   },
   error:{
     id:'error',name:'ERROR 캐논',rarity:'error',rarityLabel:'ERROR',
-    chance:.05,desc:'불안정한 글리치 탄환이 빠르게 관통하며 강력한 왜곡 폭발을 만듭니다.'
+    chance:.05,desc:'불안정한 글리치 탄환이 공간을 왜곡하며 관통합니다.',skill:'SYSTEM CRASH · 전방위 글리치 폭주'
   }
 });
 window.IronCellCannons=CANNONS;
@@ -219,7 +219,7 @@ function renderCannonGarage(){
       return `<button type="button" class="cannon-card rarity-card-${c.rarity} ${own?'':'locked'} ${eq?'equipped':''}" data-cannon="${c.id}" ${own?'':'disabled'}>
         <div class="cannon-card-head"><strong>${c.name}</strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span></div>
         <small class="cannon-chance">${chance}</small>
-        <p>${own?c.desc:'아직 획득하지 않은 대포입니다.'}</p>
+        <p>${own?c.desc:'아직 획득하지 않은 대포입니다.'}</p>${own&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}
         <div class="equip-label">${eq?'장착 중':own?'눌러서 장착':'미보유'}</div>
       </button>`;
     }).join('');
