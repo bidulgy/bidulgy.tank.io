@@ -129,7 +129,7 @@ function addRemoteShot(payload){
     team:'remote',networkRemote:true,
     cannon:String(payload.cannon||'standard'),
     shape:String(payload.shape||'round'),
-    pierce:1,splashRadius:0,hitTargets:new Set(),hitIds:new Set()
+    pierce:1,splashRadius:0,hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()
   });
 }
 function sendDamage(targetId,amount){
@@ -291,12 +291,12 @@ function fire(e){
       vx:Math.cos(sa)*p.bulletSpeed+e.vx*.18,vy:Math.sin(sa)*p.bulletSpeed+e.vy*.18,
       r:6,damage:p.damage*shot.damageMul,life:1.65,owner:e,ownerId:onlineSelfId,
       team:'player',cannon,shape:'round',pierce:1,splashRadius:0,
-      hitTargets:new Set(),hitIds:new Set()
+      hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()
     };
     if(cannon==='rapid'){b.r=4;b.life=1.35;b.shape='capsule'}
     if(cannon==='spread'){b.r=4;b.life=.95;b.shape='pellet'}
     if(cannon==='piercer'){b.r=5;b.life=1.75;b.shape='rail';b.pierce=4}
-    if(cannon==='plasma'){b.r=11;b.life=1.65;b.shape='plasma';b.splashRadius=72}
+    if(cannon==='plasma'){b.r=13;b.life=2.15;b.shape='plasma';b.splashRadius=72}
     if(cannon==='rocket'){b.r=8;b.life=2.15;b.shape='rocket';b.splashRadius=112}
     if(cannon==='ring'){b.r=12;b.life=1.85;b.shape='ring';b.pierce=8}
     if(cannon==='nova'){b.r=10;b.life=1.90;b.shape='nova';b.pierce=3;b.splashRadius=46}
@@ -357,6 +357,65 @@ function killPlayer(killerId=''){
     pilotName:player.name,level:player.level,score:player.score,kills:player.kills
   });
 }
+
+function pointSegmentDistanceSq(px,py,ax,ay,bx,by){
+  const abx=bx-ax,aby=by-ay,apx=px-ax,apy=py-ay;
+  const len2=abx*abx+aby*aby;
+  if(len2<=.0001)return apx*apx+apy*apy;
+  const t=clamp((apx*abx+apy*aby)/len2,0,1);
+  const qx=ax+abx*t,qy=ay+aby*t,dx=px-qx,dy=py-qy;
+  return dx*dx+dy*dy;
+}
+function plasmaTetherOwner(b){
+  if(b.owner===player)return player;
+  const id=String(b.ownerId||'');
+  return id?remotePlayers.get(id)||null:null;
+}
+function plasmaTetherStart(owner){
+  const a=Number.isFinite(owner?.angle)?owner.angle:0;
+  const r=Number.isFinite(owner?.r)?owner.r:27;
+  return [owner.x+Math.cos(a)*(r+17),owner.y+Math.sin(a)*(r+17)];
+}
+function updatePlasmaTetherDamage(b,now){
+  if(b.shape!=='plasma'||b.networkRemote||b.owner!==player||!player?.alive)return;
+  const [ax,ay]=plasmaTetherStart(player),bx=b.x,by=b.y;
+  const lineRadius=9;
+  const tickMs=180;
+  const damage=Math.max(1,b.damage*.22);
+  b.tetherHits ||= new Map();
+
+  // Neutral shapes can also be electrocuted by touching the live cable.
+  for(let i=shapes.length-1;i>=0;i--){
+    const s=shapes[i];
+    const rr=s.r+lineRadius;
+    if(pointSegmentDistanceSq(s.x,s.y,ax,ay,bx,by)>rr*rr)continue;
+    const key=`shape:${s.id||i}`;
+    const lastHit=b.tetherHits.get(key)||0;
+    if(now-lastHit<tickMs)continue;
+    b.tetherHits.set(key,now);
+    s.hp-=damage;
+    burst(s.x,s.y,'#86f5ff',3);
+    if(s.hp<=0){
+      gainXp(s.xp);
+      burst(s.x,s.y,colorForShape(s.type),10);
+      shapes.splice(i,1);
+    }
+  }
+
+  // PvP damage is decided by the shooter's client, like the normal projectile hit.
+  for(const enemy of remotePlayers.values()){
+    if(!enemy.alive)continue;
+    const rr=(enemy.r||27)+lineRadius;
+    if(pointSegmentDistanceSq(enemy.x,enemy.y,ax,ay,bx,by)>rr*rr)continue;
+    const key=`player:${enemy.id}`;
+    const lastHit=b.tetherHits.get(key)||0;
+    if(now-lastHit<tickMs)continue;
+    b.tetherHits.set(key,now);
+    sendDamage(enemy.id,damage);
+    burst(enemy.x,enemy.y,'#87f5ff',4);
+  }
+}
+
 function updateBullets(dt){
   for(let i=bullets.length-1;i>=0;i--){
     const b=bullets[i];
@@ -365,6 +424,8 @@ function updateBullets(dt){
     if(b.life<=0||b.x<0||b.y<0||b.x>WORLD||b.y>WORLD){
       bullets.splice(i,1);continue;
     }
+
+    if(b.shape==='plasma')updatePlasmaTetherDamage(b,performance.now());
 
     // Other players' bullets are visual replicas.
     // The shooter's client sends authoritative hit messages.
@@ -451,13 +512,85 @@ function drawTank(e){
   if(e.hp<e.maxHp||!isP){const w=r*2;ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(x-w/2,y+r+10,w,5);ctx.fillStyle='#6be28a';ctx.fillRect(x-w/2,y+r+10,w*clamp(e.hp/e.maxHp,0,1),5)}
   ctx.fillStyle='rgba(255,255,255,.87)';ctx.font='700 11px system-ui';ctx.textAlign='center';ctx.fillText(e.name,x,y-r-13);
 }
+
+function drawPlasmaLightningPath(ax,ay,bx,by,alpha=1){
+  const dx=bx-ax,dy=by-ay,len=Math.hypot(dx,dy);
+  if(len<4)return;
+  const nx=-dy/len,ny=dx/len;
+  const segments=Math.max(7,Math.min(18,Math.floor(len/42)));
+  const pts=[];
+  for(let i=0;i<=segments;i++){
+    const t=i/segments;
+    let jitter=0;
+    if(i!==0&&i!==segments){
+      const envelope=Math.sin(Math.PI*t);
+      jitter=(Math.random()-.5)*22*envelope;
+    }
+    pts.push([ax+dx*t+nx*jitter,ay+dy*t+ny*jitter]);
+  }
+
+  ctx.save();
+  ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.shadowColor=`rgba(83,229,255,${.75*alpha})`;
+  ctx.shadowBlur=17;
+  ctx.strokeStyle=`rgba(63,190,255,${.20*alpha})`;
+  ctx.lineWidth=10;
+  ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);
+  for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);
+  ctx.stroke();
+
+  ctx.shadowBlur=9;
+  ctx.strokeStyle=`rgba(112,239,255,${.80*alpha})`;
+  ctx.lineWidth=3.4;
+  ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);
+  for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);
+  ctx.stroke();
+
+  ctx.shadowBlur=0;
+  ctx.strokeStyle=`rgba(235,255,255,${.93*alpha})`;
+  ctx.lineWidth=1.05;
+  ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);
+  for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);
+  ctx.stroke();
+
+  // Small side-arcs make the cable look electrically unstable.
+  if(len>90){
+    ctx.strokeStyle=`rgba(124,231,255,${.46*alpha})`;ctx.lineWidth=1.2;
+    for(let k=2;k<pts.length-2;k+=4){
+      const p=pts[k],branch=10+Math.random()*15,side=Math.random()<.5?-1:1;
+      ctx.beginPath();ctx.moveTo(p[0],p[1]);
+      ctx.lineTo(p[0]+nx*branch*side+dx/len*7,p[1]+ny*branch*side+dy/len*7);ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+function drawPlasmaTethers(){
+  for(const b of bullets){
+    if(b.shape!=='plasma'||b.life<=0)continue;
+    const owner=plasmaTetherOwner(b);
+    if(!owner||!owner.alive)continue;
+    const [sx,sy]=plasmaTetherStart(owner);
+    const [ax,ay]=worldToScreen(sx,sy),[bx,by]=worldToScreen(b.x,b.y);
+    if((ax<-180&&bx<-180)||(ay<-180&&by<-180)||(ax>innerWidth+180&&bx>innerWidth+180)||(ay>innerHeight+180&&by>innerHeight+180))continue;
+    const pulse=.78+.22*Math.sin(performance.now()*.022+(b.x+b.y)*.01);
+    drawPlasmaLightningPath(ax,ay,bx,by,pulse);
+  }
+}
+
 function drawBullets(){
   for(const b of bullets){
     const[x,y]=worldToScreen(b.x,b.y),a=Math.atan2(b.vy,b.vx);ctx.save();ctx.translate(x,y);ctx.rotate(a);
     if(b.shape==='capsule'){ctx.fillStyle='#8ed0ff';ctx.strokeStyle='#467aa7';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(-7,-3,14,6,3);ctx.fill();ctx.stroke()}
     else if(b.shape==='pellet'){ctx.fillStyle='#ffd777';ctx.strokeStyle='#b18432';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(6,0);ctx.lineTo(-4,-4);ctx.lineTo(-4,4);ctx.closePath();ctx.fill();ctx.stroke()}
     else if(b.shape==='rail'){ctx.fillStyle='#e6f3ff';ctx.strokeStyle='#6aa3d6';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(-11,-3,22,6,2);ctx.fill();ctx.stroke();ctx.fillStyle='#75c9ff';ctx.fillRect(-7,-1,14,2)}
-    else if(b.shape==='plasma'){ctx.shadowColor='#6be7ff';ctx.shadowBlur=14;const gr=ctx.createRadialGradient(-3,-3,1,0,0,12);gr.addColorStop(0,'#fff');gr.addColorStop(.28,'#8bf1ff');gr.addColorStop(1,'#3479d0');ctx.fillStyle=gr;ctx.beginPath();ctx.arc(0,0,11,0,TAU);ctx.fill();ctx.shadowBlur=0}
+    else if(b.shape==='plasma'){
+      const pulse=1+.10*Math.sin(performance.now()*.026+(b.x+b.y)*.015);
+      ctx.shadowColor='#61eaff';ctx.shadowBlur=22;
+      const gr=ctx.createRadialGradient(-4,-4,1,0,0,14*pulse);gr.addColorStop(0,'#fff');gr.addColorStop(.23,'#b8fbff');gr.addColorStop(.55,'#62ddff');gr.addColorStop(1,'#2758c6');
+      ctx.fillStyle=gr;ctx.beginPath();ctx.arc(0,0,13*pulse,0,TAU);ctx.fill();
+      ctx.strokeStyle='rgba(180,250,255,.75)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,17*pulse,0,TAU);ctx.stroke();
+      ctx.strokeStyle='rgba(94,194,255,.40)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,0,21*pulse,0,TAU);ctx.stroke();ctx.shadowBlur=0
+    }
     else if(b.shape==='rocket'){ctx.fillStyle='#d9e1e8';ctx.strokeStyle='#637180';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(10,0);ctx.lineTo(3,-6);ctx.lineTo(-8,-5);ctx.lineTo(-8,5);ctx.lineTo(3,6);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle='#ff9f43';ctx.beginPath();ctx.moveTo(-8,-3);ctx.lineTo(-15,0);ctx.lineTo(-8,3);ctx.closePath();ctx.fill()}
     else if(b.shape==='ring'){ctx.shadowColor='#a988ff';ctx.shadowBlur=10;ctx.strokeStyle='#c9b6ff';ctx.lineWidth=5;ctx.beginPath();ctx.arc(0,0,11,0,TAU);ctx.stroke();ctx.shadowBlur=0;ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,0,6,0,TAU);ctx.stroke()}
     else if(b.shape==='nova'){
@@ -530,7 +663,7 @@ function update(dt){
 function render(){
   ctx.save();
   if(shake>0){ctx.translate(rand(-shake,shake),rand(-shake,shake));shake*=.86}
-  drawGrid();drawBoundary();shapes.forEach(drawShape);drawBullets();
+  drawGrid();drawBoundary();shapes.forEach(drawShape);drawPlasmaTethers();drawBullets();
   remotePlayers.forEach(drawTank);drawTank(player);drawParticles();
   ctx.restore();
   drawMobileAimGuide();
