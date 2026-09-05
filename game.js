@@ -1,21 +1,51 @@
 (() => {
 'use strict';
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
-const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),pauseBtn:document.querySelector('#pauseBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus')};
+const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus')};
 const TAU=Math.PI*2,WORLD=4200,GRID=56;
+const NORMAL_SHAPE_TARGET=95;
+const CENTRAL_PENTAGON_TARGET=220;
+const CENTRAL_PENTAGON_RADIUS=430;
 let running=false,paused=false,last=performance.now(),camera={x:0,y:0},shapes=[],bullets=[],particles=[],shake=0,classUpgradeShown=false,player;
 const remotePlayers=new Map();
-let onlineChannel=null,onlineReady=false,onlineSelfId='',lastStateSend=0,networkSerial=0;
+let onlineChannel=null,onlineReady=false,onlineSelfId='',lastStateSend=0,networkSerial=0,lastRunAutosave=0,runSaveBusy=false;
 const processedDamageIds=new Set();
 const input={keys:new Set(),mouseX:innerWidth/2,mouseY:innerHeight/2,firing:false,moveX:0,moveY:0,mobileAimActive:false};
 const statsDef=[['maxHealth','최대 체력'],['regen','체력 회복'],['bulletDamage','탄환 피해'],['bulletSpeed','탄환 속도'],['reload','연사 속도'],['moveSpeed','이동 속도']];
-function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
+function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
 function resize(){const dpr=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(innerWidth*dpr);canvas.height=Math.round(innerHeight*dpr);canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
 const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function dist2(a,b){const dx=a.x-b.x,dy=a.y-b.y;return dx*dx+dy*dy}function norm(dx,dy){const d=Math.hypot(dx,dy)||1;return[dx/d,dy/d]}
 function colorForShape(t){return t==='square'?'#f7c843':t==='triangle'?'#e86464':'#6b8df2'}function edgeForShape(t){return t==='square'?'#b99320':t==='triangle'?'#a83f42':'#425cb2'}
-function spawnShape(type=null){const t=type||(Math.random()<.57?'square':Math.random()<.78?'triangle':'pentagon');const c=t==='square'?{r:20,hp:36,xp:12,sides:4}:t==='triangle'?{r:24,hp:58,xp:22,sides:3}:{r:34,hp:145,xp:56,sides:5};shapes.push({type:t,x:rand(100,WORLD-100),y:rand(100,WORLD-100),r:c.r,hp:c.hp,maxHp:c.hp,xp:c.xp,sides:c.sides,angle:rand(0,TAU),spin:rand(-.35,.35),vx:0,vy:0})}
-function populate(){shapes=[];bullets=[];particles=[];for(let i=0;i<95;i++)spawnShape()}
+function spawnShape(type=null){
+  const t=type||(Math.random()<.57?'square':Math.random()<.78?'triangle':'pentagon');
+  const c=t==='square'?{r:20,hp:36,xp:12,sides:4}:t==='triangle'?{r:24,hp:58,xp:22,sides:3}:{r:34,hp:145,xp:56,sides:5};
+  shapes.push({
+    type:t,x:rand(100,WORLD-100),y:rand(100,WORLD-100),
+    r:c.r,hp:c.hp,maxHp:c.hp,xp:c.xp,sides:c.sides,
+    angle:rand(0,TAU),spin:rand(-.35,.35),vx:0,vy:0,
+    centralCluster:false
+  });
+}
+function spawnCentralPentagon(){
+  // 중앙일수록 더 빽빽하도록 반지름을 편향시킨다.
+  const a=rand(0,TAU);
+  const radius=Math.pow(Math.random(),1.85)*CENTRAL_PENTAGON_RADIUS;
+  const jitter=rand(-12,12);
+  const x=clamp(WORLD/2+Math.cos(a)*(radius+jitter),70,WORLD-70);
+  const y=clamp(WORLD/2+Math.sin(a)*(radius+jitter),70,WORLD-70);
+  shapes.push({
+    type:'pentagon',
+    x,y,r:34,hp:145,maxHp:145,xp:56,sides:5,
+    angle:rand(0,TAU),spin:rand(-.42,.42),vx:0,vy:0,
+    centralCluster:true
+  });
+}
+function populate(){
+  shapes=[];bullets=[];particles=[];
+  for(let i=0;i<NORMAL_SHAPE_TARGET;i++)spawnShape();
+  for(let i=0;i<CENTRAL_PENTAGON_TARGET;i++)spawnCentralPentagon();
+}
 
 function setNetworkStatus(state,text){
   if(ui.networkStatus){
@@ -163,11 +193,20 @@ function receiveDamage(payload){
   if(player.hp<=0)killPlayer(String(payload?.sourceId||''));
   broadcastLocalState(true);
 }
+function tankKillXp(victimLevel){
+  // 상대 탱크 레벨이 높을수록 EXP가 가파르게 증가한다.
+  // 비정상 패킷으로 과도한 EXP를 얻지 못하도록 계산 레벨은 1~100으로 제한.
+  const level=clamp(Math.floor(Number(victimLevel)||1),1,100);
+  return Math.floor(50 + level*20 + level*level*.5);
+}
 function receiveKill(payload){
   if(!player?.alive)return;
   if(String(payload?.killerId||'')!==onlineSelfId)return;
   player.kills++;
-  gainXp(Math.max(45,Math.floor(Number(payload?.victimLevel||1))*18+34));
+
+  const victimLevel=clamp(Math.floor(Number(payload?.victimLevel||1)),1,100);
+  const earnedXp=tankKillXp(victimLevel);
+  gainXp(earnedXp);
 }
 async function disconnectOnlineArena(){
   onlineReady=false;
@@ -334,7 +373,111 @@ function applySplashDamage(b,x,y){
   shake=Math.max(shake,b.cannon==='rocket'?8:4);
 }
 function updatePlayer(dt){if(!player.alive)return;const p=playerParams();let mx=input.moveX,my=input.moveY;if(input.keys.has('KeyA')||input.keys.has('ArrowLeft'))mx-=1;if(input.keys.has('KeyD')||input.keys.has('ArrowRight'))mx+=1;if(input.keys.has('KeyW')||input.keys.has('ArrowUp'))my-=1;if(input.keys.has('KeyS')||input.keys.has('ArrowDown'))my+=1;if(mx||my){[mx,my]=norm(mx,my);player.vx+=mx*p.move*dt*5.2;player.vy+=my*p.move*dt*5.2}player.angle=Math.atan2(camera.y+input.mouseY-player.y,camera.x+input.mouseX-player.x);let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);if(input.firing||input.keys.has('Space'))fire(player);if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}
-function updateShapes(dt){for(const s of shapes){s.angle+=s.spin*dt;s.x=clamp(s.x+s.vx*dt,s.r,WORLD-s.r);s.y=clamp(s.y+s.vy*dt,s.r,WORLD-s.r);s.vx*=Math.pow(.05,dt);s.vy*=Math.pow(.05,dt)}while(shapes.length<95)spawnShape()}
+function updateShapes(dt){
+  for(const s of shapes){
+    s.angle+=s.spin*dt;
+    s.x=clamp(s.x+s.vx*dt,s.r,WORLD-s.r);
+    s.y=clamp(s.y+s.vy*dt,s.r,WORLD-s.r);
+    s.vx*=Math.pow(.05,dt);
+    s.vy*=Math.pow(.05,dt);
+
+    // 중앙 무리 오각형은 충격으로 너무 멀리 흩어지지 않게 천천히 중앙으로 복귀한다.
+    if(s.centralCluster){
+      const dx=WORLD/2-s.x,dy=WORLD/2-s.y,d=Math.hypot(dx,dy)||1;
+      if(d>CENTRAL_PENTAGON_RADIUS*1.12){
+        s.vx+=dx/d*26*dt;
+        s.vy+=dy/d*26*dt;
+      }
+    }
+  }
+
+  let normalCount=0,centralCount=0;
+  for(const s of shapes){
+    if(s.centralCluster)centralCount++;
+    else normalCount++;
+  }
+  while(normalCount<NORMAL_SHAPE_TARGET){spawnShape();normalCount++}
+  while(centralCount<CENTRAL_PENTAGON_TARGET){spawnCentralPentagon();centralCount++}
+}
+function makeRunId(){
+  if(globalThis.crypto?.randomUUID)return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
+function currentRunSnapshot(){
+  if(!player?.runId)return null;
+  return {
+    runId:player.runId,
+    pilotName:player.name,
+    level:player.level,
+    score:player.score,
+    kills:player.kills
+  };
+}
+async function saveCurrentRun(finish=false){
+  const snap=currentRunSnapshot();
+  if(!snap)return null;
+  if(runSaveBusy&&!finish)return null;
+  runSaveBusy=true;
+  try{
+    const fn=finish?window.IronCellAuth?.finishRun:window.IronCellAuth?.saveRunProgress;
+    return await fn?.(snap);
+  }catch(err){
+    console.warn('Run reward save failed:',err);
+    return null;
+  }finally{
+    runSaveBusy=false;
+  }
+}
+async function leaveBattleToLobby(){
+  if(!running){
+    window.IronCellAuth?.showLobby?.();
+    return;
+  }
+
+  const wasAlive=!!player?.alive;
+  running=false;
+  input.firing=false;
+  input.mobileAimActive=false;
+  input.keys.clear();
+
+  if(ui.leaveBattleBtn){
+    ui.leaveBattleBtn.disabled=true;
+    ui.leaveBattleBtn.textContent='정산 중...';
+  }
+
+  // 서버 정산 성공을 확인한 뒤에만 실제로 전투방을 나간다.
+  // 일시적인 통신 지연이 있으면 최대 3회 재시도한다.
+  let saved=null;
+  for(let attempt=0;attempt<3;attempt++){
+    saved=await saveCurrentRun(true);
+    if(saved && !saved.error)break;
+    await new Promise(resolve=>setTimeout(resolve,350*(attempt+1)));
+  }
+
+  if(!saved || saved.error){
+    running=true;
+    if(player)player.alive=wasAlive;
+    if(ui.leaveBattleBtn){
+      ui.leaveBattleBtn.disabled=false;
+      ui.leaveBattleBtn.textContent='나가기';
+    }
+    alert('점수 정산에 실패했습니다. 인터넷 연결을 확인한 뒤 다시 나가기를 눌러주세요.');
+    return;
+  }
+
+  if(player?.alive){
+    player.alive=false;
+    broadcastLocalState(true);
+  }
+
+  await disconnectOnlineArena();
+  window.IronCellAuth?.showLobby?.();
+
+  if(ui.leaveBattleBtn){
+    ui.leaveBattleBtn.disabled=false;
+    ui.leaveBattleBtn.textContent='나가기';
+  }
+}
 function killPlayer(killerId=''){
   if(!player.alive)return;
   player.alive=false;
@@ -351,11 +494,9 @@ function killPlayer(killerId=''){
   ui.deathLevel.textContent=player.level;
   ui.deathScore.textContent=player.score.toLocaleString();
   ui.deathKills.textContent=player.kills;
-  if(ui.deathGems)ui.deathGems.textContent=(player.score*2).toLocaleString();
+  if(ui.deathGems)ui.deathGems.textContent=(player.score*5).toLocaleString();
   ui.deathScreen.classList.add('show');
-  void window.IronCellAuth?.finishRun?.({
-    pilotName:player.name,level:player.level,score:player.score,kills:player.kills
-  });
+  void saveCurrentRun(true);
 }
 
 function pointSegmentDistanceSq(px,py,ax,ay,bx,by){
@@ -659,6 +800,14 @@ function update(dt){
   updateParticles(dt);
   cameraUpdate();
   broadcastLocalState();
+
+  // 진행 중에도 주기적으로 누적 점수를 서버에 정산한다.
+  // 브라우저를 갑자기 닫더라도 최근 점수까지 최대한 보존된다.
+  const now=performance.now();
+  if(player?.alive&&now-lastRunAutosave>=8000){
+    lastRunAutosave=now;
+    void saveCurrentRun(false);
+  }
 }
 function render(){
   ctx.save();
@@ -685,6 +834,9 @@ async function startGame(){
   }
 
   player=defaultPlayer();
+  player.runId=makeRunId();
+  lastRunAutosave=performance.now();
+  runSaveBusy=false;
   player.name=(ui.nameInput.value.trim()||window.IronCellAuth.username||'PLAYER').slice(0,14);
   player.cannonType=window.IronCellAuth.getCannon?.()?.id||'standard';
   // Online players do not all spawn on exactly the same point.
@@ -703,7 +855,7 @@ async function startGame(){
   updateUI();
   broadcastLocalState(true);
 }
-ui.startBtn.onclick=()=>void startGame();ui.respawnBtn.onclick=()=>{ui.deathScreen.classList.remove('show');running=false;void disconnectOnlineArena();window.IronCellAuth?.showLobby?.();};ui.pauseBtn.onclick=()=>{if(!running||!player.alive)return;paused=!paused;ui.pauseBtn.textContent=paused?'▶':'Ⅱ'};
+ui.startBtn.onclick=()=>void startGame();ui.leaveBattleBtn.onclick=()=>void leaveBattleToLobby();ui.respawnBtn.onclick=()=>{ui.deathScreen.classList.remove('show');running=false;void disconnectOnlineArena();window.IronCellAuth?.showLobby?.();};
 addEventListener('keydown',e=>{input.keys.add(e.code);if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()});addEventListener('keyup',e=>input.keys.delete(e.code));addEventListener('mousemove',e=>{input.mouseX=e.clientX;input.mouseY=e.clientY});addEventListener('mousedown',e=>{if(e.button===0)input.firing=true});addEventListener('mouseup',e=>{if(e.button===0)input.firing=false});addEventListener('blur',()=>{input.firing=false;input.mobileAimActive=false;input.keys.clear()});
 const moveZone=document.querySelector('#mobileMove'),knob=moveZone.querySelector('.stick-knob');let moveTouch=null;function moveTouchUpdate(t){const r=moveZone.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=t.clientX-cx,dy=t.clientY-cy;const max=42,d=Math.hypot(dx,dy)||1;if(d>max){dx=dx/d*max;dy=dy/d*max}input.moveX=dx/max;input.moveY=dy/max;knob.style.transform=`translate(${dx}px,${dy}px)`}moveZone.addEventListener('touchstart',e=>{const t=e.changedTouches[0];moveTouch=t.identifier;moveTouchUpdate(t);e.preventDefault()},{passive:false});moveZone.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===moveTouch)moveTouchUpdate(t);e.preventDefault()},{passive:false});function endMove(e){for(const t of e.changedTouches)if(t.identifier===moveTouch){moveTouch=null;input.moveX=0;input.moveY=0;knob.style.transform='none'}}moveZone.addEventListener('touchend',endMove,{passive:false});moveZone.addEventListener('touchcancel',endMove,{passive:false});
 const aimZone=document.querySelector('#mobileAim');let aimTouch=null;function aimUpdate(t){input.mouseX=t.clientX;input.mouseY=t.clientY;input.firing=true;input.mobileAimActive=true}aimZone.addEventListener('touchstart',e=>{const t=e.changedTouches[0];aimTouch=t.identifier;aimUpdate(t);e.preventDefault()},{passive:false});aimZone.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===aimTouch)aimUpdate(t);e.preventDefault()},{passive:false});function endAim(e){for(const t of e.changedTouches)if(t.identifier===aimTouch){aimTouch=null;input.firing=false;input.mobileAimActive=false}}aimZone.addEventListener('touchend',endAim,{passive:false});aimZone.addEventListener('touchcancel',endAim,{passive:false});
@@ -723,6 +875,12 @@ window.IronCellGame = {
   }
 };
 
-window.addEventListener('pagehide',()=>{void disconnectOnlineArena()});
+window.addEventListener('pagehide',()=>{
+  if(running&&player?.runId)void saveCurrentRun(false);
+  void disconnectOnlineArena();
+});
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden&&running&&player?.alive)void saveCurrentRun(false);
+});
 player=defaultPlayer();populate();updateUI();
 })();

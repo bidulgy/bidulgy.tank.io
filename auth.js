@@ -40,7 +40,7 @@ const els = {
   miniCannon: document.querySelector('#miniCannon'),
   collection: document.querySelector('#cannonCollection'),
   cannonCount: document.querySelector('#cannonCountText'),
-  pullCannon: document.querySelector('#pullCannonBtn'),
+  multiPullButtons: Array.from(document.querySelectorAll('[data-pull-count]')),
   gachaMessage: document.querySelector('#gachaMessage'),
   garageLobby: document.querySelector('#garageLobbyBtn'),
   garageBackLobby: document.querySelector('#garageBackLobbyBtn'),
@@ -70,7 +70,7 @@ const CANNONS=Object.freeze({
   },
   spread:{
     id:'spread',name:'산탄포',rarity:'rare',rarityLabel:'희귀',
-    chance:.55,desc:'한 번에 5개의 산탄을 넓게 퍼뜨립니다.'
+    chance:25,desc:'한 번에 5개의 산탄을 넓게 퍼뜨립니다.'
   },
   piercer:{
     id:'piercer',name:'관통포',rarity:'epic',rarityLabel:'에픽',
@@ -202,7 +202,16 @@ function renderCannonGarage(){
   if(els.equippedCannonRarity){els.equippedCannonRarity.textContent=equipped.rarityLabel;els.equippedCannonRarity.className=`rarity ${equipped.rarity}`}
   if(els.miniCannon)els.miniCannon.className=`mini-cannon cannon-${equipped.id}`;
   if(els.cannonCount)els.cannonCount.textContent=`${owned.size} / ${Object.keys(CANNONS).length}`;
-  if(els.pullCannon){els.pullCannon.disabled=Number(profile.gems||0)<100;els.pullCannon.textContent=Number(profile.gems||0)>=100?'대포 뽑기':'보석 부족'}
+  if(els.multiPullButtons?.length){
+    const gems=Number(profile.gems||0);
+    for(const button of els.multiPullButtons){
+      const count=Math.max(1,Number(button.dataset.pullCount||1));
+      const cost=count*100;
+      button.disabled=authBusy||gems<cost;
+      button.classList.toggle('unaffordable',gems<cost);
+      button.title=gems<cost?`보석이 ${(cost-gems).toLocaleString()}개 부족합니다`:`${count.toLocaleString()}회 뽑기`;
+    }
+  }
   if(els.collection){
     els.collection.innerHTML=Object.values(CANNONS).map(c=>{
       const own=owned.has(c.id),eq=equipped.id===c.id;
@@ -275,17 +284,66 @@ function showDeploy(){
 }
 function showMenu(){showLobby()}
 
-async function pullCannon(){
+function pullResultSummary(data){
+  const counts=data?.counts||{};
+  const order=['error','nova','ring','rocket','plasma','piercer','spread','rapid'];
+  const parts=[];
+  for(const id of order){
+    const n=Number(counts[id]||0);
+    if(n>0){
+      const c=CANNONS[id];
+      parts.push(`${c?.rarityLabel||id} ${n.toLocaleString()}개`);
+    }
+  }
+  const newIds=Array.isArray(data?.new_cannons)?data.new_cannons:[];
+  const newText=newIds.length
+    ? ` · 신규 ${newIds.map(id=>CANNONS[id]?.name||id).join(', ')}`
+    : '';
+  return `${Number(data?.count||0).toLocaleString()}회 결과 · ${parts.join(' · ')}${newText}`;
+}
+
+async function pullCannons(count=1){
   if(authBusy||!currentUser)return;
-  if(Number(profile?.gems||0)<100){setGachaMessage('보석이 100개 필요합니다.','error');return}
-  setBusy(true);setGachaMessage('대포 캡슐을 개봉하는 중...');
+  count=Math.floor(Number(count||1));
+  const allowed=new Set([1,5,10,50,100,500,1000]);
+  if(!allowed.has(count))return;
+
+  const cost=count*100;
+  const gems=Number(profile?.gems||0);
+  if(gems<cost){
+    setGachaMessage(`보석이 ${cost.toLocaleString()}개 필요합니다. (현재 ${gems.toLocaleString()}개)`,'error');
+    return;
+  }
+
+  setBusy(true);
+  renderProfile();
+  setGachaMessage(`${count.toLocaleString()}회 뽑는 중...`);
+
   try{
-    const {data,error}=await client.rpc('iron_cell_pull_cannon_v1');if(error)throw error;
-    const cannon=CANNONS[data?.cannon]||CANNONS.standard;
-    profile.gems=Number(data?.gems||0);profile.owned_cannons=data?.owned_cannons||profile.owned_cannons;renderProfile();
-    setGachaMessage(`${data?.is_new?'새 대포 획득!':'중복 대포!'} [${cannon.rarityLabel}] ${cannon.name}`,`rarity-${cannon.rarity}`);
-  }catch(error){console.error(error);setGachaMessage(String(error?.message||'').includes('not_enough_gems')?'보석이 부족합니다.':'뽑기에 실패했습니다.','error')}
-  finally{setBusy(false);renderProfile()}
+    const {data,error}=await client.rpc('iron_cell_pull_cannons_v2',{p_count:count});
+    if(error)throw error;
+
+    profile.gems=Number(data?.gems||0);
+    profile.owned_cannons=data?.owned_cannons||profile.owned_cannons;
+    renderProfile();
+
+    const rarest=String(data?.rarest||'common');
+    setGachaMessage(pullResultSummary(data),`rarity-${rarest}`);
+  }catch(error){
+    console.error(error);
+    const message=String(error?.message||'');
+    setGachaMessage(
+      message.includes('not_enough_gems')
+        ? '보석이 부족합니다.'
+        : message.includes('invalid_pull_count')
+          ? '지원하지 않는 뽑기 횟수입니다.'
+          : '뽑기에 실패했습니다.',
+      'error'
+    );
+  }finally{
+    setBusy(false);
+    renderProfile();
+  }
 }
 async function equipCannon(cannonId){
   if(authBusy||!currentUser)return;const cannon=CANNONS[cannonId];if(!cannon)return;
@@ -422,26 +480,39 @@ async function savePilotName(name){
   if(error) console.warn('Pilot name save failed:', error);
 }
 
-async function finishRun(run){
-  if(!currentUser || !run) return profile;
+async function saveRun(run, finish=false){
+  if(!currentUser || !run) return {profile,awarded_gems:0,awarded_score:0};
 
   const pilotName = escapePilotName(run.pilotName || els.pilotName?.value);
+  const runId = String(run.runId || '').slice(0,80);
+  if(!runId) return {profile,awarded_gems:0,awarded_score:0};
 
-  const {data, error} = await client.rpc('iron_cell_finish_run_v1', {
+  const {data, error} = await client.rpc('iron_cell_save_run_v2', {
+    p_run_id: runId,
     p_pilot_name: pilotName,
     p_level: Math.max(1, Math.floor(Number(run.level || 1))),
     p_score: Math.max(0, Math.floor(Number(run.score || 0))),
-    p_kills: Math.max(0, Math.floor(Number(run.kills || 0)))
+    p_kills: Math.max(0, Math.floor(Number(run.kills || 0))),
+    p_finish: !!finish
   });
 
   if(error){
     console.error('Run save failed:', error);
-    return profile;
+    return {profile,awarded_gems:0,awarded_score:0,error};
   }
 
-  profile = Array.isArray(data) ? (data[0] || profile) : (data || profile);
+  const result = data || {};
+  if(result.profile) profile = result.profile;
   renderProfile();
-  return profile;
+  return result;
+}
+
+async function finishRun(run){
+  return saveRun(run,true);
+}
+
+async function saveRunProgress(run){
+  return saveRun(run,false);
 }
 
 async function refreshProfile(){
@@ -475,7 +546,9 @@ async function boot(){
 els.login?.addEventListener('click', login);
 els.signup?.addEventListener('click', signup);
 els.logout?.addEventListener('click', logout);
-els.pullCannon?.addEventListener('click',()=>void pullCannon());
+for(const button of els.multiPullButtons||[]){
+  button.addEventListener('click',()=>void pullCannons(Number(button.dataset.pullCount||1)));
+}
 els.garageLobby?.addEventListener('click',showLobby);
 els.garageBackLobby?.addEventListener('click',showLobby);
 els.lobbyBattle?.addEventListener('click',showDeploy);
@@ -508,12 +581,13 @@ window.IronCellAuth = {
   signup,
   logout,
   finishRun,
+  saveRunProgress,
   savePilotName,
   refreshProfile,
   showLobby,
   showGarage,
   showDeploy,
-  pullCannon,
+  pullCannons,
   equipCannon,
   getCannon(){return currentCannon();}
 };
