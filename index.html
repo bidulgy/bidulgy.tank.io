@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <meta name="theme-color" content="#101827" />
+  <title>Iron Cell Arena</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game"></canvas>
+    <header class="top-ui">
+      <div class="brand"><strong>IRON CELL</strong><span>ARENA</span></div>
+      <div class="hud-center">
+        <div class="level-line"><span>LV <b id="levelText">1</b></span><span class="score">SCORE <b id="scoreText">0</b></span></div>
+        <div class="xp-track"><div id="xpBar" class="xp-fill"></div></div>
+      </div>
+      <button id="pauseBtn" class="round-btn" type="button">Ⅱ</button>
+    </header>
+    <aside id="upgradePanel" class="upgrade-panel">
+      <div class="upgrade-head"><strong>강화 포인트</strong><span id="pointText">0</span></div>
+      <div id="upgradeList"></div>
+    </aside>
+    <section id="classPanel" class="class-panel hidden">
+      <div class="panel-card"><small>LEVEL 15 CLASS UPGRADE</small><h2>전투형을 선택하세요</h2><div id="classChoices" class="class-choices"></div></div>
+    </section>
+
+    <section id="authScreen" class="overlay show">
+      <div class="start-card auth-card">
+        <div class="logo-mark">◈</div>
+        <small class="eyebrow">IRON CELL NETWORK</small>
+        <h1>계정 로그인</h1>
+        <p>같은 계정으로 PC·모바일에서 기록을 공유합니다.</p>
+
+        <div class="auth-form">
+          <label>
+            아이디
+            <input id="usernameInput" maxlength="20" autocomplete="username"
+                   autocapitalize="none" spellcheck="false"
+                   placeholder="영문 소문자 / 숫자 / _" />
+          </label>
+          <label>
+            비밀번호
+            <input id="passwordInput" type="password" minlength="6"
+                   autocomplete="current-password" placeholder="6자 이상" />
+          </label>
+        </div>
+
+        <div class="auth-buttons">
+          <button id="loginBtn" class="primary" type="button">로그인</button>
+          <button id="signupBtn" class="secondary-action" type="button">회원가입</button>
+        </div>
+
+        <div id="authMessage" class="auth-message" aria-live="polite"></div>
+        <small class="auth-note">기존 Pigeon Defense 계정이 있으면 같은 아이디/비밀번호로 로그인할 수 있습니다.</small>
+      </div>
+    </section>
+
+    <section id="startScreen" class="overlay">
+      <div class="start-card">
+        <div class="logo-mark">◈</div><h1>IRON CELL ARENA</h1>
+        <p>탱크를 성장시키고 도형과 적 전차를 파괴하며 오래 살아남으세요.</p>
+
+        <div class="account-summary">
+          <div>
+            <small>로그인 계정</small>
+            <strong id="accountUsername">-</strong>
+          </div>
+          <div class="record-grid">
+            <span>최고 LV <b id="bestLevelText">1</b></span>
+            <span>최고 점수 <b id="bestScoreText">0</b></span>
+            <span>최고 처치 <b id="bestKillsText">0</b></span>
+          </div>
+          <button id="logoutBtn" class="logout-button" type="button">로그아웃</button>
+        </div>
+
+        <label>파일럿 이름<input id="nameInput" maxlength="14" value="PLAYER" /></label>
+        <button id="startBtn" class="primary" type="button">전투 시작</button>
+        <div class="controls"><span><b>PC</b> WASD 이동 · 마우스 조준 · 클릭 발사</span><span><b>모바일</b> 왼쪽 조이스틱 이동 · 오른쪽 화면 드래그 조준/연사</span></div>
+      </div>
+    </section>
+    <section id="deathScreen" class="overlay">
+      <div class="start-card compact">
+        <small>전투 종료</small><h2>탱크가 파괴되었습니다</h2>
+        <div class="death-stats"><span>레벨 <b id="deathLevel">1</b></span><span>점수 <b id="deathScore">0</b></span><span>처치 <b id="deathKills">0</b></span></div>
+        <button id="respawnBtn" class="primary" type="button">다시 출격</button>
+      </div>
+    </section>
+    <div id="mobileMove" class="joystick left-stick"><div class="stick-base"><div class="stick-knob"></div></div></div>
+    <div id="mobileAim" class="aim-zone"></div>
+    <div class="mobile-tip">왼쪽 이동 · 오른쪽 조준/발사</div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script src="./game.js"></script>
+</body>
+</html>
