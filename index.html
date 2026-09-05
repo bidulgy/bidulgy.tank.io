@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <meta name="theme-color" content="#101827" />
   <title>Iron Cell Arena</title>
-  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="./style.css?v=58" />
 </head>
 <body>
   <div id="app">
@@ -16,7 +16,9 @@
         <div class="level-line"><span>LV <b id="levelText">1</b></span><span class="score">SCORE <b id="scoreText">0</b></span><span class="online-state">ONLINE <b id="onlineCount">1</b></span></div>
         <div class="xp-track"><div id="xpBar" class="xp-fill"></div></div>
       </div>
-      <button id="pauseBtn" class="round-btn" type="button">Ⅱ</button>
+      <div class="top-actions">
+        <button id="leaveBattleBtn" class="leave-battle-button" type="button" title="현재 점수를 보석으로 정산하고 로비로 나갑니다">나가기</button>
+      </div>
     </header>
     <aside id="upgradePanel" class="upgrade-panel">
       <div class="upgrade-head"><strong>강화 포인트</strong><span id="pointText">0</span></div>
@@ -161,9 +163,17 @@
               <p id="equippedCannonDesc">균형 잡힌 기본 단발포입니다.</p>
             </div>
             <div class="gacha-box">
-              <div class="gacha-price"><span>대포 1회 뽑기</span><strong>◆ 100</strong></div>
-              <button id="pullCannonBtn" class="gacha-button" type="button">대포 뽑기</button>
-              <small>전투 점수 1점마다 보석 2개 획득</small>
+              <div class="gacha-price"><span>대포 뽑기</span><strong>1회 ◆ 100</strong></div>
+              <div id="multiPullButtons" class="multi-pull-grid">
+                <button class="gacha-button multi-pull" data-pull-count="1" type="button"><b>1회</b><small>◆ 100</small></button>
+                <button class="gacha-button multi-pull" data-pull-count="5" type="button"><b>5회</b><small>◆ 500</small></button>
+                <button class="gacha-button multi-pull" data-pull-count="10" type="button"><b>10회</b><small>◆ 1,000</small></button>
+                <button class="gacha-button multi-pull" data-pull-count="50" type="button"><b>50회</b><small>◆ 5,000</small></button>
+                <button class="gacha-button multi-pull" data-pull-count="100" type="button"><b>100회</b><small>◆ 10,000</small></button>
+                <button class="gacha-button multi-pull" data-pull-count="500" type="button"><b>500회</b><small>◆ 50,000</small></button>
+                <button class="gacha-button multi-pull wide" data-pull-count="1000" type="button"><b>1000회</b><small>◆ 100,000</small></button>
+              </div>
+              <small>전투 점수 1점마다 보석 5개 획득 · 여러 번 뽑기도 서버에서 한 번에 처리</small>
               <div class="gacha-rates">
                 <span class="common">일반 <b>60%</b></span>
                 <span class="rare">희귀 <b>25%</b></span>
@@ -206,7 +216,7 @@
           <strong id="deployCannonName">기본포</strong>
           <small id="deployCannonDesc">균형 잡힌 기본 단발포입니다.</small>
         </div>
-        <div class="deploy-reward">점수 <b>1</b> = 보석 <b>2</b></div>
+        <div class="deploy-reward">점수 <b>1</b> = 보석 <b>5</b></div>
         <div id="networkStatus" class="network-status waiting"><span></span>온라인 서버 대기</div>
         <button id="startBtn" class="primary" type="button">전투 시작</button>
         <button id="backLobbyBtn" class="secondary-action" type="button">로비로 돌아가기</button>
@@ -225,7 +235,7 @@
     <div class="mobile-tip">왼쪽 이동 · 오른쪽 드래그 조준/발사 · 조준선 표시</div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./auth.js"></script>
-  <script src="./game.js"></script>
+  <script src="./auth.js?v=58"></script>
+  <script src="./game.js?v=58"></script>
 </body>
 </html>

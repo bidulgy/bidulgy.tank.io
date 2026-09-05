@@ -303,13 +303,29 @@ function pullResultSummary(data){
 }
 
 async function pullCannons(count=1){
-  if(authBusy||!currentUser)return;
+  if(authBusy){
+    setGachaMessage('잠시 후 다시 눌러주세요.','error');
+    return;
+  }
+  if(!currentUser){
+    setGachaMessage('로그인이 필요합니다.','error');
+    return;
+  }
   count=Math.floor(Number(count||1));
   const allowed=new Set([1,5,10,50,100,500,1000]);
   if(!allowed.has(count))return;
 
   const cost=count*100;
-  const gems=Number(profile?.gems||0);
+  let gems=Number(profile?.gems||0);
+
+  // If the local wallet is stale, refresh once before blocking the pull.
+  if(gems<cost){
+    try{
+      await refreshProfile();
+      gems=Number(profile?.gems||0);
+    }catch(_){}
+  }
+
   if(gems<cost){
     setGachaMessage(`보석이 ${cost.toLocaleString()}개 필요합니다. (현재 ${gems.toLocaleString()}개)`,'error');
     return;
@@ -332,14 +348,15 @@ async function pullCannons(count=1){
   }catch(error){
     console.error(error);
     const message=String(error?.message||'');
-    setGachaMessage(
+    const friendly =
       message.includes('not_enough_gems')
         ? '보석이 부족합니다.'
         : message.includes('invalid_pull_count')
           ? '지원하지 않는 뽑기 횟수입니다.'
-          : '뽑기에 실패했습니다.',
-      'error'
-    );
+          : message.includes('not_authenticated')
+            ? '로그인이 만료되었습니다. 다시 로그인해 주세요.'
+            : `뽑기 오류: ${message || '서버 요청 실패'}`;
+    setGachaMessage(friendly,'error');
   }finally{
     setBusy(false);
     renderProfile();
@@ -546,9 +563,22 @@ async function boot(){
 els.login?.addEventListener('click', login);
 els.signup?.addEventListener('click', signup);
 els.logout?.addEventListener('click', logout);
-for(const button of els.multiPullButtons||[]){
-  button.addEventListener('click',()=>void pullCannons(Number(button.dataset.pullCount||1)));
-}
+// Gacha buttons use delegated events so both the new multi-pull UI
+// and an older cached/single-button index.html continue to work.
+document.addEventListener('click', event => {
+  const target = event.target instanceof Element ? event.target : null;
+  const button = target?.closest?.('[data-pull-count], #pullCannonBtn');
+  if(!button) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const count = button.id === 'pullCannonBtn'
+    ? 1
+    : Number(button.dataset.pullCount || 1);
+
+  void pullCannons(count);
+}, true);
 els.garageLobby?.addEventListener('click',showLobby);
 els.garageBackLobby?.addEventListener('click',showLobby);
 els.lobbyBattle?.addEventListener('click',showDeploy);
