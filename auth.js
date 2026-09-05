@@ -19,12 +19,13 @@ const client = window.supabase.createClient(
 const els = {
   authScreen: document.querySelector('#authScreen'),
   startScreen: document.querySelector('#startScreen'),
+  lobbyScreen: document.querySelector('#lobbyScreen'),
   garageScreen: document.querySelector('#garageScreen'),
   username: document.querySelector('#usernameInput'),
   password: document.querySelector('#passwordInput'),
   login: document.querySelector('#loginBtn'),
   signup: document.querySelector('#signupBtn'),
-  logout: document.querySelector('#logoutBtn'),
+  logout: document.querySelector('#lobbyLogoutBtn'),
   message: document.querySelector('#authMessage'),
   accountUsername: document.querySelector('#accountUsername'),
   bestLevel: document.querySelector('#bestLevelText'),
@@ -41,19 +42,60 @@ const els = {
   cannonCount: document.querySelector('#cannonCountText'),
   pullCannon: document.querySelector('#pullCannonBtn'),
   gachaMessage: document.querySelector('#gachaMessage'),
-  garageBattle: document.querySelector('#garageBattleBtn'),
-  backGarage: document.querySelector('#backGarageBtn'),
+  garageLobby: document.querySelector('#garageLobbyBtn'),
+  garageBackLobby: document.querySelector('#garageBackLobbyBtn'),
+  lobbyBattle: document.querySelector('#lobbyBattleBtn'),
+  lobbyArsenal: document.querySelector('#lobbyArsenalBtn'),
+  backLobby: document.querySelector('#backLobbyBtn'),
+  lobbyUsername: document.querySelector('#lobbyUsername'),
+  lobbyGemText: document.querySelector('#lobbyGemText'),
+  lobbyCannonName: document.querySelector('#lobbyCannonName'),
+  lobbyCannonRarity: document.querySelector('#lobbyCannonRarity'),
+  lobbyCannonDesc: document.querySelector('#lobbyCannonDesc'),
+  lobbyMiniCannon: document.querySelector('#lobbyMiniCannon'),
+  lobbyBestLevel: document.querySelector('#lobbyBestLevel'),
+  lobbyBestScore: document.querySelector('#lobbyBestScore'),
+  lobbyBestKills: document.querySelector('#lobbyBestKills'),
   pilotName: document.querySelector('#nameInput')
 };
 
 const CANNONS=Object.freeze({
-  standard:{id:'standard',name:'기본포',rarity:'starter',rarityLabel:'STARTER',desc:'균형 잡힌 기본 단발포입니다.'},
-  rapid:{id:'rapid',name:'기관포',rarity:'common',rarityLabel:'COMMON',desc:'작은 탄환을 매우 빠르게 연속 발사합니다.'},
-  spread:{id:'spread',name:'산탄포',rarity:'common',rarityLabel:'COMMON',desc:'한 번에 5개의 산탄을 넓게 퍼뜨립니다.'},
-  piercer:{id:'piercer',name:'관통포',rarity:'rare',rarityLabel:'RARE',desc:'길쭉한 철갑탄이 여러 적을 연속 관통합니다.'},
-  plasma:{id:'plasma',name:'플라즈마포',rarity:'rare',rarityLabel:'RARE',desc:'큰 에너지 구체가 명중 지점에 범위 피해를 줍니다.'},
-  rocket:{id:'rocket',name:'로켓포',rarity:'epic',rarityLabel:'EPIC',desc:'느리지만 강력한 로켓이 넓은 폭발 피해를 줍니다.'},
-  ring:{id:'ring',name:'링 캐논',rarity:'legendary',rarityLabel:'LEGENDARY',desc:'에너지 링이 적들을 연속으로 꿰뚫으며 공격합니다.'}
+  standard:{
+    id:'standard',name:'기본포',rarity:'starter',rarityLabel:'기본',
+    chance:0,desc:'균형 잡힌 기본 단발포입니다.'
+  },
+  rapid:{
+    id:'rapid',name:'기관포',rarity:'common',rarityLabel:'일반',
+    chance:60,desc:'작은 탄환을 매우 빠르게 연속 발사합니다.'
+  },
+  spread:{
+    id:'spread',name:'산탄포',rarity:'rare',rarityLabel:'희귀',
+    chance:.55,desc:'한 번에 5개의 산탄을 넓게 퍼뜨립니다.'
+  },
+  piercer:{
+    id:'piercer',name:'관통포',rarity:'epic',rarityLabel:'에픽',
+    chance:10,desc:'길쭉한 철갑탄이 여러 적을 연속 관통합니다.'
+  },
+  plasma:{
+    id:'plasma',name:'플라즈마포',rarity:'legendary',rarityLabel:'전설',
+    chance:3,desc:'큰 에너지 구체가 명중 지점에 범위 피해를 줍니다.'
+  },
+  rocket:{
+    id:'rocket',name:'로켓포',rarity:'mythic',rarityLabel:'신화',
+    chance:1.2,desc:'느리지만 강력한 로켓이 넓은 폭발 피해를 줍니다.'
+  },
+  ring:{
+    id:'ring',name:'링 캐논',rarity:'secret',rarityLabel:'시크릿',
+    chance:.5,desc:'에너지 링이 적들을 연속으로 꿰뚫으며 공격합니다.'
+  },
+  nova:{
+    id:'nova',name:'노바 캐논',rarity:'galaxy',rarityLabel:'갤럭시',
+    chance:.25,desc:'별 모양 노바탄 3발이 퍼지며 관통과 소형 폭발을 동시에 일으킵니다.'
+  },
+  error:{
+    id:'error',name:'ERROR 캐논',rarity:'error',rarityLabel:'ERROR',
+    chance:.05,desc:'불안정한 글리치 탄환이 빠르게 관통하며 강력한 왜곡 폭발을 만듭니다.'
+  }
 });
 window.IronCellCannons=CANNONS;
 
@@ -162,7 +204,16 @@ function renderCannonGarage(){
   if(els.cannonCount)els.cannonCount.textContent=`${owned.size} / ${Object.keys(CANNONS).length}`;
   if(els.pullCannon){els.pullCannon.disabled=Number(profile.gems||0)<100;els.pullCannon.textContent=Number(profile.gems||0)>=100?'대포 뽑기':'보석 부족'}
   if(els.collection){
-    els.collection.innerHTML=Object.values(CANNONS).map(c=>{const own=owned.has(c.id),eq=equipped.id===c.id;return `<button type="button" class="cannon-card ${own?'':'locked'} ${eq?'equipped':''}" data-cannon="${c.id}" ${own?'':'disabled'}><div class="cannon-card-head"><strong>${c.name}</strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span></div><p>${own?c.desc:'아직 획득하지 않은 대포입니다.'}</p><div class="equip-label">${eq?'장착 중':own?'눌러서 장착':'미보유'}</div></button>`}).join('');
+    els.collection.innerHTML=Object.values(CANNONS).map(c=>{
+      const own=owned.has(c.id),eq=equipped.id===c.id;
+      const chance=c.id==='standard'?'기본 지급':`뽑기 ${c.chance}%`;
+      return `<button type="button" class="cannon-card rarity-card-${c.rarity} ${own?'':'locked'} ${eq?'equipped':''}" data-cannon="${c.id}" ${own?'':'disabled'}>
+        <div class="cannon-card-head"><strong>${c.name}</strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span></div>
+        <small class="cannon-chance">${chance}</small>
+        <p>${own?c.desc:'아직 획득하지 않은 대포입니다.'}</p>
+        <div class="equip-label">${eq?'장착 중':own?'눌러서 장착':'미보유'}</div>
+      </button>`;
+    }).join('');
     els.collection.querySelectorAll('.cannon-card:not(.locked)').forEach(b=>b.addEventListener('click',()=>void equipCannon(b.dataset.cannon)));
   }
 }
@@ -174,14 +225,55 @@ function renderProfile(){
   if(els.bestKills)els.bestKills.textContent=Number(profile.best_kills||0).toLocaleString();
   if(els.gemText)els.gemText.textContent=Number(profile.gems||0).toLocaleString();
   if(els.pilotName&&!els.pilotName.dataset.userEdited)els.pilotName.value=escapePilotName(profile.pilot_name||currentUsername);
+
+  const equipped=currentCannon();
+  if(els.lobbyUsername)els.lobbyUsername.textContent=currentUsername||'PLAYER';
+  if(els.lobbyGemText)els.lobbyGemText.textContent=Number(profile.gems||0).toLocaleString();
+  if(els.lobbyBestLevel)els.lobbyBestLevel.textContent=Number(profile.best_level||1).toLocaleString();
+  if(els.lobbyBestScore)els.lobbyBestScore.textContent=Number(profile.best_score||0).toLocaleString();
+  if(els.lobbyBestKills)els.lobbyBestKills.textContent=Number(profile.best_kills||0).toLocaleString();
+  if(els.lobbyCannonName)els.lobbyCannonName.textContent=equipped.name;
+  if(els.lobbyCannonDesc)els.lobbyCannonDesc.textContent=equipped.desc;
+  if(els.lobbyCannonRarity){
+    els.lobbyCannonRarity.textContent=equipped.rarityLabel;
+    els.lobbyCannonRarity.className=`rarity ${equipped.rarity}`;
+  }
+  if(els.lobbyMiniCannon)els.lobbyMiniCannon.className=`mini-cannon cannon-${equipped.id}`;
+
   renderCannonGarage();
 }
 
-function hideGameMenus(){els.startScreen?.classList.remove('show');els.garageScreen?.classList.remove('show')}
-function showAuth(){hideGameMenus();els.authScreen?.classList.add('show')}
-function showGarage(){els.authScreen?.classList.remove('show');els.startScreen?.classList.remove('show');els.garageScreen?.classList.add('show');renderProfile()}
-function showDeploy(){els.garageScreen?.classList.remove('show');els.authScreen?.classList.remove('show');els.startScreen?.classList.add('show');renderProfile()}
-function showMenu(){showGarage()}
+function hideGameMenus(){
+  els.startScreen?.classList.remove('show');
+  els.garageScreen?.classList.remove('show');
+  els.lobbyScreen?.classList.remove('show');
+}
+function showAuth(){
+  hideGameMenus();
+  els.authScreen?.classList.add('show');
+}
+function showLobby(){
+  els.authScreen?.classList.remove('show');
+  els.startScreen?.classList.remove('show');
+  els.garageScreen?.classList.remove('show');
+  els.lobbyScreen?.classList.add('show');
+  renderProfile();
+}
+function showGarage(){
+  els.authScreen?.classList.remove('show');
+  els.startScreen?.classList.remove('show');
+  els.lobbyScreen?.classList.remove('show');
+  els.garageScreen?.classList.add('show');
+  renderProfile();
+}
+function showDeploy(){
+  els.garageScreen?.classList.remove('show');
+  els.lobbyScreen?.classList.remove('show');
+  els.authScreen?.classList.remove('show');
+  els.startScreen?.classList.add('show');
+  renderProfile();
+}
+function showMenu(){showLobby()}
 
 async function pullCannon(){
   if(authBusy||!currentUser)return;
@@ -191,7 +283,7 @@ async function pullCannon(){
     const {data,error}=await client.rpc('iron_cell_pull_cannon_v1');if(error)throw error;
     const cannon=CANNONS[data?.cannon]||CANNONS.standard;
     profile.gems=Number(data?.gems||0);profile.owned_cannons=data?.owned_cannons||profile.owned_cannons;renderProfile();
-    setGachaMessage(`${data?.is_new?'새 대포 획득!':'중복 대포!'} ${cannon.name}`,cannon.rarity==='legendary'?'legendary':'good');
+    setGachaMessage(`${data?.is_new?'새 대포 획득!':'중복 대포!'} [${cannon.rarityLabel}] ${cannon.name}`,`rarity-${cannon.rarity}`);
   }catch(error){console.error(error);setGachaMessage(String(error?.message||'').includes('not_enough_gems')?'보석이 부족합니다.':'뽑기에 실패했습니다.','error')}
   finally{setBusy(false);renderProfile()}
 }
@@ -384,8 +476,11 @@ els.login?.addEventListener('click', login);
 els.signup?.addEventListener('click', signup);
 els.logout?.addEventListener('click', logout);
 els.pullCannon?.addEventListener('click',()=>void pullCannon());
-els.garageBattle?.addEventListener('click',showDeploy);
-els.backGarage?.addEventListener('click',showGarage);
+els.garageLobby?.addEventListener('click',showLobby);
+els.garageBackLobby?.addEventListener('click',showLobby);
+els.lobbyBattle?.addEventListener('click',showDeploy);
+els.lobbyArsenal?.addEventListener('click',showGarage);
+els.backLobby?.addEventListener('click',showLobby);
 
 els.password?.addEventListener('keydown', event => {
   if(event.key === 'Enter') login();
@@ -415,6 +510,7 @@ window.IronCellAuth = {
   finishRun,
   savePilotName,
   refreshProfile,
+  showLobby,
   showGarage,
   showDeploy,
   pullCannon,
