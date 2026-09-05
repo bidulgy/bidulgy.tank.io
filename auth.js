@@ -19,6 +19,7 @@ const client = window.supabase.createClient(
 const els = {
   authScreen: document.querySelector('#authScreen'),
   startScreen: document.querySelector('#startScreen'),
+  garageScreen: document.querySelector('#garageScreen'),
   username: document.querySelector('#usernameInput'),
   password: document.querySelector('#passwordInput'),
   login: document.querySelector('#loginBtn'),
@@ -29,8 +30,32 @@ const els = {
   bestLevel: document.querySelector('#bestLevelText'),
   bestScore: document.querySelector('#bestScoreText'),
   bestKills: document.querySelector('#bestKillsText'),
+  gemText: document.querySelector('#gemText'),
+  equippedCannonName: document.querySelector('#equippedCannonName'),
+  equippedCannonRarity: document.querySelector('#equippedCannonRarity'),
+  equippedCannonDesc: document.querySelector('#equippedCannonDesc'),
+  deployCannonName: document.querySelector('#deployCannonName'),
+  deployCannonDesc: document.querySelector('#deployCannonDesc'),
+  miniCannon: document.querySelector('#miniCannon'),
+  collection: document.querySelector('#cannonCollection'),
+  cannonCount: document.querySelector('#cannonCountText'),
+  pullCannon: document.querySelector('#pullCannonBtn'),
+  gachaMessage: document.querySelector('#gachaMessage'),
+  garageBattle: document.querySelector('#garageBattleBtn'),
+  backGarage: document.querySelector('#backGarageBtn'),
   pilotName: document.querySelector('#nameInput')
 };
+
+const CANNONS=Object.freeze({
+  standard:{id:'standard',name:'기본포',rarity:'starter',rarityLabel:'STARTER',desc:'균형 잡힌 기본 단발포입니다.'},
+  rapid:{id:'rapid',name:'기관포',rarity:'common',rarityLabel:'COMMON',desc:'작은 탄환을 매우 빠르게 연속 발사합니다.'},
+  spread:{id:'spread',name:'산탄포',rarity:'common',rarityLabel:'COMMON',desc:'한 번에 5개의 산탄을 넓게 퍼뜨립니다.'},
+  piercer:{id:'piercer',name:'관통포',rarity:'rare',rarityLabel:'RARE',desc:'길쭉한 철갑탄이 여러 적을 연속 관통합니다.'},
+  plasma:{id:'plasma',name:'플라즈마포',rarity:'rare',rarityLabel:'RARE',desc:'큰 에너지 구체가 명중 지점에 범위 피해를 줍니다.'},
+  rocket:{id:'rocket',name:'로켓포',rarity:'epic',rarityLabel:'EPIC',desc:'느리지만 강력한 로켓이 넓은 폭발 피해를 줍니다.'},
+  ring:{id:'ring',name:'링 캐논',rarity:'legendary',rarityLabel:'LEGENDARY',desc:'에너지 링이 적들을 연속으로 꿰뚫으며 공격합니다.'}
+});
+window.IronCellCannons=CANNONS;
 
 let currentUser = null;
 let currentUsername = '';
@@ -117,27 +142,63 @@ async function ensureProfile(){
   return profile;
 }
 
-function renderProfile(){
-  if(!profile || !currentUser) return;
-
-  if(els.accountUsername) els.accountUsername.textContent = currentUsername || 'PLAYER';
-  if(els.bestLevel) els.bestLevel.textContent = Number(profile.best_level || 1).toLocaleString();
-  if(els.bestScore) els.bestScore.textContent = Number(profile.best_score || 0).toLocaleString();
-  if(els.bestKills) els.bestKills.textContent = Number(profile.best_kills || 0).toLocaleString();
-
-  if(els.pilotName && !els.pilotName.dataset.userEdited){
-    els.pilotName.value = escapePilotName(profile.pilot_name || currentUsername);
+function ownedCannons(){
+  const raw=profile?.owned_cannons;
+  if(Array.isArray(raw))return raw;
+  if(typeof raw==='string'){try{const p=JSON.parse(raw);if(Array.isArray(p))return p}catch(_){}}
+  return ['standard'];
+}
+function currentCannon(){const id=String(profile?.equipped_cannon||'standard');return CANNONS[id]||CANNONS.standard}
+function setGachaMessage(text='',type=''){if(!els.gachaMessage)return;els.gachaMessage.textContent=text;els.gachaMessage.className=`gacha-message ${type}`.trim()}
+function renderCannonGarage(){
+  if(!profile)return;
+  const owned=new Set(ownedCannons());owned.add('standard');const equipped=currentCannon();
+  if(els.equippedCannonName)els.equippedCannonName.textContent=equipped.name;
+  if(els.equippedCannonDesc)els.equippedCannonDesc.textContent=equipped.desc;
+  if(els.deployCannonName)els.deployCannonName.textContent=equipped.name;
+  if(els.deployCannonDesc)els.deployCannonDesc.textContent=equipped.desc;
+  if(els.equippedCannonRarity){els.equippedCannonRarity.textContent=equipped.rarityLabel;els.equippedCannonRarity.className=`rarity ${equipped.rarity}`}
+  if(els.miniCannon)els.miniCannon.className=`mini-cannon cannon-${equipped.id}`;
+  if(els.cannonCount)els.cannonCount.textContent=`${owned.size} / ${Object.keys(CANNONS).length}`;
+  if(els.pullCannon){els.pullCannon.disabled=Number(profile.gems||0)<100;els.pullCannon.textContent=Number(profile.gems||0)>=100?'대포 뽑기':'보석 부족'}
+  if(els.collection){
+    els.collection.innerHTML=Object.values(CANNONS).map(c=>{const own=owned.has(c.id),eq=equipped.id===c.id;return `<button type="button" class="cannon-card ${own?'':'locked'} ${eq?'equipped':''}" data-cannon="${c.id}" ${own?'':'disabled'}><div class="cannon-card-head"><strong>${c.name}</strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span></div><p>${own?c.desc:'아직 획득하지 않은 대포입니다.'}</p><div class="equip-label">${eq?'장착 중':own?'눌러서 장착':'미보유'}</div></button>`}).join('');
+    els.collection.querySelectorAll('.cannon-card:not(.locked)').forEach(b=>b.addEventListener('click',()=>void equipCannon(b.dataset.cannon)));
   }
 }
-
-function showAuth(){
-  els.startScreen?.classList.remove('show');
-  els.authScreen?.classList.add('show');
+function renderProfile(){
+  if(!profile||!currentUser)return;
+  if(els.accountUsername)els.accountUsername.textContent=currentUsername||'PLAYER';
+  if(els.bestLevel)els.bestLevel.textContent=Number(profile.best_level||1).toLocaleString();
+  if(els.bestScore)els.bestScore.textContent=Number(profile.best_score||0).toLocaleString();
+  if(els.bestKills)els.bestKills.textContent=Number(profile.best_kills||0).toLocaleString();
+  if(els.gemText)els.gemText.textContent=Number(profile.gems||0).toLocaleString();
+  if(els.pilotName&&!els.pilotName.dataset.userEdited)els.pilotName.value=escapePilotName(profile.pilot_name||currentUsername);
+  renderCannonGarage();
 }
-function showMenu(){
-  els.authScreen?.classList.remove('show');
-  els.startScreen?.classList.add('show');
-  renderProfile();
+
+function hideGameMenus(){els.startScreen?.classList.remove('show');els.garageScreen?.classList.remove('show')}
+function showAuth(){hideGameMenus();els.authScreen?.classList.add('show')}
+function showGarage(){els.authScreen?.classList.remove('show');els.startScreen?.classList.remove('show');els.garageScreen?.classList.add('show');renderProfile()}
+function showDeploy(){els.garageScreen?.classList.remove('show');els.authScreen?.classList.remove('show');els.startScreen?.classList.add('show');renderProfile()}
+function showMenu(){showGarage()}
+
+async function pullCannon(){
+  if(authBusy||!currentUser)return;
+  if(Number(profile?.gems||0)<100){setGachaMessage('보석이 100개 필요합니다.','error');return}
+  setBusy(true);setGachaMessage('대포 캡슐을 개봉하는 중...');
+  try{
+    const {data,error}=await client.rpc('iron_cell_pull_cannon_v1');if(error)throw error;
+    const cannon=CANNONS[data?.cannon]||CANNONS.standard;
+    profile.gems=Number(data?.gems||0);profile.owned_cannons=data?.owned_cannons||profile.owned_cannons;renderProfile();
+    setGachaMessage(`${data?.is_new?'새 대포 획득!':'중복 대포!'} ${cannon.name}`,cannon.rarity==='legendary'?'legendary':'good');
+  }catch(error){console.error(error);setGachaMessage(String(error?.message||'').includes('not_enough_gems')?'보석이 부족합니다.':'뽑기에 실패했습니다.','error')}
+  finally{setBusy(false);renderProfile()}
+}
+async function equipCannon(cannonId){
+  if(authBusy||!currentUser)return;const cannon=CANNONS[cannonId];if(!cannon)return;
+  try{const {data,error}=await client.rpc('iron_cell_equip_cannon_v1',{p_cannon:cannonId});if(error)throw error;profile=data||profile;renderProfile();setGachaMessage(`${cannon.name} 장착 완료`,'good')}
+  catch(error){console.error(error);setGachaMessage('대포 장착에 실패했습니다.','error')}
 }
 
 async function enterSession(user){
@@ -322,6 +383,9 @@ async function boot(){
 els.login?.addEventListener('click', login);
 els.signup?.addEventListener('click', signup);
 els.logout?.addEventListener('click', logout);
+els.pullCannon?.addEventListener('click',()=>void pullCannon());
+els.garageBattle?.addEventListener('click',showDeploy);
+els.backGarage?.addEventListener('click',showGarage);
 
 els.password?.addEventListener('keydown', event => {
   if(event.key === 'Enter') login();
@@ -350,7 +414,12 @@ window.IronCellAuth = {
   logout,
   finishRun,
   savePilotName,
-  refreshProfile
+  refreshProfile,
+  showGarage,
+  showDeploy,
+  pullCannon,
+  equipCannon,
+  getCannon(){return currentCannon();}
 };
 
 void boot();

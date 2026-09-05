@@ -57,34 +57,73 @@
       </div>
     </section>
 
-    <section id="startScreen" class="overlay">
-      <div class="start-card">
-        <div class="logo-mark">◈</div><h1>IRON CELL ARENA</h1>
-        <p>탱크를 성장시키고 도형과 적 전차를 파괴하며 오래 살아남으세요.</p>
-
-        <div class="account-summary">
-          <div>
-            <small>로그인 계정</small>
-            <strong id="accountUsername">-</strong>
-          </div>
-          <div class="record-grid">
+    <section id="garageScreen" class="overlay">
+      <div class="garage-card">
+        <div class="garage-top">
+          <div><small class="eyebrow">IRON CELL HANGAR</small><h1>전투 격납고</h1></div>
+          <button id="logoutBtn" class="logout-button garage-logout" type="button">로그아웃</button>
+        </div>
+        <div class="garage-account">
+          <div><small>로그인 계정</small><strong id="accountUsername">-</strong></div>
+          <div class="gem-wallet"><span class="gem-icon">◆</span><div><small>보석</small><strong id="gemText">0</strong></div></div>
+        </div>
+        <div class="garage-grid">
+          <section class="cannon-panel">
+            <div class="section-head">
+              <div><small>현재 장착</small><h2 id="equippedCannonName">기본포</h2></div>
+              <span id="equippedCannonRarity" class="rarity starter">STARTER</span>
+            </div>
+            <div id="cannonPreview" class="cannon-preview">
+              <div class="mini-tank"><div class="mini-body"></div><div id="miniCannon" class="mini-cannon cannon-standard"></div></div>
+              <p id="equippedCannonDesc">균형 잡힌 기본 단발포입니다.</p>
+            </div>
+            <div class="gacha-box">
+              <div class="gacha-price"><span>대포 1회 뽑기</span><strong>◆ 100</strong></div>
+              <button id="pullCannonBtn" class="gacha-button" type="button">대포 뽑기</button>
+              <small>전투 점수 1점마다 보석 10개 획득</small>
+              <div id="gachaMessage" class="gacha-message"></div>
+            </div>
+          </section>
+          <section class="collection-panel">
+            <div class="section-head">
+              <div><small>보유 대포</small><h2>대포 컬렉션</h2></div>
+              <span id="cannonCountText" class="collection-count">1 / 7</span>
+            </div>
+            <div id="cannonCollection" class="cannon-collection"></div>
+          </section>
+        </div>
+        <div class="garage-footer">
+          <div class="record-strip">
             <span>최고 LV <b id="bestLevelText">1</b></span>
             <span>최고 점수 <b id="bestScoreText">0</b></span>
             <span>최고 처치 <b id="bestKillsText">0</b></span>
           </div>
-          <button id="logoutBtn" class="logout-button" type="button">로그아웃</button>
+          <label class="pilot-field">파일럿 이름<input id="nameInput" maxlength="14" value="PLAYER" /></label>
+          <button id="garageBattleBtn" class="primary battle-ready-button" type="button">전투 준비</button>
         </div>
+      </div>
+    </section>
 
-        <label>파일럿 이름<input id="nameInput" maxlength="14" value="PLAYER" /></label>
+    <section id="startScreen" class="overlay">
+      <div class="start-card deploy-card">
+        <small class="eyebrow">DEPLOYMENT READY</small>
+        <h1>출격 준비</h1>
+        <div class="deploy-cannon">
+          <span>장착 대포</span>
+          <strong id="deployCannonName">기본포</strong>
+          <small id="deployCannonDesc">균형 잡힌 기본 단발포입니다.</small>
+        </div>
+        <div class="deploy-reward">점수 <b>1</b> = 보석 <b>10</b></div>
         <button id="startBtn" class="primary" type="button">전투 시작</button>
-        <div class="controls"><span><b>PC</b> WASD 이동 · 마우스 조준 · 클릭 발사</span><span><b>모바일</b> 왼쪽 조이스틱 이동 · 오른쪽 화면 드래그 조준/연사</span></div>
+        <button id="backGarageBtn" class="secondary-action" type="button">격납고로 돌아가기</button>
+        <div class="controls"><span><b>PC</b> WASD 이동 · 마우스 조준 · 클릭 발사</span><span><b>모바일</b> 왼쪽 이동 · 오른쪽 조준/연사</span></div>
       </div>
     </section>
     <section id="deathScreen" class="overlay">
       <div class="start-card compact">
         <small>전투 종료</small><h2>탱크가 파괴되었습니다</h2>
-        <div class="death-stats"><span>레벨 <b id="deathLevel">1</b></span><span>점수 <b id="deathScore">0</b></span><span>처치 <b id="deathKills">0</b></span></div>
-        <button id="respawnBtn" class="primary" type="button">다시 출격</button>
+        <div class="death-stats four"><span>레벨 <b id="deathLevel">1</b></span><span>점수 <b id="deathScore">0</b></span><span>처치 <b id="deathKills">0</b></span><span>획득 보석 <b id="deathGems">0</b></span></div>
+        <button id="respawnBtn" class="primary" type="button">격납고로</button>
       </div>
     </section>
     <div id="mobileMove" class="joystick left-stick"><div class="stick-base"><div class="stick-knob"></div></div></div>
