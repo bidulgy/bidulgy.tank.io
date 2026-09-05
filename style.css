@@ -396,3 +396,34 @@
   .skill-copy strong{font-size:9px}
   .skill-copy small{font-size:8px}
 }
+
+
+/* ===== V5.10 MYTHIC+ SECOND SKILLS ===== */
+.skill-hud{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.skill2-button.hidden{display:none}
+.skill2-button{
+  border-color:rgba(255,255,255,.22);
+  background:rgba(13,11,28,.90);
+}
+.skill2-button .skill-key{
+  background:rgba(170,126,255,.15);
+}
+.skill2-button.cannon-rocket .skill-fill{background:#ffc06a}
+.skill2-button.cannon-ring .skill-fill{background:#dfc8ff}
+.skill2-button.cannon-nova .skill-fill{background:#8fa8ff}
+.skill2-button.cannon-error .skill-fill{
+  background:linear-gradient(90deg,#ff42dc,#72ff43,#42eaff)
+}
+.cannon-skill-line.second{
+  color:#eadcff;
+  background:rgba(168,114,255,.08);
+  border-color:rgba(187,143,255,.13);
+}
+@media(max-width:760px),(pointer:coarse){
+  .skill-hud{gap:5px}
+  .skill2-button .skill-key:after{content:"R";font-size:11px;font-weight:1000}
+}

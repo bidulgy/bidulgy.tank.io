@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <meta name="theme-color" content="#101827" />
   <title>Iron Cell Arena</title>
-  <link rel="stylesheet" href="./style.css?v=59" />
+  <link rel="stylesheet" href="./style.css?v=511" />
 </head>
 <body>
   <div id="app">
@@ -220,7 +220,7 @@
         <div id="networkStatus" class="network-status waiting"><span></span>온라인 서버 대기</div>
         <button id="startBtn" class="primary" type="button">전투 시작</button>
         <button id="backLobbyBtn" class="secondary-action" type="button">로비로 돌아가기</button>
-        <div class="controls"><span><b>PC</b> WASD 이동 · 마우스 조준 · 클릭 발사 · 전설 이상 Q 스킬</span><span><b>모바일</b> 왼쪽 이동 · 오른쪽 조준/연사 · 전설 이상 SKILL 버튼</span></div>
+        <div class="controls"><span><b>PC</b> WASD 이동 · 마우스 조준 · 클릭 발사 · 전설 이상 Q · 신화 이상 R</span><span><b>모바일</b> 왼쪽 이동 · 오른쪽 조준/연사 · Q/R 스킬 버튼</span></div>
       </div>
     </section>
     <section id="deathScreen" class="overlay">
@@ -240,14 +240,22 @@
           <small id="skillCooldown">READY</small>
         </span>
       </button>
+      <button id="skill2Btn" class="skill-button skill2-button hidden" type="button">
+        <i id="skill2Fill" class="skill-fill"></i>
+        <span class="skill-key">R</span>
+        <span class="skill-copy">
+          <strong id="skill2Name">SECOND SKILL</strong>
+          <small id="skill2Cooldown">READY</small>
+        </span>
+      </button>
     </div>
 
     <div id="mobileMove" class="joystick left-stick"><div class="stick-base"><div class="stick-knob"></div></div></div>
     <div id="mobileAim" class="aim-zone"></div>
-    <div class="mobile-tip">왼쪽 이동 · 오른쪽 조준/발사 · 전설 이상 SKILL</div>
+    <div class="mobile-tip">왼쪽 이동 · 오른쪽 조준/발사 · 전설 이상 Q · 신화 이상 R</div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./auth.js?v=59"></script>
-  <script src="./game.js?v=59"></script>
+  <script src="./auth.js?v=511"></script>
+  <script src="./game.js?v=511"></script>
 </body>
 </html>

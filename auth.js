@@ -82,19 +82,19 @@ const CANNONS=Object.freeze({
   },
   rocket:{
     id:'rocket',name:'로켓포',rarity:'mythic',rarityLabel:'신화',
-    chance:1.2,desc:'중장갑 로켓이 넓은 폭발 피해를 줍니다.',skill:'미사일 폭격 · 전방 다연장 로켓 일제사'
+    chance:1.2,desc:'중장갑 로켓이 넓은 폭발 피해를 줍니다.',skill:'Q 미사일 폭격 · 전방 다연장 로켓 일제사',skill2:'R 강철 요새 · 6초간 받는 피해 70% 감소'
   },
   ring:{
     id:'ring',name:'링 캐논',rarity:'secret',rarityLabel:'시크릿',
-    chance:.5,desc:'차원 에너지 링이 적들을 연속 관통합니다.',skill:'차원 절단 · 16방향 관통 링 방출'
+    chance:.5,desc:'차원 에너지 링이 적들을 연속 관통합니다.',skill:'Q 차원 절단 · 16방향 관통 링 방출',skill2:'R 공간 도약 · 조준 방향으로 장거리 순간이동'
   },
   nova:{
     id:'nova',name:'노바 캐논',rarity:'galaxy',rarityLabel:'갤럭시',
-    chance:.25,desc:'별 모양 노바탄이 관통과 폭발을 동시에 일으킵니다.',skill:'초신성 · 광역 폭발 + 노바탄 전방위 방출'
+    chance:.25,desc:'별 모양 노바탄이 관통과 폭발을 동시에 일으킵니다.',skill:'Q 초신성 · 광역 폭발 + 노바탄 전방위 방출',skill2:'R 중력 특이점 · 지속형 중력장을 생성해 적을 끌어당김'
   },
   error:{
     id:'error',name:'ERROR 캐논',rarity:'error',rarityLabel:'ERROR',
-    chance:.05,desc:'불안정한 글리치 탄환이 공간을 왜곡하며 관통합니다.',skill:'SYSTEM CRASH · 전방위 글리치 폭주'
+    chance:.05,desc:'불안정한 글리치 탄환이 공간을 왜곡하며 관통합니다.',skill:'Q SYSTEM CRASH · 전방위 글리치 폭주',skill2:'R OVERCLOCK.EXE · 6.5초간 초고속 이동/연사/탄속'
   }
 });
 window.IronCellCannons=CANNONS;
@@ -219,7 +219,7 @@ function renderCannonGarage(){
       return `<button type="button" class="cannon-card rarity-card-${c.rarity} ${own?'':'locked'} ${eq?'equipped':''}" data-cannon="${c.id}" ${own?'':'disabled'}>
         <div class="cannon-card-head"><strong>${c.name}</strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span></div>
         <small class="cannon-chance">${chance}</small>
-        <p>${own?c.desc:'아직 획득하지 않은 대포입니다.'}</p>${own&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}
+        <p>${own?c.desc:'아직 획득하지 않은 대포입니다.'}</p>${own&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}${own&&c.skill2?`<div class="cannon-skill-line second">◆ ${c.skill2}</div>`:''}
         <div class="equip-label">${eq?'장착 중':own?'눌러서 장착':'미보유'}</div>
       </button>`;
     }).join('');

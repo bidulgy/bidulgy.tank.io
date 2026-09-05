@@ -1,14 +1,18 @@
 (() => {
 'use strict';
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
-const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill')};
+const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill')};
 const TAU=Math.PI*2,WORLD=4200,GRID=56;
 const NORMAL_SHAPE_TARGET=95;
 const CENTRAL_PENTAGON_TARGET=220;
 const CENTRAL_PENTAGON_RADIUS=430;
-let running=false,paused=false,last=performance.now(),camera={x:0,y:0},shapes=[],bullets=[],particles=[],combatFx=[],shake=0,classUpgradeShown=false,player;
+const INITIAL_NORMAL_SHAPES=28;
+const INITIAL_CENTRAL_PENTAGONS=12;
+const NORMAL_SPAWN_INTERVAL=.45;
+const CENTRAL_SPAWN_INTERVAL=.11;
+let running=false,paused=false,last=performance.now(),camera={x:0,y:0},shapes=[],bullets=[],particles=[],combatFx=[],skillZones=[],shake=0,classUpgradeShown=false,player;
 const remotePlayers=new Map();
-let onlineChannel=null,onlineReady=false,onlineSelfId='',lastStateSend=0,networkSerial=0,lastRunAutosave=0,runSaveBusy=false;
+let onlineChannel=null,onlineReady=false,onlineSelfId='',lastStateSend=0,networkSerial=0,lastRunAutosave=0,runSaveBusy=false,normalSpawnTimer=0,centralSpawnTimer=0;
 const processedDamageIds=new Set();
 const input={keys:new Set(),mouseX:innerWidth/2,mouseY:innerHeight/2,firing:false,moveX:0,moveY:0,mobileAimActive:false};
 
@@ -18,6 +22,12 @@ const CANNON_SKILLS=Object.freeze({
   ring:{name:'차원 절단',cooldown:20,color:'#c09aff'},
   nova:{name:'초신성',cooldown:24,color:'#74efff'},
   error:{name:'SYSTEM CRASH',cooldown:27,color:'#7dff48'}
+});
+const CANNON_SKILLS_2=Object.freeze({
+  rocket:{name:'강철 요새',cooldown:28,color:'#ffc06a',kind:'fortress'},
+  ring:{name:'공간 도약',cooldown:16,color:'#e2caff',kind:'warp'},
+  nova:{name:'중력 특이점',cooldown:30,color:'#8fa8ff',kind:'gravity'},
+  error:{name:'OVERCLOCK.EXE',cooldown:34,color:'#ff46dc',kind:'overclock'}
 });
 const TANK_THEMES=Object.freeze({
   standard:{body:'#55a7ff',edge:'#2868ad',glow:'#68b8ff'},
@@ -32,7 +42,7 @@ const TANK_THEMES=Object.freeze({
 });
 
 const statsDef=[['maxHealth','최대 체력'],['regen','체력 회복'],['bulletDamage','탄환 피해'],['bulletSpeed','탄환 속도'],['reload','연사 속도'],['moveSpeed','이동 속도']];
-function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
+function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,skill2Cd:0,skill2Max:0,fortressUntil:0,overclockUntil:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
 function resize(){const dpr=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(innerWidth*dpr);canvas.height=Math.round(innerHeight*dpr);canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
 const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function dist2(a,b){const dx=a.x-b.x,dy=a.y-b.y;return dx*dx+dy*dy}function norm(dx,dy){const d=Math.hypot(dx,dy)||1;return[dx/d,dy/d]}
@@ -44,7 +54,7 @@ function spawnShape(type=null){
     type:t,x:rand(100,WORLD-100),y:rand(100,WORLD-100),
     r:c.r,hp:c.hp,maxHp:c.hp,xp:c.xp,sides:c.sides,
     angle:rand(0,TAU),spin:rand(-.35,.35),vx:0,vy:0,
-    centralCluster:false
+    centralCluster:false,spawnAge:0
   });
 }
 function spawnCentralPentagon(){
@@ -52,19 +62,29 @@ function spawnCentralPentagon(){
   const a=rand(0,TAU);
   const radius=Math.pow(Math.random(),1.85)*CENTRAL_PENTAGON_RADIUS;
   const jitter=rand(-12,12);
-  const x=clamp(WORLD/2+Math.cos(a)*(radius+jitter),70,WORLD-70);
-  const y=clamp(WORLD/2+Math.sin(a)*(radius+jitter),70,WORLD-70);
+  let x=clamp(WORLD/2+Math.cos(a)*(radius+jitter),70,WORLD-70);
+  let y=clamp(WORLD/2+Math.sin(a)*(radius+jitter),70,WORLD-70);
+  if(player?.alive){
+    const dx=x-player.x,dy=y-player.y,d=Math.hypot(dx,dy);
+    if(d<125){
+      const push=(125-d)+rand(20,65),n=d||1;
+      x=clamp(x+dx/n*push,70,WORLD-70);
+      y=clamp(y+dy/n*push,70,WORLD-70);
+    }
+  }
   shapes.push({
     type:'pentagon',
     x,y,r:34,hp:145,maxHp:145,xp:56,sides:5,
     angle:rand(0,TAU),spin:rand(-.42,.42),vx:0,vy:0,
-    centralCluster:true
+    centralCluster:true,spawnAge:0
   });
 }
 function populate(){
-  shapes=[];bullets=[];particles=[];
-  for(let i=0;i<NORMAL_SHAPE_TARGET;i++)spawnShape();
-  for(let i=0;i<CENTRAL_PENTAGON_TARGET;i++)spawnCentralPentagon();
+  shapes=[];bullets=[];particles=[];combatFx=[];skillZones=[];
+  normalSpawnTimer=0;
+  centralSpawnTimer=0;
+  for(let i=0;i<INITIAL_NORMAL_SHAPES;i++)spawnShape();
+  for(let i=0;i<INITIAL_CENTRAL_PENTAGONS;i++)spawnCentralPentagon();
 }
 
 function setNetworkStatus(state,text){
@@ -103,7 +123,7 @@ function upsertRemotePlayer(payload){
       tx:safeRemoteNumber(payload.x,WORLD/2),ty:safeRemoteNumber(payload.y,WORLD/2),
       angle:safeRemoteNumber(payload.angle,0),targetAngle:safeRemoteNumber(payload.angle,0),
       vx:0,vy:0,r:27,hp:120,maxHp:120,level:1,score:0,kills:0,
-      name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',lastSeen:performance.now()
+      name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',fortress:false,overclock:false,lastSeen:performance.now()
     };
     remotePlayers.set(id,r);
   }
@@ -118,6 +138,8 @@ function upsertRemotePlayer(payload){
   r.name=String(payload.name||r.name||'PLAYER').slice(0,14);
   r.cannonType=String(payload.cannonType||r.cannonType||'standard');
   r.classType=String(payload.classType||r.classType||'basic');
+  r.fortress=payload.fortress===true;
+  r.overclock=payload.overclock===true;
   r.alive=payload.alive!==false;
   r.lastSeen=performance.now();
 }
@@ -144,7 +166,8 @@ function localNetworkState(){
     hp:player.hp,maxHp:player.maxHp,
     level:player.level,score:player.score,kills:player.kills,
     name:player.name,cannonType:player.cannonType||'standard',
-    classType:player.classType||'basic',alive:!!player.alive
+    classType:player.classType||'basic',alive:!!player.alive,
+    fortress:performance.now()<(player.fortressUntil||0),overclock:performance.now()<(player.overclockUntil||0)
   };
 }
 function sendOnline(event,payload){
@@ -206,8 +229,11 @@ function receiveDamage(payload){
       processedDamageIds.delete(first);
     }
   }
-  const amount=Math.max(0,Math.min(5000,Number(payload?.amount)||0));
+  let amount=Math.max(0,Math.min(5000,Number(payload?.amount)||0));
   if(!amount)return;
+  const now=performance.now();
+  if(now<(player.phaseUntil||0))return;
+  if(now<(player.fortressUntil||0))amount*=.30;
   player.hp-=amount;
   player.regenTimer=0;
   burst(player.x,player.y,'#ff8a8a',5);
@@ -336,7 +362,15 @@ function playerParams(){
   if(cannon==='ring'){damage*=.86;bulletSpeed*=1.05;reload*=1.15}
   if(cannon==='nova'){damage*=1.20;bulletSpeed*=.92;reload*=1.42}
   if(cannon==='error'){damage*=2.55;bulletSpeed*=1.60;reload*=1.75}
-  return{damage,bulletSpeed,reload:Math.max(.07,reload),move};
+  const now=performance.now();
+  if(now<(player.fortressUntil||0)){move*=.70}
+  if(now<(player.overclockUntil||0)){
+    move*=1.65;
+    reload*=.38;
+    bulletSpeed*=1.25;
+    damage*=.92;
+  }
+  return{damage,bulletSpeed,reload:Math.max(.05,reload),move};
 }
 
 function spawnCombatFx(type,x,y,opts={}){
@@ -366,8 +400,33 @@ function receiveRemoteSkill(payload){
   if(!payload||String(payload.ownerId||'')===onlineSelfId)return;
   const cannon=String(payload.cannon||'');
   const x=safeRemoteNumber(payload.x),y=safeRemoteNumber(payload.y);
+  const angle=safeRemoteNumber(payload.angle);
+  const slot=Math.floor(safeRemoteNumber(payload.slot,1));
+
+  if(slot===2){
+    const def=CANNON_SKILLS_2[cannon];
+    if(!def)return;
+
+    if(cannon==='rocket'){
+      spawnCombatFx('skill2-rocket',x,y,{angle,color:def.color,life:1.1,radius:115,cannon});
+    }else if(cannon==='ring'){
+      const tx=safeRemoteNumber(payload.targetX,x),ty=safeRemoteNumber(payload.targetY,y);
+      spawnCombatFx('skill2-ring',x,y,{angle,color:def.color,life:.85,radius:100,cannon});
+      spawnCombatFx('skill2-ring',tx,ty,{angle,color:def.color,life:.85,radius:100,cannon});
+    }else if(cannon==='nova'){
+      const tx=safeRemoteNumber(payload.targetX,x),ty=safeRemoteNumber(payload.targetY,y);
+      skillZones.push({
+        type:'gravity',x:tx,y:ty,radius:330,life:5.5,maxLife:5.5,
+        damage:0,tick:0,ownerId:String(payload.ownerId||''),networkRemote:true
+      });
+    }else if(cannon==='error'){
+      spawnCombatFx('skill2-error',x,y,{angle,color:def.color,life:1.0,radius:135,cannon});
+    }
+    return;
+  }
+
   const color=CANNON_SKILLS[cannon]?.color||'#fff';
-  spawnCombatFx(`skill-${cannon}`,x,y,{angle:safeRemoteNumber(payload.angle),color,life:1.15,radius:cannon==='nova'?390:190,cannon});
+  spawnCombatFx(`skill-${cannon}`,x,y,{angle,color,life:1.15,radius:cannon==='nova'?390:190,cannon});
 }
 function skillProjectile(cannon,angle,opts={}){
   const p=playerParams();
@@ -409,10 +468,13 @@ function skillAreaDamage(x,y,radius,damage,color){
   }
 }
 function updateSkillHud(){
-  const def=CANNON_SKILLS[player?.cannonType||''];
+  const cannon=player?.cannonType||'';
+  const def=CANNON_SKILLS[cannon];
+  const def2=CANNON_SKILLS_2[cannon];
   const visible=!!(running&&player?.alive&&def);
   ui.skillHud?.classList.toggle('hidden',!visible);
   if(!visible)return;
+
   const cd=Math.max(0,player.skillCd||0);
   const max=Math.max(.01,player.skillMax||def.cooldown);
   const ready=cd<=.001;
@@ -421,7 +483,22 @@ function updateSkillHud(){
   if(ui.skillFill)ui.skillFill.style.width=`${clamp((1-cd/max)*100,0,100)}%`;
   if(ui.skillBtn){
     ui.skillBtn.disabled=!ready;
-    ui.skillBtn.className=`skill-button cannon-${player.cannonType} ${ready?'ready':'cooling'}`;
+    ui.skillBtn.className=`skill-button cannon-${cannon} ${ready?'ready':'cooling'}`;
+  }
+
+  const showSecond=!!def2;
+  ui.skill2Btn?.classList.toggle('hidden',!showSecond);
+  if(showSecond){
+    const cd2=Math.max(0,player.skill2Cd||0);
+    const max2=Math.max(.01,player.skill2Max||def2.cooldown);
+    const ready2=cd2<=.001;
+    if(ui.skill2Name)ui.skill2Name.textContent=def2.name;
+    if(ui.skill2Cooldown)ui.skill2Cooldown.textContent=ready2?'READY':`${cd2.toFixed(1)}s`;
+    if(ui.skill2Fill)ui.skill2Fill.style.width=`${clamp((1-cd2/max2)*100,0,100)}%`;
+    if(ui.skill2Btn){
+      ui.skill2Btn.disabled=!ready2;
+      ui.skill2Btn.className=`skill-button skill2-button cannon-${cannon} ${ready2?'ready':'cooling'}`;
+    }
   }
 }
 function activateSkill(){
@@ -451,6 +528,67 @@ function activateSkill(){
     for(let i=0;i<24;i++)skillProjectile('error',i*TAU/24+rand(-.035,.035),{damageMul:.65,speedMul:1.25,life:2.5,pierce:16,splashRadius:94});
     burst(player.x,player.y,'#79ff47',44);burst(player.x,player.y,'#ff46e8',20);shake=Math.max(shake,17);
   }
+  updateSkillHud();
+}
+
+function activateSkill2(){
+  if(!running||paused||!player?.alive)return;
+  const cannon=player.cannonType||'standard',def=CANNON_SKILLS_2[cannon];
+  if(!def||player.skill2Cd>0)return;
+
+  player.skill2Cd=def.cooldown;
+  player.skill2Max=def.cooldown;
+  const now=performance.now(),a=player.angle,p=playerParams();
+  const ox=player.x,oy=player.y;
+
+  if(cannon==='rocket'){
+    // 공격형 Q와 완전히 다른 방어형 스킬.
+    player.fortressUntil=now+6000;
+    player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.12);
+    sendOnline('skill',{slot:2,ownerId:onlineSelfId,cannon,x:player.x,y:player.y,angle:a});
+    spawnCombatFx('skill2-rocket',player.x,player.y,{angle:a,color:def.color,life:1.1,radius:115,cannon});
+    burst(player.x,player.y,'#ffc16d',24);
+    shake=Math.max(shake,5);
+    broadcastLocalState(true);
+
+  }else if(cannon==='ring'){
+    // 순수 기동/회피형 순간이동. 이동 도중 잠깐 무적.
+    const distance=720;
+    const tx=clamp(player.x+Math.cos(a)*distance,player.r+10,WORLD-player.r-10);
+    const ty=clamp(player.y+Math.sin(a)*distance,player.r+10,WORLD-player.r-10);
+    player.phaseUntil=now+700;
+    spawnCombatFx('skill2-ring',ox,oy,{angle:a,color:def.color,life:.85,radius:100,cannon});
+    player.x=tx;player.y=ty;player.vx=0;player.vy=0;
+    spawnCombatFx('skill2-ring',tx,ty,{angle:a,color:def.color,life:.85,radius:100,cannon});
+    burst(ox,oy,'#cdb4ff',18);burst(tx,ty,'#f0e6ff',22);
+    sendOnline('skill',{slot:2,ownerId:onlineSelfId,cannon,x:ox,y:oy,targetX:tx,targetY:ty,angle:a});
+    camera.x=player.x-innerWidth/2;camera.y=player.y-innerHeight/2;
+    broadcastLocalState(true);
+
+  }else if(cannon==='nova'){
+    // 일회 폭발 Q와 다른 지속형 제어 스킬.
+    const targetDistance=520;
+    const tx=clamp(player.x+Math.cos(a)*targetDistance,120,WORLD-120);
+    const ty=clamp(player.y+Math.sin(a)*targetDistance,120,WORLD-120);
+    skillZones.push({
+      type:'gravity',x:tx,y:ty,radius:330,life:5.5,maxLife:5.5,
+      damage:p.damage*.26,tick:0,ownerId:onlineSelfId,networkRemote:false
+    });
+    sendOnline('skill',{slot:2,ownerId:onlineSelfId,cannon,x:player.x,y:player.y,targetX:tx,targetY:ty,angle:a});
+    spawnCombatFx('skill2-nova',tx,ty,{angle:a,color:def.color,life:1.0,radius:125,cannon});
+    burst(tx,ty,'#9fb4ff',28);
+    shake=Math.max(shake,6);
+
+  }else if(cannon==='error'){
+    // 탄막 Q와 다른 자기 강화/속도형 스킬.
+    player.overclockUntil=now+6500;
+    sendOnline('skill',{slot:2,ownerId:onlineSelfId,cannon,x:player.x,y:player.y,angle:a});
+    spawnCombatFx('skill2-error',player.x,player.y,{angle:a,color:def.color,life:1.0,radius:135,cannon});
+    burst(player.x,player.y,'#74ff45',25);burst(player.x,player.y,'#ff42dc',20);
+    shake=Math.max(shake,7);
+    broadcastLocalState(true);
+  }
+
   updateSkillHud();
 }
 
@@ -512,9 +650,63 @@ function applySplashDamage(b,x,y){
   burst(x,y,b.cannon==='rocket'?'#ffb55f':'#69e6ff',b.cannon==='rocket'?22:14);
   shake=Math.max(shake,b.cannon==='rocket'?8:4);
 }
-function updatePlayer(dt){if(!player.alive)return;player.skillCd=Math.max(0,(player.skillCd||0)-dt);const p=playerParams();let mx=input.moveX,my=input.moveY;if(input.keys.has('KeyA')||input.keys.has('ArrowLeft'))mx-=1;if(input.keys.has('KeyD')||input.keys.has('ArrowRight'))mx+=1;if(input.keys.has('KeyW')||input.keys.has('ArrowUp'))my-=1;if(input.keys.has('KeyS')||input.keys.has('ArrowDown'))my+=1;if(mx||my){[mx,my]=norm(mx,my);player.vx+=mx*p.move*dt*5.2;player.vy+=my*p.move*dt*5.2}player.angle=Math.atan2(camera.y+input.mouseY-player.y,camera.x+input.mouseX-player.x);let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);if(input.firing||input.keys.has('Space'))fire(player);if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}
+
+function shapeContactDamage(s){
+  if(s.centralCluster)return 15;
+  if(s.type==='pentagon')return 12;
+  if(s.type==='triangle')return 8;
+  return 5;
+}
+function handleShapeContact(){
+  if(!player?.alive)return;
+  const now=performance.now();
+  let hitShape=null,hitDamage=0;
+
+  for(const s of shapes){
+    const dx=player.x-s.x,dy=player.y-s.y;
+    const minDist=player.r+s.r;
+    const d2=dx*dx+dy*dy;
+    if(d2>=minDist*minDist)continue;
+
+    const d=Math.sqrt(d2)||.001;
+    const nx=dx/d,ny=dy/d;
+    const overlap=minDist-d;
+
+    // 겹쳐진 탱크와 도형을 분리하고 충돌감을 준다.
+    player.x=clamp(player.x+nx*overlap*.58,player.r,WORLD-player.r);
+    player.y=clamp(player.y+ny*overlap*.58,player.r,WORLD-player.r);
+    player.vx+=nx*72;
+    player.vy+=ny*72;
+    s.vx-=nx*95;
+    s.vy-=ny*95;
+
+    const dmg=shapeContactDamage(s);
+    if(dmg>hitDamage){
+      hitDamage=dmg;
+      hitShape=s;
+    }
+  }
+
+  // 중앙의 많은 오각형과 동시에 겹쳐도 한 프레임에 피해가 수십 번 중첩되지 않게 한다.
+  if(!hitShape||player.shapeContactCd>0)return;
+  if(now<(player.phaseUntil||0))return;
+
+  let damage=hitDamage;
+  if(now<(player.fortressUntil||0))damage*=.30;
+
+  player.hp-=damage;
+  player.regenTimer=0;
+  player.shapeContactCd=.34;
+  burst(player.x,player.y,hitShape.centralCluster?'#8ca6ff':colorForShape(hitShape.type),7);
+  shake=Math.max(shake,4);
+
+  if(player.hp<=0)killPlayer('');
+}
+
+function updatePlayer(dt){if(!player.alive)return;player.skillCd=Math.max(0,(player.skillCd||0)-dt);player.skill2Cd=Math.max(0,(player.skill2Cd||0)-dt);player.shapeContactCd=Math.max(0,(player.shapeContactCd||0)-dt);const p=playerParams();let mx=input.moveX,my=input.moveY;if(input.keys.has('KeyA')||input.keys.has('ArrowLeft'))mx-=1;if(input.keys.has('KeyD')||input.keys.has('ArrowRight'))mx+=1;if(input.keys.has('KeyW')||input.keys.has('ArrowUp'))my-=1;if(input.keys.has('KeyS')||input.keys.has('ArrowDown'))my+=1;if(mx||my){[mx,my]=norm(mx,my);player.vx+=mx*p.move*dt*5.2;player.vy+=my*p.move*dt*5.2}player.angle=Math.atan2(camera.y+input.mouseY-player.y,camera.x+input.mouseX-player.x);let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);if(input.firing||input.keys.has('Space'))fire(player);handleShapeContact();if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}
 function updateShapes(dt){
   for(const s of shapes){
+    s.spawnAge=(s.spawnAge||0)+dt;
     s.angle+=s.spin*dt;
     s.x=clamp(s.x+s.vx*dt,s.r,WORLD-s.r);
     s.y=clamp(s.y+s.vy*dt,s.r,WORLD-s.r);
@@ -536,8 +728,21 @@ function updateShapes(dt){
     if(s.centralCluster)centralCount++;
     else normalCount++;
   }
-  while(normalCount<NORMAL_SHAPE_TARGET){spawnShape();normalCount++}
-  while(centralCount<CENTRAL_PENTAGON_TARGET){spawnCentralPentagon();centralCount++}
+
+  // 적은 한꺼번에 채우지 않고 시간이 지나며 조금씩 생성된다.
+  normalSpawnTimer-=dt;
+  centralSpawnTimer-=dt;
+
+  if(normalCount<NORMAL_SHAPE_TARGET&&normalSpawnTimer<=0){
+    spawnShape();
+    normalSpawnTimer=NORMAL_SPAWN_INTERVAL;
+  }
+
+  // 중앙 오각형 군집도 한 번에 220개가 생기지 않고 약 0.11초마다 1개씩 보충된다.
+  if(centralCount<CENTRAL_PENTAGON_TARGET&&centralSpawnTimer<=0){
+    spawnCentralPentagon();
+    centralSpawnTimer=CENTRAL_SPAWN_INTERVAL;
+  }
 }
 function makeRunId(){
   if(globalThis.crypto?.randomUUID)return crypto.randomUUID();
@@ -759,11 +964,46 @@ function updateBullets(dt){
 }
 function updateParticles(dt){for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.life-=dt;if(p.life<=0){particles.splice(i,1);continue}p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.pow(.04,dt);p.vy*=Math.pow(.04,dt)}}
 function updateCombatFx(dt){for(let i=combatFx.length-1;i>=0;i--){combatFx[i].life-=dt;if(combatFx[i].life<=0)combatFx.splice(i,1)}}
+function updateSkillZones(dt){
+  for(let zi=skillZones.length-1;zi>=0;zi--){
+    const z=skillZones[zi];
+    z.life-=dt;
+    if(z.life<=0){skillZones.splice(zi,1);continue}
+    if(z.networkRemote)continue;
+
+    z.tick-=dt;
+    const doTick=z.tick<=0;
+    if(doTick)z.tick=.22;
+
+    for(let i=shapes.length-1;i>=0;i--){
+      const s=shapes[i],dx=z.x-s.x,dy=z.y-s.y,d=Math.hypot(dx,dy)||1;
+      if(d>z.radius)continue;
+      const force=(1-d/z.radius)*820;
+      s.vx+=dx/d*force*dt;
+      s.vy+=dy/d*force*dt;
+      if(doTick){
+        s.hp-=z.damage;
+        burst(s.x,s.y,'#8da9ff',2);
+        if(s.hp<=0){
+          gainXp(s.xp);burst(s.x,s.y,colorForShape(s.type),10);shapes.splice(i,1);
+        }
+      }
+    }
+
+    if(doTick){
+      for(const enemy of remotePlayers.values()){
+        if(!enemy.alive)continue;
+        const dx=z.x-enemy.x,dy=z.y-enemy.y;
+        if(dx*dx+dy*dy<=z.radius*z.radius)sendDamage(enemy.id,z.damage*.75);
+      }
+    }
+  }
+}
 function cameraUpdate(){const tx=player.x-innerWidth/2,ty=player.y-innerHeight/2;camera.x+=(tx-camera.x)*.12;camera.y+=(ty-camera.y)*.12;camera.x=clamp(camera.x,0,Math.max(0,WORLD-innerWidth));camera.y=clamp(camera.y,0,Math.max(0,WORLD-innerHeight))}
 const worldToScreen=(x,y)=>[x-camera.x,y-camera.y];
 function drawGrid(){ctx.fillStyle='#152235';ctx.fillRect(0,0,innerWidth,innerHeight);const sx=-(camera.x%GRID),sy=-(camera.y%GRID);ctx.strokeStyle='rgba(255,255,255,.045)';ctx.lineWidth=1;ctx.beginPath();for(let x=sx;x<innerWidth;x+=GRID){ctx.moveTo(x,0);ctx.lineTo(x,innerHeight)}for(let y=sy;y<innerHeight;y+=GRID){ctx.moveTo(0,y);ctx.lineTo(innerWidth,y)}ctx.stroke()}
 function polygon(x,y,r,sides,a){ctx.beginPath();for(let i=0;i<sides;i++){const q=a+i*TAU/sides,px=x+Math.cos(q)*r,py=y+Math.sin(q)*r;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)}ctx.closePath()}
-function drawShape(s){const[x,y]=worldToScreen(s.x,s.y);if(x<-80||y<-80||x>innerWidth+80||y>innerHeight+80)return;ctx.save();ctx.shadowColor='rgba(0,0,0,.25)';ctx.shadowBlur=10;ctx.shadowOffsetY=4;polygon(x,y,s.r,s.sides,s.angle);ctx.fillStyle=colorForShape(s.type);ctx.fill();ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.strokeStyle=edgeForShape(s.type);ctx.lineWidth=5;ctx.stroke();if(s.hp<s.maxHp){const w=s.r*1.6;ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(x-w/2,y+s.r+8,w,4);ctx.fillStyle='#7ee787';ctx.fillRect(x-w/2,y+s.r+8,w*(s.hp/s.maxHp),4)}ctx.restore()}
+function drawShape(s){const[x,y]=worldToScreen(s.x,s.y);if(x<-80||y<-80||x>innerWidth+80||y>innerHeight+80)return;const spawnP=clamp((s.spawnAge||0)/.34,0,1),ease=1-Math.pow(1-spawnP,3),rr=s.r*(.35+.65*ease);ctx.save();ctx.globalAlpha=.28+.72*ease;ctx.shadowColor=s.centralCluster?'rgba(90,130,255,.34)':'rgba(0,0,0,.25)';ctx.shadowBlur=s.centralCluster?14:10;ctx.shadowOffsetY=4;polygon(x,y,rr,s.sides,s.angle);ctx.fillStyle=colorForShape(s.type);ctx.fill();ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.strokeStyle=edgeForShape(s.type);ctx.lineWidth=5;ctx.stroke();if(s.hp<s.maxHp){const w=s.r*1.6;ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(x-w/2,y+s.r+8,w,4);ctx.fillStyle='#7ee787';ctx.fillRect(x-w/2,y+s.r+8,w*(s.hp/s.maxHp),4)}ctx.restore()}
 function drawPlayerCannon(cannon,r){
   ctx.fillStyle='#6f7f90';ctx.strokeStyle='#45515f';ctx.lineWidth=4;
   if(cannon==='rapid'){ctx.beginPath();ctx.roundRect(r*.22,-5,r+28,10,3);ctx.fill();ctx.stroke();ctx.fillStyle='#9aa9b8';for(let i=0;i<3;i++)ctx.fillRect(r+2+i*7,-2,4,4)}
@@ -796,6 +1036,20 @@ function drawTank(e){
   // Team recognition ring stays blue/red even though each cannon has its own armor color.
   ctx.strokeStyle=teamColor;ctx.globalAlpha=.78;ctx.lineWidth=3;
   ctx.beginPath();ctx.arc(0,0,r+6,0,TAU);ctx.stroke();ctx.globalAlpha=1;
+
+  const fortressActive=isP?performance.now()<(e.fortressUntil||0):!!e.fortress;
+  const overclockActive=isP?performance.now()<(e.overclockUntil||0):!!e.overclock;
+  if(fortressActive){
+    ctx.strokeStyle='rgba(255,196,104,.92)';ctx.lineWidth=5;ctx.shadowColor='#ffc568';ctx.shadowBlur=14;
+    ctx.beginPath();ctx.arc(0,0,r+13+Math.sin(t*6)*2,0,TAU);ctx.stroke();ctx.shadowBlur=0;
+    for(let i=0;i<6;i++){const q=i*TAU/6+t*.25;ctx.fillStyle='rgba(255,216,151,.75)';ctx.beginPath();ctx.arc(Math.cos(q)*(r+13),Math.sin(q)*(r+13),3,0,TAU);ctx.fill()}
+  }
+  if(overclockActive){
+    ctx.strokeStyle='rgba(117,255,66,.88)';ctx.lineWidth=2;
+    ctx.strokeRect(-r-9+Math.sin(t*21)*3,-r-9,(r+9)*2,(r+9)*2);
+    ctx.strokeStyle='rgba(255,63,223,.65)';
+    ctx.strokeRect(-r-6+Math.cos(t*17)*4,-r-11,(r+8)*2,(r+10)*2);
+  }
 
   // Cannon is drawn behind the hull.
   drawPlayerCannon(cannon,r);
@@ -933,6 +1187,31 @@ function drawPlasmaTethers(){
 }
 
 
+function drawSkillZones(){
+  const t=performance.now()*.001;
+  for(const z of skillZones){
+    if(z.type!=='gravity')continue;
+    const[x,y]=worldToScreen(z.x,z.y);
+    const p=clamp(z.life/z.maxLife,0,1);
+    ctx.save();ctx.translate(x,y);
+    ctx.globalAlpha=Math.min(1,p*1.3);
+    ctx.strokeStyle='rgba(132,159,255,.75)';
+    ctx.lineWidth=3;
+    ctx.shadowColor='#829dff';ctx.shadowBlur=16;
+    for(let i=0;i<4;i++){
+      const rr=z.radius*(.18+i*.19)+Math.sin(t*3+i)*8;
+      ctx.beginPath();
+      ctx.arc(0,0,rr,t*(i%2?-.8:.8)+i,TAU+t*(i%2?-.8:.8)+i);
+      ctx.stroke();
+    }
+    ctx.fillStyle='rgba(30,38,92,.22)';
+    ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.fill();
+    ctx.fillStyle='#dbe3ff';ctx.shadowBlur=22;
+    ctx.beginPath();ctx.arc(0,0,12+Math.sin(t*8)*3,0,TAU);ctx.fill();
+    ctx.restore();
+  }
+}
+
 function drawCombatEffects(){
   for(const f of combatFx){
     const[x,y]=worldToScreen(f.x,f.y),p=clamp(f.life/f.maxLife,0,1),q=1-p;
@@ -957,6 +1236,22 @@ function drawCombatEffects(){
       for(let i=0;i<8;i++){const a=i*TAU/8;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*f.radius*q,Math.sin(a)*f.radius*q);ctx.stroke()}ctx.shadowBlur=0;
     }else if(f.type==='errorMuzzle'){
       ctx.fillStyle='#76ff43';ctx.fillRect(-f.radius*q,-10,18,5);ctx.fillStyle='#ff3fe2';ctx.fillRect(-f.radius*q*.65,2,25,5);ctx.fillStyle='#42eaff';ctx.fillRect(-f.radius*q*.85,10,13,4);
+    }else if(f.type==='skill2-rocket'){
+      ctx.strokeStyle='#ffc16c';ctx.lineWidth=7*p+1;ctx.shadowColor='#ffc16c';ctx.shadowBlur=16;
+      for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(0,0,f.radius*q*(.55+i*.18),0,TAU);ctx.stroke()}
+      ctx.shadowBlur=0;
+    }else if(f.type==='skill2-ring'){
+      ctx.strokeStyle='#dfc8ff';ctx.lineWidth=7*p+1;ctx.shadowColor='#c49bff';ctx.shadowBlur=18;
+      ctx.beginPath();ctx.ellipse(0,0,f.radius*q,f.radius*q*.34,0,0,TAU);ctx.stroke();
+      ctx.beginPath();ctx.ellipse(0,0,f.radius*q*.72,f.radius*q*.22,Math.PI/2,0,TAU);ctx.stroke();ctx.shadowBlur=0;
+    }else if(f.type==='skill2-nova'){
+      ctx.strokeStyle='#9db1ff';ctx.lineWidth=5*p+1;ctx.shadowColor='#859fff';ctx.shadowBlur=18;
+      for(let i=0;i<8;i++){const a=i*TAU/8+q;ctx.beginPath();ctx.moveTo(Math.cos(a)*f.radius*.2,Math.sin(a)*f.radius*.2);ctx.lineTo(Math.cos(a)*f.radius*q,Math.sin(a)*f.radius*q);ctx.stroke()}
+      ctx.shadowBlur=0;
+    }else if(f.type==='skill2-error'){
+      ctx.strokeStyle='#72ff43';ctx.lineWidth=4;ctx.strokeRect(-f.radius*q*.55,-f.radius*q*.55,f.radius*q*1.1,f.radius*q*1.1);
+      ctx.strokeStyle='#ff42df';ctx.strokeRect(-f.radius*q*.42+8,-f.radius*q*.58,f.radius*q*.84,f.radius*q*1.16);
+      ctx.fillStyle='#47eaff';for(let i=0;i<6;i++)ctx.fillRect(rand(-f.radius*q,f.radius*q),rand(-f.radius*q,f.radius*q),rand(8,24),4);
     }else if(f.type.startsWith('skill-')){
       const cannon=f.type.slice(6);
       if(cannon==='plasma'){
@@ -1058,6 +1353,7 @@ function update(dt){
   updateBullets(dt);
   updateParticles(dt);
   updateCombatFx(dt);
+  updateSkillZones(dt);
   updateSkillHud();
   cameraUpdate();
   broadcastLocalState();
@@ -1073,7 +1369,7 @@ function update(dt){
 function render(){
   ctx.save();
   if(shake>0){ctx.translate(rand(-shake,shake),rand(-shake,shake));shake*=.86}
-  drawGrid();drawBoundary();shapes.forEach(drawShape);drawPlasmaTethers();drawCombatEffects();drawBullets();
+  drawGrid();drawBoundary();shapes.forEach(drawShape);drawPlasmaTethers();drawSkillZones();drawCombatEffects();drawBullets();
   remotePlayers.forEach(drawTank);drawTank(player);drawParticles();
   ctx.restore();
   drawMobileAimGuide();
@@ -1117,8 +1413,8 @@ async function startGame(){
   updateSkillHud();
   broadcastLocalState(true);
 }
-ui.startBtn.onclick=()=>void startGame();if(ui.skillBtn)ui.skillBtn.onclick=e=>{e.preventDefault();e.stopPropagation();activateSkill()};ui.leaveBattleBtn.onclick=()=>void leaveBattleToLobby();ui.respawnBtn.onclick=()=>{ui.deathScreen.classList.remove('show');running=false;void disconnectOnlineArena();window.IronCellAuth?.showLobby?.();};
-addEventListener('keydown',e=>{input.keys.add(e.code);if(e.code==='KeyQ'&&!e.repeat){activateSkill();e.preventDefault()}if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()});addEventListener('keyup',e=>input.keys.delete(e.code));addEventListener('mousemove',e=>{input.mouseX=e.clientX;input.mouseY=e.clientY});addEventListener('mousedown',e=>{if(e.button===0)input.firing=true});addEventListener('mouseup',e=>{if(e.button===0)input.firing=false});addEventListener('blur',()=>{input.firing=false;input.mobileAimActive=false;input.keys.clear()});
+ui.startBtn.onclick=()=>void startGame();if(ui.skillBtn)ui.skillBtn.onclick=e=>{e.preventDefault();e.stopPropagation();activateSkill()};if(ui.skill2Btn)ui.skill2Btn.onclick=e=>{e.preventDefault();e.stopPropagation();activateSkill2()};ui.leaveBattleBtn.onclick=()=>void leaveBattleToLobby();ui.respawnBtn.onclick=()=>{ui.deathScreen.classList.remove('show');running=false;void disconnectOnlineArena();window.IronCellAuth?.showLobby?.();};
+addEventListener('keydown',e=>{input.keys.add(e.code);if(e.code==='KeyQ'&&!e.repeat){activateSkill();e.preventDefault()}if(e.code==='KeyR'&&!e.repeat){activateSkill2();e.preventDefault()}if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()});addEventListener('keyup',e=>input.keys.delete(e.code));addEventListener('mousemove',e=>{input.mouseX=e.clientX;input.mouseY=e.clientY});addEventListener('mousedown',e=>{if(e.button===0)input.firing=true});addEventListener('mouseup',e=>{if(e.button===0)input.firing=false});addEventListener('blur',()=>{input.firing=false;input.mobileAimActive=false;input.keys.clear()});
 const moveZone=document.querySelector('#mobileMove'),knob=moveZone.querySelector('.stick-knob');let moveTouch=null;function moveTouchUpdate(t){const r=moveZone.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=t.clientX-cx,dy=t.clientY-cy;const max=42,d=Math.hypot(dx,dy)||1;if(d>max){dx=dx/d*max;dy=dy/d*max}input.moveX=dx/max;input.moveY=dy/max;knob.style.transform=`translate(${dx}px,${dy}px)`}moveZone.addEventListener('touchstart',e=>{const t=e.changedTouches[0];moveTouch=t.identifier;moveTouchUpdate(t);e.preventDefault()},{passive:false});moveZone.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===moveTouch)moveTouchUpdate(t);e.preventDefault()},{passive:false});function endMove(e){for(const t of e.changedTouches)if(t.identifier===moveTouch){moveTouch=null;input.moveX=0;input.moveY=0;knob.style.transform='none'}}moveZone.addEventListener('touchend',endMove,{passive:false});moveZone.addEventListener('touchcancel',endMove,{passive:false});
 const aimZone=document.querySelector('#mobileAim');let aimTouch=null;function aimUpdate(t){input.mouseX=t.clientX;input.mouseY=t.clientY;input.firing=true;input.mobileAimActive=true}aimZone.addEventListener('touchstart',e=>{const t=e.changedTouches[0];aimTouch=t.identifier;aimUpdate(t);e.preventDefault()},{passive:false});aimZone.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===aimTouch)aimUpdate(t);e.preventDefault()},{passive:false});function endAim(e){for(const t of e.changedTouches)if(t.identifier===aimTouch){aimTouch=null;input.firing=false;input.mobileAimActive=false}}aimZone.addEventListener('touchend',endAim,{passive:false});aimZone.addEventListener('touchcancel',endAim,{passive:false});
 
@@ -1129,7 +1425,7 @@ window.IronCellGame = {
     input.firing=false;
     input.keys.clear();
     ui.deathScreen.classList.remove('show');
-    ui.skillHud?.classList.add('hidden');
+    ui.skillHud?.classList.add('hidden');ui.skill2Btn?.classList.add('hidden');
     ui.classPanel.classList.add('hidden');
     ui.startScreen.classList.remove('show');
     document.querySelector('#garageScreen')?.classList.remove('show');
