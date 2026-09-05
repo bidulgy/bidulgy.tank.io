@@ -94,7 +94,7 @@ const CANNONS=Object.freeze({
   },
   error:{
     id:'error',name:'ERROR 캐논',rarity:'error',rarityLabel:'ERROR',
-    chance:.05,desc:'불안정한 글리치 탄환이 공간을 왜곡하며 관통합니다.',skill:'Q SYSTEM CRASH · 전방위 글리치 폭주',skill2:'R OVERCLOCK.EXE · 6.5초간 초고속 이동/연사/탄속'
+    chance:.05,desc:'불안정한 글리치 탄환이 공간을 왜곡하며 관통합니다.',skill:'Q SYSTEM CRASH · 전방위 글리치 폭주',skill2:'R OVERCLOCK.EXE · 15초 강화 + 강화 중 R로 3초마다 글리치 도약'
   }
 });
 window.IronCellCannons=CANNONS;
