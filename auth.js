@@ -643,6 +643,73 @@ async function adminLookupDirect(username){
   };
 }
 
+
+async function callAdminPanelV4(query='',limit=30,exact=null){
+  await ensureAdminSession();
+  const args={
+    p_query:String(query||''),
+    p_limit:Math.max(1,Math.min(Number(limit)||30,100)),
+    p_exact:exact?String(exact):null
+  };
+
+  let lastError=null;
+  for(let attempt=0;attempt<2;attempt++){
+    try{
+      const response=await withAdminTimeout(client.rpc('iron_cell_admin_panel_v4',args),8000);
+      if(!response.error&&response.data?.ok!==false)return response.data||{};
+      lastError=response.error||new Error('admin_panel_invalid_response');
+    }catch(error){
+      lastError=error;
+    }
+
+    // One forced auth refresh protects the admin page from stale browser sessions.
+    if(attempt===0){
+      try{await client.auth.refreshSession()}catch(_){}
+      await ensureActiveIronCellSession();
+      await refreshAdminAccess();
+    }
+  }
+
+  throw lastError||new Error('admin_panel_failed');
+}
+async function loadAdminDirectoryFallback(query='',limit=30){
+  // Fallback 1: direct admin RLS table read. Supports contains search.
+  try{
+    await ensureAdminSession();
+    const q=String(query||'').trim().toLowerCase();
+    let request=client
+      .from('iron_cell_accounts')
+      .select('username,user_id,created_at',{count:'exact'})
+      .order('created_at',{ascending:false})
+      .limit(Math.max(1,Math.min(Number(limit)||30,100)));
+    if(q)request=request.ilike('username',`%${q}%`);
+    const result=await withAdminTimeout(request,6000);
+    if(result.error)throw result.error;
+    const accounts=Array.isArray(result.data)?result.data:[];
+    let profiles=new Map();
+    try{profiles=await loadAdminProfilesByIds(accounts.map(row=>row.user_id))}catch(_){}
+    return{
+      total:Math.max(0,Number(result.count||accounts.length)),
+      users:accounts.map(row=>({
+        ...row,
+        ...(profiles.get(String(row.user_id))||{})
+      }))
+    };
+  }catch(error){
+    console.warn('Admin direct fallback failed:',error);
+  }
+
+  // Fallback 2: previous stable v3 RPC.
+  const response=await withAdminTimeout(client.rpc('iron_cell_admin_panel_v3',{
+    p_query:String(query||''),p_limit:Math.max(1,Math.min(Number(limit)||30,100)),p_exact:null
+  }),6000);
+  if(response.error)throw response.error;
+  return{
+    total:Math.max(0,Number(response.data?.total||0)),
+    users:Array.isArray(response.data?.users)?response.data.users:[]
+  };
+}
+
 function formatAdminDate(value){
   if(!value)return '';
   const d=new Date(value);
@@ -673,25 +740,25 @@ function renderAdminSearchResults(rows,query){
       </span>
       <b>◆ ${Number(row.gems||0).toLocaleString()}</b>
     </button>
-  `).join(''):`<div class="admin-search-empty">"${escapeHtml(query)}"로 시작하는 sworder VS tank 계정이 없습니다.</div>`;
+  `).join(''):`<div class="admin-search-empty">"${escapeHtml(query)}"가 포함된 sworder VS tank 계정이 없습니다.</div>`;
 }
 async function loadAdminDirectory(query='',limit=30){
   if(!adminEnabled)return {total:0,users:[]};
-  await ensureActiveIronCellSession();
+  try{
+    const data=await callAdminPanelV4(query,limit,null);
+    let users=Array.isArray(data?.users)?data.users:[];
 
-  const response=await withAdminTimeout(
-    client.rpc('iron_cell_admin_panel_v3',{
-      p_query:String(query||''),
-      p_limit:Math.max(1,Math.min(Number(limit)||30,100)),
-      p_exact:null
-    }),
-    4500
-  );
-  if(response.error)throw response.error;
-  return {
-    total:Math.max(0,Number(response.data?.total||0)),
-    users:Array.isArray(response.data?.users)?response.data.users:[]
-  };
+    // v4 currently guarantees fresh recent accounts. For contains-search convenience,
+    // use the direct RLS fallback if the server prefix result is empty.
+    if(query&&users.length===0){
+      const fallback=await loadAdminDirectoryFallback(query,limit);
+      if(fallback.users.length)return fallback;
+    }
+    return{total:Math.max(0,Number(data?.total||0)),users};
+  }catch(error){
+    console.warn('Admin v4 directory failed, using fallback:',error);
+    return await loadAdminDirectoryFallback(query,limit);
+  }
 }
 async function searchAdminDirectory(queryValue=els.adminUsername?.value){
   if(!adminEnabled)return;
@@ -739,20 +806,23 @@ async function adminLookup(usernameValue=els.adminUsername?.value){
 
   setAdminMessage(`${username} 계정 검색 중...`,'busy');
   try{
-    await ensureActiveIronCellSession();
-    const response=await withAdminTimeout(
-      client.rpc('iron_cell_admin_panel_v3',{
-        p_query:username,
-        p_limit:12,
-        p_exact:username
-      }),
-      4500
-    );
-    if(response.error)throw response.error;
+    let payload=null;
+    try{payload=await callAdminPanelV4(username,20,username)}catch(error){
+      console.warn('Admin exact v4 failed:',error);
+    }
 
-    const data=response.data?.exact||null;
+    let data=payload?.exact||null;
+    let candidates=Array.isArray(payload?.users)?payload.users:[];
+
+    // If exact v4 is unavailable for any reason, direct lookup is still allowed only to admin.
     if(!data){
-      const candidates=Array.isArray(response.data?.users)?response.data.users:[];
+      try{data=await adminLookupDirect(username)}catch(_){}
+    }
+    if(!candidates.length){
+      try{candidates=(await loadAdminDirectoryFallback(username,20)).users}catch(_){}
+    }
+
+    if(!data){
       renderAdminSearchResults(candidates,username);
       setAdminMessage(candidates.length?'정확히 일치하는 계정은 없습니다. 아래 후보를 선택하세요.':'해당 계정을 찾지 못했습니다.','error');
       return;
@@ -838,11 +908,12 @@ async function showAdmin(){
   await loadAdminRecentUsers();
 
   const visibleCount=els.adminRecentUsers?.querySelectorAll?.('[data-admin-user]')?.length||0;
+  const totalText=String(els.adminAccountCount?.textContent||'').trim();
   setAdminMessage(
     visibleCount
-      ? `관리자 연결 정상 · 최근 계정 ${visibleCount}개 표시`
-      : '관리자 연결 정상 · 표시할 계정을 확인해 주세요.',
-    visibleCount?'good':''
+      ? `관리자 연결 정상 · 최근 ${visibleCount}개 표시 · ${totalText}`
+      : '관리자 연결은 됐지만 계정 목록을 불러오지 못했습니다. 새로고침을 눌러 다시 시도하세요.',
+    visibleCount?'good':'error'
   );
 }
 
