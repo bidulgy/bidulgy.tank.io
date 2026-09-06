@@ -64,6 +64,8 @@ const els = {
   adminMessage: document.querySelector('#adminMessage'),
   adminUsername: document.querySelector('#adminUsernameInput'),
   adminSearch: document.querySelector('#adminSearchBtn'),
+  adminSearchResults: document.querySelector('#adminSearchResults'),
+  adminAccountCount: document.querySelector('#adminAccountCount'),
   adminTarget: document.querySelector('#adminTargetCard'),
   adminGemAmount: document.querySelector('#adminGemAmount'),
   adminCannonGrid: document.querySelector('#adminCannonGrid'),
@@ -106,7 +108,7 @@ const CANNONS=Object.freeze({
   },
   error:{
     id:'error',name:'ERROR 캐논',rarity:'error',rarityLabel:'ERROR',
-    chance:.005,desc:'불안정한 글리치 에너지와 ERROR 검을 사용하는 최고 등급 탱크입니다.',passive:'평타 · 기본은 NULL OVERWRITE, T 검 모드에서는 검 베기 + 매 평타 ERROR 검기',skill:'Q ERROR 검기 · 초대형 관통 검기를 전방으로 발사',skill2:'R GLITCH DRIVE · 15초 이동속도 증가 + 강화 중 R로 3초마다 도약',skill3:'T GLITCH BLADE · 7초 쿨 · 돌진하며 ERROR 검을 휘두르고 검 모드 ON/OFF'
+    chance:.005,desc:'불안정한 글리치 에너지와 ERROR 검을 사용하는 최고 등급 탱크입니다.',passive:'평타 · T 검 모드에서는 검만 휘두름 · R 버프 중에만 평타마다 ERROR 검기 추가',skill:'Q 이중 스킬 · 검 모드 OFF: 원래 SYSTEM CRASH 24발 · 검 모드 ON: 최대 5초 차징 ERROR 검기',skill2:'R GLITCH DRIVE · 15초 이동속도 증가 + 검 평타마다 검기 + 강화 중 R로 3초마다 도약',skill3:'T GLITCH BLADE · 7초 쿨 · 돌진하며 ERROR 검을 휘두르고 검 모드 ON/OFF'
   }
 });
 window.IronCellCannons=CANNONS;
@@ -118,6 +120,8 @@ let authBusy = false;
 let adminEnabled = false;
 let adminTargetUsername = '';
 let adminTargetData = null;
+let adminSearchTimer = 0;
+let adminSearchSeq = 0;
 
 function normalizeUsername(value){
   return String(value || '').trim().toLowerCase();
@@ -372,19 +376,106 @@ async function refreshAdminAccess(){
   els.lobbyAdmin?.classList.toggle('hidden',!adminEnabled);
   return adminEnabled;
 }
+
+function formatAdminDate(value){
+  if(!value)return '';
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime()))return '';
+  return d.toLocaleString('ko-KR',{
+    month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'
+  });
+}
+function hideAdminSearchResults(){
+  if(!els.adminSearchResults)return;
+  els.adminSearchResults.classList.add('hidden');
+  els.adminSearchResults.innerHTML='';
+}
+function renderAdminSearchResults(rows,query){
+  if(!els.adminSearchResults)return;
+  const list=Array.isArray(rows)?rows:[];
+  if(!query){
+    hideAdminSearchResults();
+    return;
+  }
+
+  els.adminSearchResults.classList.remove('hidden');
+  els.adminSearchResults.innerHTML=list.length?list.map(row=>`
+    <button class="admin-search-result" type="button" data-admin-user="${escapeHtml(row.username||'')}">
+      <span>
+        <strong>${escapeHtml(row.username||'-')}</strong>
+        <small>LV ${Number(row.best_level||1)} · SCORE ${Number(row.best_score||0).toLocaleString()}</small>
+      </span>
+      <b>◆ ${Number(row.gems||0).toLocaleString()}</b>
+    </button>
+  `).join(''):`<div class="admin-search-empty">"${escapeHtml(query)}"로 시작하는 Iron Cell 계정이 없습니다.</div>`;
+}
+async function loadAdminDirectory(query='',limit=30){
+  if(!adminEnabled)return {total:0,users:[]};
+  const {data,error}=await client.rpc('iron_cell_admin_directory_v2',{
+    p_query:String(query||''),
+    p_limit:Math.max(1,Math.min(Number(limit)||30,100))
+  });
+  if(error)throw error;
+  return {
+    total:Math.max(0,Number(data?.total||0)),
+    users:Array.isArray(data?.users)?data.users:[]
+  };
+}
+async function searchAdminDirectory(queryValue=els.adminUsername?.value){
+  if(!adminEnabled)return;
+  const query=normalizeUsername(queryValue);
+  const seq=++adminSearchSeq;
+
+  if(!query){
+    hideAdminSearchResults();
+    return;
+  }
+  if(!/^[a-z0-9_]{1,20}$/.test(query)){
+    renderAdminSearchResults([],query);
+    return;
+  }
+
+  try{
+    const result=await loadAdminDirectory(query,12);
+    if(seq!==adminSearchSeq)return;
+    renderAdminSearchResults(result.users,query);
+    if(els.adminAccountCount)els.adminAccountCount.textContent=`총 ${result.total.toLocaleString()}개`;
+  }catch(error){
+    if(seq!==adminSearchSeq)return;
+    console.warn('Fast admin directory search failed:',error);
+    if(els.adminSearchResults){
+      els.adminSearchResults.classList.remove('hidden');
+      els.adminSearchResults.innerHTML=`<div class="admin-search-empty">${escapeHtml(adminFriendlyError(error))}</div>`;
+    }
+  }
+}
+function scheduleAdminDirectorySearch(){
+  clearTimeout(adminSearchTimer);
+  adminSearchTimer=setTimeout(()=>void searchAdminDirectory(),120);
+}
+
 async function adminLookup(usernameValue=els.adminUsername?.value){
   if(!adminEnabled)return;
   const username=normalizeUsername(usernameValue);
   if(!validUsername(username)){
-    setAdminMessage('검색할 아이디 형식을 확인하세요.','error');return;
+    setAdminMessage('검색할 아이디 형식을 확인하세요.','error');
+    if(username)void searchAdminDirectory(username);
+    return;
   }
-  setAdminMessage('계정을 불러오는 중...','busy');
-  const {data,error}=await client.rpc('iron_cell_admin_lookup_user',{p_username:username});
-  if(error){setAdminMessage(adminFriendlyError(error),'error');return}
-  adminTargetUsername=username;
-  if(els.adminUsername)els.adminUsername.value=username;
-  renderAdminTarget(data);
-  setAdminMessage(`${username} 계정을 불러왔습니다.`,'good');
+
+  setAdminMessage(`${username} 계정 검색 중...`,'busy');
+  try{
+    const {data,error}=await client.rpc('iron_cell_admin_lookup_user',{p_username:username});
+    if(error)throw error;
+    adminTargetUsername=username;
+    if(els.adminUsername)els.adminUsername.value=username;
+    renderAdminTarget(data);
+    hideAdminSearchResults();
+    setAdminMessage(`${username} 계정을 불러왔습니다.`,'good');
+  }catch(error){
+    setAdminMessage(adminFriendlyError(error),'error');
+    void searchAdminDirectory(username);
+  }
 }
 async function adminChangeGems(mode){
   if(!adminEnabled||!adminTargetUsername){
@@ -419,18 +510,25 @@ async function adminSetCannon(cannon,owned){
 }
 async function loadAdminRecentUsers(){
   if(!adminEnabled||!els.adminRecentUsers)return;
-  const {data,error}=await client.rpc('iron_cell_admin_recent_users',{p_limit:30});
-  if(error){
+  els.adminRecentUsers.innerHTML='<div class="admin-message busy">최근 가입 계정을 불러오는 중...</div>';
+  try{
+    const result=await loadAdminDirectory('',30);
+    const rows=result.users;
+    if(els.adminAccountCount)els.adminAccountCount.textContent=`총 ${result.total.toLocaleString()}개`;
+
+    els.adminRecentUsers.innerHTML=rows.length?rows.map(row=>`
+      <button class="admin-recent-user" type="button" data-admin-user="${escapeHtml(row.username||'')}">
+        <span>
+          <strong>${escapeHtml(row.username||'-')}</strong>
+          <small>LV ${Number(row.best_level||1)} · SCORE ${Number(row.best_score||0).toLocaleString()}</small>
+          <time>${escapeHtml(formatAdminDate(row.created_at))} 가입</time>
+        </span>
+        <b>◆ ${Number(row.gems||0).toLocaleString()}</b>
+      </button>
+    `).join(''):`<div class="admin-message">현재 Iron Cell 독립계정이 없습니다.</div>`;
+  }catch(error){
     els.adminRecentUsers.innerHTML=`<div class="admin-message error">${escapeHtml(adminFriendlyError(error))}</div>`;
-    return;
   }
-  const rows=Array.isArray(data)?data:[];
-  els.adminRecentUsers.innerHTML=rows.length?rows.map(row=>`
-    <button class="admin-recent-user" type="button" data-admin-user="${escapeHtml(row.username||'')}">
-      <span><strong>${escapeHtml(row.username||'-')}</strong><small>LV ${Number(row.best_level||1)} · SCORE ${Number(row.best_score||0).toLocaleString()}</small></span>
-      <b>◆ ${Number(row.gems||0).toLocaleString()}</b>
-    </button>
-  `).join(''):'<div class="admin-message">표시할 계정이 없습니다.</div>';
 }
 async function showAdmin(){
   if(!await refreshAdminAccess()){
@@ -825,6 +923,7 @@ document.addEventListener('click', event => {
   }
   if(userButton){
     event.preventDefault();event.stopPropagation();
+    hideAdminSearchResults();
     void adminLookup(String(userButton.dataset.adminUser||''));
   }
 },true);
@@ -858,8 +957,17 @@ els.backLobby?.addEventListener('click',showLobby);
 els.password?.addEventListener('keydown', event => {
   if(event.key === 'Enter') login();
 });
+els.adminUsername?.addEventListener('input',scheduleAdminDirectorySearch);
+els.adminUsername?.addEventListener('focus',()=>{
+  if(els.adminUsername?.value) scheduleAdminDirectorySearch();
+});
 els.adminUsername?.addEventListener('keydown', event => {
-  if(event.key === 'Enter') void adminLookup();
+  if(event.key === 'Enter'){
+    event.preventDefault();
+    void adminLookup();
+  }else if(event.key === 'Escape'){
+    hideAdminSearchResults();
+  }
 });
 els.username?.addEventListener('keydown', event => {
   if(event.key === 'Enter') els.password?.focus();

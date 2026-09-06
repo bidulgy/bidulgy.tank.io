@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <meta name="theme-color" content="#101827" />
   <title>Iron Cell Arena</title>
-  <link rel="stylesheet" href="./style.css?v=521" />
+  <link rel="stylesheet" href="./style.css?v=522" />
 </head>
 <body>
   <div id="app">
@@ -167,9 +167,11 @@
           </div>
           <div class="admin-search-row">
             <input id="adminUsernameInput" maxlength="20" autocomplete="off"
-                   autocapitalize="none" spellcheck="false" placeholder="Iron Cell 아이디" />
+                   autocapitalize="none" spellcheck="false"
+                   placeholder="아이디 일부만 입력해도 검색됩니다" />
             <button id="adminSearchBtn" class="primary" type="button">검색</button>
           </div>
+          <div id="adminSearchResults" class="admin-search-results hidden"></div>
           <div id="adminTargetCard" class="admin-target-card empty">
             검색할 계정 아이디를 입력하세요.
           </div>
@@ -199,7 +201,10 @@
 
         <section class="admin-section">
           <div class="admin-section-title">
-            <div><small>RECENT PILOTS</small><h2>최근 가입 계정</h2></div>
+            <div>
+              <small>RECENT PILOTS</small>
+              <h2>최근 가입 계정 <span id="adminAccountCount" class="admin-account-count">총 0개</span></h2>
+            </div>
             <button id="adminRefreshBtn" class="secondary-action compact" type="button">새로고침</button>
           </div>
           <div id="adminRecentUsers" class="admin-recent-users"></div>
@@ -328,7 +333,7 @@
     <div class="mobile-tip">왼쪽 이동 · 오른쪽 조준/발사 · 모든 탱크 Q · 신화 이상 R · ERROR T</div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./auth.js?v=521"></script>
-  <script src="./game.js?v=520"></script>
+  <script src="./auth.js?v=524"></script>
+  <script src="./game.js?v=524"></script>
 </body>
 </html>

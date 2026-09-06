@@ -47,7 +47,7 @@ const TANK_THEMES=Object.freeze({
 });
 
 const statsDef=[['maxHealth','최대 체력'],['regen','체력 회복'],['bulletDamage','탄환 피해'],['bulletSpeed','탄환 속도'],['reload','연사 속도'],['moveSpeed','이동 속도']];
-function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
+function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
 function resize(){const dpr=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(innerWidth*dpr);canvas.height=Math.round(innerHeight*dpr);canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
 const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function dist2(a,b){const dx=a.x-b.x,dy=a.y-b.y;return dx*dx+dy*dy}function norm(dx,dy){const d=Math.hypot(dx,dy)||1;return[dx/d,dy/d]}
@@ -178,7 +178,13 @@ function localNetworkState(){
 }
 function sendOnline(event,payload){
   if(!onlineReady||!onlineChannel)return;
-  void onlineChannel.send({type:'broadcast',event,payload}).catch(()=>{});
+  try{
+    const result=onlineChannel.send({type:'broadcast',event,payload});
+    if(result&&typeof result.catch==='function')void result.catch(()=>{});
+  }catch(error){
+    // Realtime disconnects or Supabase maintenance must never stop the local battle loop.
+    console.warn('Realtime send skipped:',error);
+  }
 }
 function broadcastLocalState(force=false){
   if(!onlineReady||!player)return;
@@ -458,7 +464,11 @@ function receiveRemoteSkill(payload){
   }
 
   const color=CANNON_SKILLS[cannon]?.color||'#fff';
-  spawnCombatFx(cannon==='error'?'errorSwordCast':`skill-${cannon}`,x,y,{angle,color,life:1.15,radius:cannon==='nova'?390:190,cannon});
+  const errorMode=String(payload.mode||'');
+  spawnCombatFx(
+    cannon==='error'?(errorMode==='sword'?'errorSwordCast':'skill-error'):`skill-${cannon}`,
+    x,y,{angle,color,life:1.15,radius:cannon==='nova'?390:190,cannon}
+  );
 }
 function skillProjectile(cannon,angle,opts={}){
   const p=playerParams();
@@ -541,12 +551,27 @@ function updateSkillHud(){
   const cd=Math.max(0,player.skillCd||0);
   const max=Math.max(.01,player.skillMax||def.cooldown);
   const ready=cd<=.001;
-  if(ui.skillName)ui.skillName.textContent=def.name;
-  if(ui.skillCooldown)ui.skillCooldown.textContent=ready?'READY':`${cd.toFixed(1)}s`;
-  if(ui.skillFill)ui.skillFill.style.width=`${clamp((1-cd/max)*100,0,100)}%`;
+  const errorCharging=cannon==='error'&&player.errorQCharging===true;
+  const chargeSec=errorCharging?clamp((Date.now()-(player.errorQChargeStartAt||Date.now()))/1000,0,5):0;
+
+  if(ui.skillName){
+    ui.skillName.textContent=errorCharging
+      ? 'ERROR 검기 · CHARGE'
+      : (cannon==='error'?(player.errorSwordMode?'ERROR 검기':'SYSTEM CRASH'):def.name);
+  }
+  if(ui.skillCooldown){
+    ui.skillCooldown.textContent=errorCharging
+      ? `차징 ${chargeSec.toFixed(1)} / 5.0s`
+      : (ready?'READY':`${cd.toFixed(1)}s`);
+  }
+  if(ui.skillFill){
+    ui.skillFill.style.width=errorCharging
+      ? `${clamp(chargeSec/5*100,0,100)}%`
+      : `${clamp((1-cd/max)*100,0,100)}%`;
+  }
   if(ui.skillBtn){
-    ui.skillBtn.disabled=!ready;
-    ui.skillBtn.className=`skill-button cannon-${cannon} ${ready?'ready':'cooling'}`;
+    ui.skillBtn.disabled=errorCharging?false:!ready;
+    ui.skillBtn.className=`skill-button cannon-${cannon} ${errorCharging?'charging':(ready?'ready':'cooling')}`;
   }
 
   const showSecond=!!def2;
@@ -644,6 +669,7 @@ function activateSkill3(){
   if(!running||paused||!player?.alive||player.cannonType!=='error')return;
   refreshRealTimeSkillCooldowns();
   if(player.skill3Cd>0)return;
+  if(player.errorQCharging)cancelErrorQCharge();
 
   const now=performance.now(),wallNow=Date.now(),a=player.angle,p=playerParams();
   const ox=player.x,oy=player.y;
@@ -679,7 +705,33 @@ function activateSkill3(){
   updateSkillHud();
 }
 
-function activateSkill(){
+
+function startErrorQCharge(){
+  if(!running||paused||!player?.alive||player.cannonType!=='error'||!player.errorSwordMode)return false;
+  refreshRealTimeSkillCooldowns();
+  if(player.skillCd>0||player.errorQCharging)return false;
+  player.errorQCharging=true;
+  player.errorQChargeStartAt=Date.now();
+  updateSkillHud();
+  return true;
+}
+function cancelErrorQCharge(){
+  if(!player)return;
+  player.errorQCharging=false;
+  player.errorQChargeStartAt=0;
+  updateSkillHud();
+}
+function releaseErrorQCharge(){
+  if(!player?.errorQCharging)return false;
+  const heldMs=Math.max(0,Date.now()-(player.errorQChargeStartAt||Date.now()));
+  const ratio=clamp(heldMs/5000,0,1);
+  player.errorQCharging=false;
+  player.errorQChargeStartAt=0;
+  activateSkill(ratio);
+  return true;
+}
+
+function activateSkill(errorChargeRatio=0){
   if(!running||paused||!player?.alive)return;
   const cannon=player.cannonType||'standard',def=CANNON_SKILLS[cannon];
   refreshRealTimeSkillCooldowns();
@@ -687,8 +739,16 @@ function activateSkill(){
   player.skillCd=def.cooldown;player.skillMax=def.cooldown;
   player.skillReadyAt=Date.now()+def.cooldown*1000;
   const p=playerParams(),a=player.angle;
-  sendOnline('skill',{ownerId:onlineSelfId,cannon,x:player.x,y:player.y,angle:a});
-  spawnCombatFx(cannon==='error'?'errorSwordCast':`skill-${cannon}`,player.x,player.y,{angle:a,color:def.color,life:1.15,radius:cannon==='nova'?390:190,cannon});
+  const errorSwordQ=cannon==='error'&&player.errorSwordMode===true;
+  sendOnline('skill',{
+    ownerId:onlineSelfId,cannon,x:player.x,y:player.y,angle:a,
+    charge:errorSwordQ?clamp(Number(errorChargeRatio)||0,0,1):0,
+    mode:cannon==='error'?(errorSwordQ?'sword':'gun'):''
+  });
+  spawnCombatFx(
+    cannon==='error'?(errorSwordQ?'errorSwordCast':'skill-error'):`skill-${cannon}`,
+    player.x,player.y,{angle:a,color:def.color,life:1.15,radius:cannon==='nova'?390:190,cannon}
+  );
 
   if(cannon==='standard'){
     // 기본포: 단순하지만 확실한 고위력 대형 관통탄.
@@ -741,14 +801,45 @@ function activateSkill(){
     for(let i=0;i<12;i++)skillProjectile('nova',i*TAU/12,{damageMul:.78,speedMul:.90,life:2.4,pierce:5,splashRadius:72});
     burst(player.x,player.y,'#8ff6ff',38);shake=Math.max(shake,15);
   }else if(cannon==='error'){
-    // Q: SYSTEM CRASH를 없애고 초대형 ERROR 검기 1발로 변경.
-    errorSwordArcDamage(player.x,player.y,a,p.damage*1.8,150,.72);
-    const blade=spawnErrorSwordWave(a,4.8,{speedMul:1.30,life:2.75,pierce:28,scale:1.65,special:'errorQBlade'});
-    spawnAttackFx('error',blade.x,blade.y,a);
-    spawnCombatFx('errorSwordSwing',player.x,player.y,{angle:a,color:'#72ff43',life:.50,radius:155,cannon:'error'});
-    burst(player.x+Math.cos(a)*45,player.y+Math.sin(a)*45,'#72ff43',24);
-    burst(player.x+Math.cos(a)*45,player.y+Math.sin(a)*45,'#ff42df',18);
-    shake=Math.max(shake,14);
+    if(!player.errorSwordMode){
+      // T 사용 전 / 검 모드 OFF: 원래 ERROR Q(SYSTEM CRASH) 그대로 복원.
+      skillAreaDamage(player.x,player.y,245,p.damage*2.8,'#79ff47');
+      for(let i=0;i<24;i++){
+        skillProjectile('error',i*TAU/24+rand(-.035,.035),{
+          damageMul:.65,speedMul:1.25,life:2.5,pierce:16,splashRadius:94
+        });
+      }
+      burst(player.x,player.y,'#79ff47',44);
+      burst(player.x,player.y,'#ff46e8',20);
+      shake=Math.max(shake,17);
+    }else{
+      // T 검 모드 ON: 최대 5초 차징 ERROR 검기.
+      const charge=clamp(Number(errorChargeRatio)||0,0,1);
+      const baseScale=2.60;
+      const bladeScale=baseScale*(1+2*charge); // 0초=2.6 / 5초=7.8 => 3배
+      const damageMul=4.8*(1+.50*charge);
+      const pierce=Math.round(28+12*charge);
+      const life=2.85+.45*charge;
+
+      errorSwordArcDamage(player.x,player.y,a,p.damage*(1.8+.8*charge),155+55*charge,.74);
+      const blade=spawnErrorSwordWave(a,damageMul,{
+        speedMul:1.30,
+        life,
+        pierce,
+        scale:bladeScale,
+        special:'errorQBlade'
+      });
+      blade.charge=charge;
+
+      spawnAttackFx('error',blade.x,blade.y,a);
+      spawnCombatFx('errorSwordSwing',player.x,player.y,{
+        angle:a,color:'#72ff43',life:.50+.18*charge,radius:165+90*charge,cannon:'error'
+      });
+      burst(player.x+Math.cos(a)*45,player.y+Math.sin(a)*45,'#72ff43',24+Math.round(18*charge));
+      burst(player.x+Math.cos(a)*45,player.y+Math.sin(a)*45,'#ff42df',18+Math.round(14*charge));
+      if(charge>.95)burst(player.x+Math.cos(a)*45,player.y+Math.sin(a)*45,'#42eaff',28);
+      shake=Math.max(shake,14+8*charge);
+    }
   }
   updateSkillHud();
 }
@@ -952,12 +1043,25 @@ function fire(e){
   const cannon=e.cannonType||'standard';e.basicShotCount=(e.basicShotCount||0)+1;const shotNo=e.basicShotCount;
 
   if(cannon==='error'&&e.errorSwordMode){
-    // 검 모드: 기존 ERROR 탄환 대신 검을 휘두르고 매 평타마다 검기를 날린다.
+    // 검 모드 기본 평타: 켄지처럼 검만 휘두른다. 평상시에는 검기가 절대 나오지 않는다.
     e.fireCd=Math.max(.18,p.reload*.88);
     errorSwordArcDamage(e.x,e.y,a,p.damage*1.30,125,.86);
     spawnCombatFx('errorSwordSwing',e.x,e.y,{angle:a,color:'#72ff43',life:.32,radius:128,cannon:'error'});
-    spawnErrorSwordWave(a,.72,{speedMul:1.12,life:1.55,pierce:12,scale:.78,basicAttack:true,special:'errorBasicBlade'});
-    sendOnline('skill',{slot:3,mode:'basicSwing',ownerId:onlineSelfId,cannon:'error',x:e.x,y:e.y,targetX:e.x,targetY:e.y,angle:a,swordMode:true});
+
+    const rBoostActive=performance.now()<(e.overclockUntil||0);
+    if(rBoostActive){
+      // R 버프 중에만 평타와 비슷한 시각 크기의 검기 1발을 추가한다.
+      spawnErrorSwordWave(a,.68,{
+        speedMul:1.14,life:1.50,pierce:10,scale:2.0,
+        basicAttack:true,special:'errorRBasicBlade'
+      });
+    }
+
+    sendOnline('skill',{
+      slot:3,mode:'basicSwing',ownerId:onlineSelfId,cannon:'error',
+      x:e.x,y:e.y,targetX:e.x,targetY:e.y,angle:a,swordMode:true,
+      rBlade:rBoostActive
+    });
     e.vx-=Math.cos(a)*10;e.vy-=Math.sin(a)*10;
     return;
   }
@@ -1887,19 +1991,22 @@ function drawBullets(){
 
     // ERROR SWORD WAVE — 검의 궤적이 그대로 날아가는 RGB 초승달
     else if(b.shape==='errorSwordWave'){
-      const big=b.special==='errorQBlade',sc=big?1.45:1;
-      ctx.shadowColor='#72ff43';ctx.shadowBlur=big?26:17;
+      // b.r is network-synced, so charged Q size also matches on remote clients.
+      const sc=Math.max(.45,(Number(b.r)||14)/14);
+      const big=b.special==='errorQBlade';
+      ctx.shadowColor='#72ff43';ctx.shadowBlur=(big?24:16)*Math.min(2.4,Math.sqrt(sc));
       ctx.globalAlpha=.26;
-      ctx.strokeStyle='#42eaff';ctx.lineWidth=big?12:8;
-      ctx.beginPath();ctx.arc(-5,0,24*sc,-1.05,1.05);ctx.stroke();
+      ctx.strokeStyle='#42eaff';ctx.lineWidth=(big?10:7)*Math.min(2.1,Math.sqrt(sc));
+      ctx.beginPath();ctx.arc(-5*sc,0,24*sc,-1.05,1.05);ctx.stroke();
       ctx.globalAlpha=1;
-      ctx.strokeStyle='#72ff43';ctx.lineWidth=big?7:5;
+      ctx.strokeStyle='#72ff43';ctx.lineWidth=(big?6:4.5)*Math.min(2.1,Math.sqrt(sc));
       ctx.beginPath();ctx.arc(0,0,27*sc,-1.08,1.08);ctx.stroke();
-      ctx.strokeStyle='#ff42df';ctx.lineWidth=big?3.5:2.5;
-      ctx.beginPath();ctx.arc(4,0,31*sc,-1.02,1.02);ctx.stroke();
-      ctx.fillStyle='#f2ffff';ctx.beginPath();ctx.moveTo(22*sc,-5);ctx.lineTo(36*sc,0);ctx.lineTo(22*sc,5);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#ff42df';ctx.lineWidth=(big?3.2:2.2)*Math.min(2,Math.sqrt(sc));
+      ctx.beginPath();ctx.arc(4*sc,0,31*sc,-1.02,1.02);ctx.stroke();
+      ctx.fillStyle='#f2ffff';
+      ctx.beginPath();ctx.moveTo(22*sc,-5*sc);ctx.lineTo(36*sc,0);ctx.lineTo(22*sc,5*sc);ctx.closePath();ctx.fill();
       ctx.globalAlpha=.35;
-      ctx.fillStyle='#72ff43';ctx.fillRect(-48*sc,-2,35*sc,3);
+      ctx.fillStyle='#72ff43';ctx.fillRect(-48*sc,-2*sc,35*sc,3*sc);
       ctx.shadowBlur=0;ctx.globalAlpha=1;
     }
 
@@ -2021,7 +2128,25 @@ function render(){
   drawMobileAimGuide();
   drawMinimap();
 }
-function frame(now){const dt=Math.min(.032,(now-last)/1000||0);last=now;if(running&&!paused)update(dt);render();requestAnimationFrame(frame)}requestAnimationFrame(frame);
+let lastFrameErrorLog=0;
+function frame(now){
+  const dt=Math.min(.032,(now-last)/1000||0);
+  last=now;
+  try{
+    if(running&&!paused)update(dt);
+    render();
+  }catch(error){
+    // Never allow a transient ERROR skill/network exception to kill requestAnimationFrame.
+    const wallNow=Date.now();
+    if(wallNow-lastFrameErrorLog>1000){
+      lastFrameErrorLog=wallNow;
+      console.error('Battle frame recovered from error:',error);
+    }
+  }finally{
+    requestAnimationFrame(frame);
+  }
+}
+requestAnimationFrame(frame);
 async function startGame(){
   if(!window.IronCellAuth?.user){window.IronCellAuth?.logout?.();return}
   const originalText=ui.startBtn.textContent;
@@ -2059,7 +2184,29 @@ async function startGame(){
   updateSkillHud();
   broadcastLocalState(true);
 }
-ui.startBtn.onclick=()=>void startGame();if(ui.skillBtn)ui.skillBtn.onclick=e=>{e.preventDefault();e.stopPropagation();activateSkill()};if(ui.skill2Btn)ui.skill2Btn.onclick=e=>{e.preventDefault();e.stopPropagation();activateSkill2()};if(ui.skill3Btn)ui.skill3Btn.onclick=e=>{e.preventDefault();e.stopPropagation();activateSkill3()};ui.leaveBattleBtn.onclick=()=>void leaveBattleToLobby();ui.respawnBtn.onclick=()=>{ui.deathScreen.classList.remove('show');running=false;void disconnectOnlineArena();window.IronCellAuth?.showLobby?.();};
+ui.startBtn.onclick=()=>void startGame();
+if(ui.skillBtn){
+  ui.skillBtn.addEventListener('pointerdown',e=>{
+    e.preventDefault();e.stopPropagation();
+    if(player?.cannonType==='error'){
+      if(player.errorSwordMode)startErrorQCharge();
+      else activateSkill();
+    }else activateSkill();
+  });
+  const releaseQ=e=>{
+    e.preventDefault();e.stopPropagation();
+    if(player?.cannonType==='error')releaseErrorQCharge();
+  };
+  ui.skillBtn.addEventListener('pointerup',releaseQ);
+  ui.skillBtn.addEventListener('pointercancel',e=>{
+    e.preventDefault();e.stopPropagation();
+    if(player?.cannonType==='error')releaseErrorQCharge();
+  });
+  ui.skillBtn.addEventListener('contextmenu',e=>e.preventDefault());
+}
+if(ui.skill2Btn)ui.skill2Btn.onclick=e=>{e.preventDefault();e.stopPropagation();activateSkill2()};
+if(ui.skill3Btn)ui.skill3Btn.onclick=e=>{e.preventDefault();e.stopPropagation();activateSkill3()};
+ui.leaveBattleBtn.onclick=()=>void leaveBattleToLobby();ui.respawnBtn.onclick=()=>{ui.deathScreen.classList.remove('show');running=false;void disconnectOnlineArena();window.IronCellAuth?.showLobby?.();};
 function isEditableInputTarget(target){
   if(!(target instanceof Element))return false;
   return !!target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]');
@@ -2067,7 +2214,13 @@ function isEditableInputTarget(target){
 addEventListener('keydown',e=>{
   if(isEditableInputTarget(e.target))return;
   input.keys.add(e.code);
-  if(e.code==='KeyQ'&&!e.repeat){activateSkill();e.preventDefault()}
+  if(e.code==='KeyQ'&&!e.repeat){
+    if(player?.cannonType==='error'){
+      if(player.errorSwordMode)startErrorQCharge();
+      else activateSkill();
+    }else activateSkill();
+    e.preventDefault()
+  }
   if(e.code==='KeyR'&&!e.repeat){activateSkill2();e.preventDefault()}
   if(e.code==='KeyT'&&!e.repeat){activateSkill3();e.preventDefault()}
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()
@@ -2075,7 +2228,11 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>{
   if(isEditableInputTarget(e.target))return;
   input.keys.delete(e.code);
-});addEventListener('mousemove',e=>{input.mouseX=e.clientX;input.mouseY=e.clientY});addEventListener('mousedown',e=>{if(e.button===0)input.firing=true});addEventListener('mouseup',e=>{if(e.button===0)input.firing=false});addEventListener('blur',()=>{input.firing=false;input.mobileAimActive=false;input.keys.clear()});
+  if(e.code==='KeyQ'&&player?.cannonType==='error'){
+    releaseErrorQCharge();
+    e.preventDefault();
+  }
+});addEventListener('mousemove',e=>{input.mouseX=e.clientX;input.mouseY=e.clientY});addEventListener('mousedown',e=>{if(e.button===0)input.firing=true});addEventListener('mouseup',e=>{if(e.button===0)input.firing=false});addEventListener('blur',()=>{input.firing=false;input.mobileAimActive=false;input.keys.clear();if(player?.errorQCharging)cancelErrorQCharge()});
 const moveZone=document.querySelector('#mobileMove'),knob=moveZone.querySelector('.stick-knob');let moveTouch=null;function moveTouchUpdate(t){const r=moveZone.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=t.clientX-cx,dy=t.clientY-cy;const max=42,d=Math.hypot(dx,dy)||1;if(d>max){dx=dx/d*max;dy=dy/d*max}input.moveX=dx/max;input.moveY=dy/max;knob.style.transform=`translate(${dx}px,${dy}px)`}moveZone.addEventListener('touchstart',e=>{const t=e.changedTouches[0];moveTouch=t.identifier;moveTouchUpdate(t);e.preventDefault()},{passive:false});moveZone.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===moveTouch)moveTouchUpdate(t);e.preventDefault()},{passive:false});function endMove(e){for(const t of e.changedTouches)if(t.identifier===moveTouch){moveTouch=null;input.moveX=0;input.moveY=0;knob.style.transform='none'}}moveZone.addEventListener('touchend',endMove,{passive:false});moveZone.addEventListener('touchcancel',endMove,{passive:false});
 const aimZone=document.querySelector('#mobileAim');let aimTouch=null;function aimUpdate(t){input.mouseX=t.clientX;input.mouseY=t.clientY;input.firing=true;input.mobileAimActive=true;aimZone.classList.add('aiming')}aimZone.addEventListener('touchstart',e=>{const t=e.changedTouches[0];aimTouch=t.identifier;aimUpdate(t);e.preventDefault()},{passive:false});aimZone.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===aimTouch)aimUpdate(t);e.preventDefault()},{passive:false});function endAim(e){for(const t of e.changedTouches)if(t.identifier===aimTouch){aimTouch=null;input.firing=false;input.mobileAimActive=false;aimZone.classList.remove('aiming')}}aimZone.addEventListener('touchend',endAim,{passive:false});aimZone.addEventListener('touchcancel',endAim,{passive:false});
 
@@ -2085,6 +2242,7 @@ window.IronCellGame = {
     paused=false;
     input.firing=false;
     input.keys.clear();
+    if(player?.errorQCharging)cancelErrorQCharge();
     ui.deathScreen.classList.remove('show');
     ui.skillHud?.classList.add('hidden');ui.skill2Btn?.classList.add('hidden');ui.skill3Btn?.classList.add('hidden');
     ui.classPanel.classList.add('hidden');
