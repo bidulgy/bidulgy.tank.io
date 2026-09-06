@@ -11,7 +11,8 @@ const client = window.supabase.createClient(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true
+      detectSessionInUrl: false,
+      storageKey: 'iron-cell-arena-auth-v2'
     }
   }
 );
@@ -62,19 +63,19 @@ const els = {
 const CANNONS=Object.freeze({
   standard:{
     id:'standard',name:'기본포',rarity:'starter',rarityLabel:'기본',
-    chance:0,desc:'균형 잡힌 기본 단발포입니다.',passive:'평타 · 정밀 코어: 5번째 탄이 1.7배 피해 + 2회 관통'
+    chance:0,desc:'균형 잡힌 기본 단발포입니다.',passive:'평타 · 정밀 코어: 5번째 탄이 1.7배 피해 + 2회 관통',skill:'Q 코어 포격 · 3.2배 피해의 대형 관통탄'
   },
   rapid:{
     id:'rapid',name:'기관포',rarity:'common',rarityLabel:'일반',
-    chance:61.5,desc:'작은 탄환을 매우 빠르게 연속 발사합니다.',passive:'평타 · 가속 탄띠: 8번째 사격마다 3발 동시 가속탄'
+    chance:61.5,desc:'작은 탄환을 매우 빠르게 연속 발사합니다.',passive:'평타 · 가속 탄띠: 8번째 사격마다 3발 동시 가속탄',skill:'Q 탄환 폭주 · 전방에 고속탄 15발 집중 난사'
   },
   spread:{
     id:'spread',name:'산탄포',rarity:'rare',rarityLabel:'희귀',
-    chance:25.63,desc:'한 번에 5개의 산탄을 넓게 퍼뜨립니다.',passive:'평타 · 파편 확산: 명중 시 좌우 2차 파편 생성'
+    chance:25.63,desc:'한 번에 5개의 산탄을 넓게 퍼뜨립니다.',passive:'평타 · 파편 확산: 명중 시 좌우 2차 파편 생성',skill:'Q 산탄 폭풍 · 넓은 부채꼴로 파편탄 25발 발사'
   },
   piercer:{
     id:'piercer',name:'관통포',rarity:'epic',rarityLabel:'에픽',
-    chance:10.255,desc:'길쭉한 철갑탄이 여러 적을 연속 관통합니다.',passive:'평타 · 관통 가속: 관통할수록 공격력 8%·탄속 4% 증가'
+    chance:10.255,desc:'길쭉한 철갑탄이 여러 적을 연속 관통합니다.',passive:'평타 · 관통 가속: 관통할수록 공격력 8%·탄속 4% 증가',skill:'Q 레일 브레이커 · 4.1배 피해·16회 관통 초고속 레일탄'
   },
   plasma:{
     id:'plasma',name:'플라즈마포',rarity:'legendary',rarityLabel:'전설',
@@ -94,7 +95,7 @@ const CANNONS=Object.freeze({
   },
   error:{
     id:'error',name:'ERROR 캐논',rarity:'error',rarityLabel:'ERROR',
-    chance:.005,desc:'불안정한 글리치 탄환이 공간을 왜곡하며 관통합니다.',passive:'평타 · 글리치 복제: 5번째 사격마다 양옆 복제탄 2발 추가',skill:'Q SYSTEM CRASH · 전방위 글리치 폭주',skill2:'R OVERCLOCK.EXE · 15초 강화 + 강화 중 R로 3초마다 글리치 도약'
+    chance:.005,desc:'불안정한 글리치 탄환이 공간을 왜곡하며 관통합니다.',passive:'평타 · NULL OVERWRITE: 모든 탄환이 관통하며 명중마다 왜곡 폭발, 관통할수록 강화 · 5번째 사격은 NULL BREAK 5발',skill:'Q SYSTEM CRASH · 전방위 글리치 폭주',skill2:'R OVERCLOCK.EXE · 15초 강화 + 강화 중 R로 3초마다 글리치 도약'
   }
 });
 window.IronCellCannons=CANNONS;
@@ -107,8 +108,48 @@ let authBusy = false;
 function normalizeUsername(value){
   return String(value || '').trim().toLowerCase();
 }
+const IRON_CELL_EMAIL_DOMAIN = 'players.example.com';
+const IRON_CELL_EMAIL_PREFIX = 'ic_';
+const IRON_CELL_NAMESPACE = 'iron-cell-arena';
+
 function usernameToInternalEmail(username){
-  return `${username}@players.example.com`;
+  return `${IRON_CELL_EMAIL_PREFIX}${username}@${IRON_CELL_EMAIL_DOMAIN}`;
+}
+function isIronCellUser(user){
+  const email = String(user?.email || '').trim().toLowerCase();
+  const namespace = String(user?.user_metadata?.game_namespace || '').trim().toLowerCase();
+  return namespace === IRON_CELL_NAMESPACE
+    || /^ic_[a-z0-9_]{3,20}@players\.example\.com$/.test(email);
+}
+async function ensureActiveIronCellSession(){
+  let session = null;
+  try{
+    const first = await client.auth.getSession();
+    session = first?.data?.session || null;
+
+    if(!session?.user){
+      const refreshed = await client.auth.refreshSession();
+      session = refreshed?.data?.session || null;
+    }
+
+    if(!session?.user){
+      const err = new Error('iron_cell_session_required');
+      err.code = 'iron_cell_session_required';
+      throw err;
+    }
+
+    if(!isIronCellUser(session.user)){
+      const err = new Error('iron_cell_account_required');
+      err.code = 'iron_cell_account_required';
+      throw err;
+    }
+
+    currentUser = session.user;
+    currentUsername = usernameFromUser(session.user);
+    return session;
+  }catch(error){
+    throw error;
+  }
 }
 function usernameFromUser(user){
   const meta = normalizeUsername(user?.user_metadata?.username);
@@ -369,13 +410,24 @@ async function equipCannon(cannonId){
 }
 
 async function enterSession(user){
+  if(!isIronCellUser(user)){
+    try{ await client.auth.signOut({scope:'local'}); }catch(_){}
+    currentUser = null;
+    currentUsername = '';
+    profile = null;
+    showAuth();
+    setMessage('이 계정은 Iron Cell 전용 계정이 아닙니다. 회원가입 버튼으로 새 Iron Cell 계정을 만들어 주세요.', 'error');
+    return false;
+  }
+
   currentUser = user;
   currentUsername = usernameFromUser(user);
-  setMessage('계정 데이터를 불러오는 중...', 'busy');
+  setMessage('Iron Cell 계정 데이터를 불러오는 중...', 'busy');
   await ensureProfile();
   renderProfile();
   setMessage('');
   showMenu();
+  return true;
 }
 
 async function signup(){
@@ -393,13 +445,13 @@ async function signup(){
   }
 
   setBusy(true);
-  setMessage('계정을 만드는 중...', 'busy');
+  setMessage('Iron Cell 전용 계정을 만드는 중...', 'busy');
 
   try{
     const {data, error} = await client.auth.signUp({
       email: usernameToInternalEmail(username),
       password,
-      options: { data: { username } }
+      options: { data: { username, game_namespace: IRON_CELL_NAMESPACE } }
     });
 
     if(error){
@@ -450,7 +502,7 @@ async function login(){
     });
 
     if(error || !data?.user){
-      setMessage('아이디 또는 비밀번호를 확인하세요.', 'error');
+      setMessage('Iron Cell 아이디 또는 비밀번호를 확인하세요. 처음이라면 회원가입을 먼저 해주세요.', 'error');
       return;
     }
 
@@ -498,32 +550,60 @@ async function savePilotName(name){
 }
 
 async function saveRun(run, finish=false){
-  if(!currentUser || !run) return {profile,awarded_gems:0,awarded_score:0};
+  if(!run) return {profile,awarded_gems:0,awarded_score:0,error:{message:'invalid_run'}};
 
   const pilotName = escapePilotName(run.pilotName || els.pilotName?.value);
   const runId = String(run.runId || '').slice(0,80);
-  if(!runId) return {profile,awarded_gems:0,awarded_score:0};
+  if(!runId) return {profile,awarded_gems:0,awarded_score:0,error:{message:'invalid_run_id'}};
 
-  const {data, error} = await client.rpc('iron_cell_save_run_v2', {
+  const args = {
     p_run_id: runId,
     p_pilot_name: pilotName,
     p_level: Math.max(1, Math.floor(Number(run.level || 1))),
     p_score: Math.max(0, Math.floor(Number(run.score || 0))),
     p_kills: Math.max(0, Math.floor(Number(run.kills || 0))),
     p_finish: !!finish
-  });
+  };
 
-  if(error){
-    console.error('Run save failed:', error);
+  try{
+    await ensureActiveIronCellSession();
+
+    let response = await client.rpc('iron_cell_save_run_v2', args);
+
+    // Background tab / sleeping laptop can leave an expired access token.
+    // Refresh once and retry instead of falsely reporting an internet error.
+    if(response.error){
+      const msg = String(response.error.message || '').toLowerCase();
+      const authLike =
+        msg.includes('jwt') ||
+        msg.includes('not_authenticated') ||
+        msg.includes('account_required') ||
+        msg.includes('session');
+
+      if(authLike){
+        try{
+          await client.auth.refreshSession();
+          await ensureActiveIronCellSession();
+          response = await client.rpc('iron_cell_save_run_v2', args);
+        }catch(_){}
+      }
+    }
+
+    const {data, error} = response;
+    if(error){
+      console.error('Run save failed:', error);
+      return {profile,awarded_gems:0,awarded_score:0,error};
+    }
+
+    const result = data || {};
+    if(result.profile) profile = result.profile;
+    renderProfile();
+    return result;
+  }catch(error){
+    console.error('Run save/session failed:', error);
     return {profile,awarded_gems:0,awarded_score:0,error};
   }
-
-  const result = data || {};
-  if(result.profile) profile = result.profile;
-  renderProfile();
-  return result;
 }
-
 async function finishRun(run){
   return saveRun(run,true);
 }
