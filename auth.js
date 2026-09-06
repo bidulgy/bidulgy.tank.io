@@ -74,41 +74,197 @@ const els = {
 };
 
 const CANNONS=Object.freeze({
+  // 기본 등급 — 모든 계정 무료
   standard:{
-    id:'standard',name:'기본포',rarity:'starter',rarityLabel:'기본',
-    chance:0,desc:'균형 잡힌 기본 단발포입니다.',passive:'평타 · 정밀 코어: 5번째 탄이 1.7배 피해 + 2회 관통',skill:'Q 코어 포격 · 3.2배 피해의 대형 관통탄'
+    id:'standard',name:'기본포',rarity:'starter',rarityLabel:'기본',chance:0,
+    desc:'균형 잡힌 기본 단발포입니다.',
+    passive:'평타 · 정밀 코어: 5번째 탄이 1.7배 피해 + 2회 관통',
+    skill:'Q 코어 포격 · 3.2배 피해의 대형 관통탄'
   },
+  scout:{
+    id:'scout',name:'스카우트',rarity:'starter',rarityLabel:'기본',chance:0,
+    desc:'가볍고 빠른 기동형 탱크입니다.',
+    passive:'평타 · 더블 탭: 4번째 사격마다 2발을 빠르게 발사',
+    skill:'Q 스피드 발리 · 전방에 고속탄 7발'
+  },
+  bastion:{
+    id:'bastion',name:'바스티온',rarity:'starter',rarityLabel:'기본',chance:0,
+    desc:'느리지만 강한 중장갑 포격형 탱크입니다.',
+    passive:'평타 · 철갑 코어: 6번째 탄이 2.2배 피해 + 3회 관통',
+    skill:'Q 수호 포격 · 범위 충격파 + 중철갑탄 + 체력 회복'
+  },
+
+  // 일반 61.5% / 3캐릭터
   rapid:{
-    id:'rapid',name:'기관포',rarity:'common',rarityLabel:'일반',
-    chance:61.5,desc:'작은 탄환을 매우 빠르게 연속 발사합니다.',passive:'평타 · 가속 탄띠: 8번째 사격마다 3발 동시 가속탄',skill:'Q 탄환 폭주 · 전방에 고속탄 15발 집중 난사'
+    id:'rapid',name:'기관포',rarity:'common',rarityLabel:'일반',chance:20.5,
+    desc:'작은 탄환을 매우 빠르게 연속 발사합니다.',
+    passive:'평타 · 가속 탄띠: 8번째 사격마다 3발 동시 가속탄',
+    skill:'Q 탄환 폭주 · 전방에 고속탄 15발 집중 난사'
   },
+  dual:{
+    id:'dual',name:'듀얼 캐논',rarity:'common',rarityLabel:'일반',chance:20.5,
+    desc:'양쪽 포신에서 두 발을 동시에 발사합니다.',
+    passive:'평타 · 트윈 링크: 기본 2발, 7번째 사격은 4발',
+    skill:'Q 듀얼 러시 · 좁은 전방에 24발 연속 난사'
+  },
+  needle:{
+    id:'needle',name:'니들러',rarity:'common',rarityLabel:'일반',chance:20.5,
+    desc:'작고 매우 빠른 침형 탄환을 사용합니다.',
+    passive:'평타 · 니들 코어: 6번째 탄이 강화되어 4회 관통',
+    skill:'Q 니들 레인 · 전방에 관통 니들 14발'
+  },
+
+  // 희귀 25.63% / 3캐릭터
   spread:{
-    id:'spread',name:'산탄포',rarity:'rare',rarityLabel:'희귀',
-    chance:25.63,desc:'한 번에 5개의 산탄을 넓게 퍼뜨립니다.',passive:'평타 · 파편 확산: 명중 시 좌우 2차 파편 생성',skill:'Q 산탄 폭풍 · 넓은 부채꼴로 파편탄 25발 발사'
+    id:'spread',name:'산탄포',rarity:'rare',rarityLabel:'희귀',chance:8.543333,
+    desc:'한 번에 5개의 산탄을 넓게 퍼뜨립니다.',
+    passive:'평타 · 파편 확산: 명중 시 좌우 2차 파편 생성',
+    skill:'Q 산탄 폭풍 · 넓은 부채꼴로 파편탄 25발 발사'
   },
+  burst:{
+    id:'burst',name:'버스트 캐논',rarity:'rare',rarityLabel:'희귀',chance:8.543333,
+    desc:'좁은 범위에 3연발 탄막을 집중합니다.',
+    passive:'평타 · 버스트 3연사: 매 사격 3발, 5번째는 5발',
+    skill:'Q 버스트 웨이브 · 부채꼴 21발 집중 포격'
+  },
+  crystal:{
+    id:'crystal',name:'크리스탈 샷',rarity:'rare',rarityLabel:'희귀',chance:8.543334,
+    desc:'결정 파편처럼 넓게 갈라지는 탄환을 사용합니다.',
+    passive:'평타 · 결정 분산: 4번째 사격마다 7갈래 파편',
+    skill:'Q 크리스탈 노바 · 18방향 결정탄 방출'
+  },
+
+  // 에픽 10.255% / 3캐릭터
   piercer:{
-    id:'piercer',name:'관통포',rarity:'epic',rarityLabel:'에픽',
-    chance:10.255,desc:'길쭉한 철갑탄이 여러 적을 연속 관통합니다.',passive:'평타 · 관통 가속: 관통할수록 공격력 8%·탄속 4% 증가',skill:'Q 레일 브레이커 · 4.1배 피해·16회 관통 초고속 레일탄'
+    id:'piercer',name:'관통포',rarity:'epic',rarityLabel:'에픽',chance:3.418333,
+    desc:'길쭉한 철갑탄이 여러 적을 연속 관통합니다.',
+    passive:'평타 · 관통 가속: 관통할수록 공격력 8%·탄속 4% 증가',
+    skill:'Q 레일 브레이커 · 4.1배 피해·16회 관통 초고속 레일탄'
   },
+  laser:{
+    id:'laser',name:'레이저 랜서',rarity:'epic',rarityLabel:'에픽',chance:3.418333,
+    desc:'초고속 레일 레이저로 일직선을 압박합니다.',
+    passive:'평타 · 삼중 증폭: 3번째 레일탄이 1.75배 강화',
+    skill:'Q 트리플 레이 · 고위력 레일탄 3발 동시 발사'
+  },
+  drill:{
+    id:'drill',name:'드릴 캐논',rarity:'epic',rarityLabel:'에픽',chance:3.418334,
+    desc:'느리지만 강력한 드릴탄이 적을 깊게 관통합니다.',
+    passive:'평타 · 회전 드릴: 기본 8회 관통, 4번째 탄은 초대형 드릴',
+    skill:'Q 오버 드릴 · 6.5배 피해·26회 관통 초대형 드릴탄'
+  },
+
+  // 전설 2% / 3캐릭터
   plasma:{
-    id:'plasma',name:'플라즈마포',rarity:'legendary',rarityLabel:'전설',
-    chance:2,desc:'플라즈마 구체와 전기 연결선으로 공격합니다.',passive:'평타 · 연쇄 방전: 명중 시 주변 최대 2명에게 45% 번개 피해',skill:'전류 폭주 · 8방향 플라즈마 전기망'
+    id:'plasma',name:'플라즈마포',rarity:'legendary',rarityLabel:'전설',chance:.666667,
+    desc:'플라즈마 구체와 전기 연결선으로 공격합니다.',
+    passive:'평타 · 연쇄 방전: 명중 시 주변 최대 2명에게 45% 번개 피해',
+    skill:'Q 전류 폭주 · 8방향 플라즈마 전기망'
   },
+  thunder:{
+    id:'thunder',name:'썬더 코어',rarity:'legendary',rarityLabel:'전설',chance:.666667,
+    desc:'강한 전류가 담긴 플라즈마 코어를 발사합니다.',
+    passive:'평타 · 삼중 번개: 4번째 사격마다 플라즈마 3발 + 최대 3연쇄',
+    skill:'Q 썬더 서클 · 12방향 플라즈마 폭발'
+  },
+  inferno:{
+    id:'inferno',name:'인페르노',rarity:'legendary',rarityLabel:'전설',chance:.666666,
+    desc:'고열 화염탄이 폭발하고 불길을 남깁니다.',
+    passive:'평타 · 화염 포화: 5번째 사격마다 소이탄 3발',
+    skill:'Q 헬파이어 · 전방에 대형 화염탄 9발'
+  },
+
+  // 신화 .5% / 3캐릭터
   rocket:{
-    id:'rocket',name:'로켓포',rarity:'mythic',rarityLabel:'신화',
-    chance:.5,desc:'중장갑 로켓이 넓은 폭발 피해를 줍니다.',passive:'평타 · 소이 폭발: 폭발 지점에 2.4초 화염 지대',skill:'Q 미사일 폭격 · 전방 다연장 로켓 일제사',skill2:'R 강철 요새 · 6초간 받는 피해 70% 감소'
+    id:'rocket',name:'로켓포',rarity:'mythic',rarityLabel:'신화',chance:.166667,
+    desc:'중장갑 로켓이 넓은 폭발 피해를 줍니다.',
+    passive:'평타 · 소이 폭발: 폭발 지점에 2.4초 화염 지대',
+    skill:'Q 미사일 폭격 · 전방 다연장 로켓 일제사',
+    skill2:'R 강철 요새 · 6초간 받는 피해 70% 감소'
   },
+  titan:{
+    id:'titan',name:'타이탄',rarity:'mythic',rarityLabel:'신화',chance:.166667,
+    desc:'거대한 중포와 높은 방어력을 가진 중전차입니다.',
+    passive:'평타 · 중포 코어: 대형 폭발탄, 4번째는 쌍포격',
+    skill:'Q 타이탄 포화 · 12방향 중로켓 일제사',
+    skill2:'R 타이탄 장갑 · 8초간 피해 70% 감소 + 체력 18% 회복'
+  },
+  phantom:{
+    id:'phantom',name:'팬텀',rarity:'mythic',rarityLabel:'신화',chance:.166666,
+    desc:'순간 이동과 고속 레일탄을 사용하는 암살형 탱크입니다.',
+    passive:'평타 · 팬텀 레일: 5번째 사격마다 3발 레일탄',
+    skill:'Q 팬텀 스트라이크 · 전방 돌진 후 레일탄 9발',
+    skill2:'R 페이즈 워프 · 조준 방향 900 순간이동 + 무적'
+  },
+
+  // 시크릿 .1% / 3캐릭터
   ring:{
-    id:'ring',name:'링 캐논',rarity:'secret',rarityLabel:'시크릿',
-    chance:.1,desc:'차원 에너지 링이 적들을 연속 관통합니다.',passive:'평타 · 회귀 링: 멀리 날아간 링이 사용자에게 되돌아옴',skill:'Q 차원 절단 · 16방향 관통 링 방출',skill2:'R 공간 도약 · 조준 방향으로 장거리 순간이동'
+    id:'ring',name:'링 캐논',rarity:'secret',rarityLabel:'시크릿',chance:.033334,
+    desc:'차원 에너지 링이 적들을 연속 관통합니다.',
+    passive:'평타 · 회귀 링: 멀리 날아간 링이 사용자에게 되돌아옴',
+    skill:'Q 차원 절단 · 16방향 관통 링 방출',
+    skill2:'R 공간 도약 · 조준 방향으로 장거리 순간이동'
   },
+  chrono:{
+    id:'chrono',name:'크로노',rarity:'secret',rarityLabel:'시크릿',chance:.033333,
+    desc:'시간 링을 겹쳐 쏘며 빠르게 위치를 바꿉니다.',
+    passive:'평타 · 타임 듀오: 3번째 사격마다 회귀 링 2발',
+    skill:'Q 크로노 서클 · 20방향 고속 링 방출',
+    skill2:'R 타임 스킵 · 560 순간이동 + Q 쿨타임 일부 단축'
+  },
+  void:{
+    id:'void',name:'보이드',rarity:'secret',rarityLabel:'시크릿',chance:.033333,
+    desc:'공간을 압축하는 보이드 탄환과 중력장을 사용합니다.',
+    passive:'평타 · 보이드 펄스: 4번째 사격마다 3개의 폭발성 보이드탄',
+    skill:'Q 보이드 싱크 · 목표 지점에 소형 중력장 생성',
+    skill2:'R 보이드 필드 · 6초 대형 중력장'
+  },
+
+  // 갤럭시 .01% / 3캐릭터
   nova:{
-    id:'nova',name:'노바 캐논',rarity:'galaxy',rarityLabel:'갤럭시',
-    chance:.01,desc:'별 모양 노바탄이 관통과 폭발을 동시에 일으킵니다.',passive:'평타 · 성운 분열: 첫 명중 시 작은 별 파편 4개 생성',skill:'Q 초신성 · 광역 폭발 + 노바탄 전방위 방출',skill2:'R 중력 특이점 · 지속형 중력장을 생성해 적을 끌어당김'
+    id:'nova',name:'노바 캐논',rarity:'galaxy',rarityLabel:'갤럭시',chance:.003334,
+    desc:'별 모양 노바탄이 관통과 폭발을 동시에 일으킵니다.',
+    passive:'평타 · 성운 분열: 첫 명중 시 작은 별 파편 4개 생성',
+    skill:'Q 초신성 · 광역 폭발 + 노바탄 전방위 방출',
+    skill2:'R 중력 특이점 · 지속형 중력장을 생성해 적을 끌어당김'
   },
+  comet:{
+    id:'comet',name:'코멧',rarity:'galaxy',rarityLabel:'갤럭시',chance:.003333,
+    desc:'고속 혜성탄으로 전장을 가로지르는 기동형 탱크입니다.',
+    passive:'평타 · 혜성 꼬리: 5번째 사격마다 노바탄 3발',
+    skill:'Q 코멧 스톰 · 전방 부채꼴 혜성탄 19발',
+    skill2:'R 혜성 도약 · 조준 방향 1100 초장거리 순간이동'
+  },
+  stellar:{
+    id:'stellar',name:'스텔라',rarity:'galaxy',rarityLabel:'갤럭시',chance:.003333,
+    desc:'별빛을 폭발시키는 광역 제압형 탱크입니다.',
+    passive:'평타 · 쌍성: 기본 2발, 6번째 사격은 5발 성탄',
+    skill:'Q 스텔라 버스트 · 대광역 폭발 + 16방향 별탄',
+    skill2:'R 성광 장막 · 6초 피해 감소 + 체력 25% 회복'
+  },
+
+  // ERROR .005% / 3캐릭터
   error:{
-    id:'error',name:'ERROR 캐논',rarity:'error',rarityLabel:'ERROR',
-    chance:.005,desc:'불안정한 글리치 에너지와 ERROR 검을 사용하는 최고 등급 탱크입니다.',passive:'평타 · T 검 모드에서는 검만 휘두름 · R 버프 중에만 평타마다 ERROR 검기 추가',skill:'Q 이중 스킬 · 검 모드 OFF: 원래 SYSTEM CRASH 24발 · 검 모드 ON: 최대 5초 차징 ERROR 검기',skill2:'R GLITCH DRIVE · 15초 이동속도 증가 + 검 평타마다 검기 + 강화 중 R로 3초마다 도약',skill3:'T GLITCH BLADE · 7초 쿨 · 돌진하며 ERROR 검을 휘두르고 검 모드 ON/OFF'
+    id:'error',name:'ERROR 캐논',rarity:'error',rarityLabel:'ERROR',chance:.001667,
+    desc:'불안정한 글리치 에너지와 ERROR 검을 사용하는 최고 등급 탱크입니다.',
+    passive:'평타 · T 검 모드에서는 검만 휘두름 · R 버프 중에만 평타마다 ERROR 검기 추가',
+    skill:'Q 이중 스킬 · 검 모드 OFF: SYSTEM CRASH 24발 · 검 모드 ON: 최대 5초 차징 ERROR 검기',
+    skill2:'R GLITCH DRIVE · 15초 이동속도 증가 + 검 평타마다 검기 + 강화 중 R로 3초마다 도약',
+    skill3:'T GLITCH BLADE · 7초 쿨 · 돌진하며 ERROR 검을 휘두르고 검 모드 ON/OFF'
+  },
+  glitch:{
+    id:'glitch',name:'GLITCH-13',rarity:'error',rarityLabel:'ERROR',chance:.001667,
+    desc:'분열되는 글리치탄으로 화면을 뒤덮는 ERROR 개체입니다.',
+    passive:'평타 · 패킷 분열: 기본 2발, 6번째 사격은 7발 글리치탄',
+    skill:'Q PACKET STORM · 36방향 ERROR 탄환 방출',
+    skill2:'R DESYNC · 12초간 이동속도 초가속'
+  },
+  zero:{
+    id:'zero',name:'ZERO',rarity:'error',rarityLabel:'ERROR',chance:.001666,
+    desc:'극단적인 단발 화력과 공간 삭제 능력을 가진 ERROR 개체입니다.',
+    passive:'평타 · ZERO CORE: 강한 관통탄, 4번째 사격은 3중 NULL 탄',
+    skill:'Q ZERO BEAM · 9배 피해·40회 관통 초대형 NULL 탄환',
+    skill2:'R ZERO SHIFT · 1200 순간이동 + 1.2초 위상 무적'
   }
 });
 window.IronCellCannons=CANNONS;
@@ -202,7 +358,7 @@ async function ensureProfile(){
     .maybeSingle();
 
   if(error){
-    console.error('Iron Cell profile load failed:', error);
+    console.error('sworder VS tank profile load failed:', error);
     throw error;
   }
 
@@ -320,9 +476,10 @@ function setAdminMessage(text='',type=''){
 function adminFriendlyError(error){
   const msg=String(error?.message||error||'').toLowerCase();
   if(msg.includes('admin_required'))return '관리자 권한이 없습니다.';
-  if(msg.includes('user_not_found'))return '해당 Iron Cell 계정을 찾지 못했습니다.';
+  if(msg.includes('user_not_found'))return '해당 sworder VS tank 계정을 찾지 못했습니다.';
   if(msg.includes('invalid_username'))return '아이디 형식을 확인하세요.';
-  if(msg.includes('cannot_remove_standard'))return '기본포는 회수할 수 없습니다.';
+  if(msg.includes('cannot_remove_standard')||msg.includes('cannot_remove_starter'))return '기본 등급 캐릭터는 회수할 수 없습니다.';
+  if(msg.includes('admin_request_timeout'))return '서버 응답이 지연되고 있습니다. 다시 시도해 주세요.';
   return String(error?.message||error||'서버 요청 실패');
 }
 function renderAdminCannons(){
@@ -377,6 +534,115 @@ async function refreshAdminAccess(){
   return adminEnabled;
 }
 
+
+function withAdminTimeout(promiseLike,ms=4500){
+  let timer=0;
+  const timeout=new Promise((_,reject)=>{
+    timer=setTimeout(()=>{
+      const error=new Error('admin_request_timeout');
+      error.code='admin_request_timeout';
+      reject(error);
+    },ms);
+  });
+  return Promise.race([Promise.resolve(promiseLike),timeout]).finally(()=>clearTimeout(timer));
+}
+async function ensureAdminSession(){
+  await ensureActiveIronCellSession();
+  if(!adminEnabled){
+    const allowed=await refreshAdminAccess();
+    if(!allowed){
+      const error=new Error('admin_required');
+      error.code='admin_required';
+      throw error;
+    }
+  }
+}
+async function loadAdminProfilesByIds(ids){
+  const list=[...new Set((ids||[]).filter(Boolean))];
+  if(!list.length)return new Map();
+
+  const response=await withAdminTimeout(
+    client
+      .from('iron_cell_profiles')
+      .select('user_id,gems,best_level,best_score,best_kills,total_runs,total_kills,equipped_cannon,owned_cannons,pilot_name')
+      .in('user_id',list),
+    4500
+  );
+  if(response.error)throw response.error;
+
+  return new Map((response.data||[]).map(row=>[String(row.user_id),row]));
+}
+async function loadAdminDirectoryDirect(query='',limit=30){
+  await ensureAdminSession();
+
+  const q=String(query||'').trim().toLowerCase();
+  let request=client
+    .from('iron_cell_accounts')
+    .select('username,user_id,created_at',{count:'exact'})
+    .order('created_at',{ascending:false})
+    .limit(Math.max(1,Math.min(Number(limit)||30,100)));
+
+  if(q)request=request.ilike('username',`${q}%`);
+
+  const response=await withAdminTimeout(request,4500);
+  if(response.error)throw response.error;
+
+  const accounts=Array.isArray(response.data)?response.data:[];
+  let profiles=new Map();
+  try{
+    profiles=await loadAdminProfilesByIds(accounts.map(row=>row.user_id));
+  }catch(error){
+    // The account list itself is more important than optional stats.
+    console.warn('Admin profile merge skipped:',error);
+  }
+
+  return {
+    total:q?null:Math.max(0,Number(response.count||accounts.length)),
+    users:accounts.map(row=>({
+      username:String(row.username||''),
+      user_id:String(row.user_id||''),
+      created_at:row.created_at||null,
+      ...(profiles.get(String(row.user_id))||{})
+    }))
+  };
+}
+async function adminLookupDirect(username){
+  await ensureAdminSession();
+
+  const accountResponse=await withAdminTimeout(
+    client
+      .from('iron_cell_accounts')
+      .select('username,user_id,created_at')
+      .eq('username',username)
+      .maybeSingle(),
+    4500
+  );
+  if(accountResponse.error)throw accountResponse.error;
+  if(!accountResponse.data){
+    const error=new Error('user_not_found');
+    error.code='user_not_found';
+    throw error;
+  }
+
+  const userId=String(accountResponse.data.user_id||'');
+  const profileResponse=await withAdminTimeout(
+    client
+      .from('iron_cell_profiles')
+      .select('*')
+      .eq('user_id',userId)
+      .maybeSingle(),
+    4500
+  );
+  if(profileResponse.error)throw profileResponse.error;
+
+  return {
+    username:String(accountResponse.data.username||username),
+    user_id:userId,
+    created_at:accountResponse.data.created_at||null,
+    profile:profileResponse.data||null
+  };
+}
+
 function formatAdminDate(value){
   if(!value)return '';
   const d=new Date(value);
@@ -407,18 +673,24 @@ function renderAdminSearchResults(rows,query){
       </span>
       <b>◆ ${Number(row.gems||0).toLocaleString()}</b>
     </button>
-  `).join(''):`<div class="admin-search-empty">"${escapeHtml(query)}"로 시작하는 Iron Cell 계정이 없습니다.</div>`;
+  `).join(''):`<div class="admin-search-empty">"${escapeHtml(query)}"로 시작하는 sworder VS tank 계정이 없습니다.</div>`;
 }
 async function loadAdminDirectory(query='',limit=30){
   if(!adminEnabled)return {total:0,users:[]};
-  const {data,error}=await client.rpc('iron_cell_admin_directory_v2',{
-    p_query:String(query||''),
-    p_limit:Math.max(1,Math.min(Number(limit)||30,100))
-  });
-  if(error)throw error;
+  await ensureActiveIronCellSession();
+
+  const response=await withAdminTimeout(
+    client.rpc('iron_cell_admin_panel_v3',{
+      p_query:String(query||''),
+      p_limit:Math.max(1,Math.min(Number(limit)||30,100)),
+      p_exact:null
+    }),
+    4500
+  );
+  if(response.error)throw response.error;
   return {
-    total:Math.max(0,Number(data?.total||0)),
-    users:Array.isArray(data?.users)?data.users:[]
+    total:Math.max(0,Number(response.data?.total||0)),
+    users:Array.isArray(response.data?.users)?response.data.users:[]
   };
 }
 async function searchAdminDirectory(queryValue=els.adminUsername?.value){
@@ -439,7 +711,9 @@ async function searchAdminDirectory(queryValue=els.adminUsername?.value){
     const result=await loadAdminDirectory(query,12);
     if(seq!==adminSearchSeq)return;
     renderAdminSearchResults(result.users,query);
-    if(els.adminAccountCount)els.adminAccountCount.textContent=`총 ${result.total.toLocaleString()}개`;
+    if(els.adminAccountCount&&Number.isFinite(result.total)){
+      els.adminAccountCount.textContent=`총 ${result.total.toLocaleString()}개`;
+    }
   }catch(error){
     if(seq!==adminSearchSeq)return;
     console.warn('Fast admin directory search failed:',error);
@@ -465,8 +739,25 @@ async function adminLookup(usernameValue=els.adminUsername?.value){
 
   setAdminMessage(`${username} 계정 검색 중...`,'busy');
   try{
-    const {data,error}=await client.rpc('iron_cell_admin_lookup_user',{p_username:username});
-    if(error)throw error;
+    await ensureActiveIronCellSession();
+    const response=await withAdminTimeout(
+      client.rpc('iron_cell_admin_panel_v3',{
+        p_query:username,
+        p_limit:12,
+        p_exact:username
+      }),
+      4500
+    );
+    if(response.error)throw response.error;
+
+    const data=response.data?.exact||null;
+    if(!data){
+      const candidates=Array.isArray(response.data?.users)?response.data.users:[];
+      renderAdminSearchResults(candidates,username);
+      setAdminMessage(candidates.length?'정확히 일치하는 계정은 없습니다. 아래 후보를 선택하세요.':'해당 계정을 찾지 못했습니다.','error');
+      return;
+    }
+
     adminTargetUsername=username;
     if(els.adminUsername)els.adminUsername.value=username;
     renderAdminTarget(data);
@@ -474,7 +765,6 @@ async function adminLookup(usernameValue=els.adminUsername?.value){
     setAdminMessage(`${username} 계정을 불러왔습니다.`,'good');
   }catch(error){
     setAdminMessage(adminFriendlyError(error),'error');
-    void searchAdminDirectory(username);
   }
 }
 async function adminChangeGems(mode){
@@ -511,10 +801,13 @@ async function adminSetCannon(cannon,owned){
 async function loadAdminRecentUsers(){
   if(!adminEnabled||!els.adminRecentUsers)return;
   els.adminRecentUsers.innerHTML='<div class="admin-message busy">최근 가입 계정을 불러오는 중...</div>';
+  if(els.adminAccountCount)els.adminAccountCount.textContent='불러오는 중…';
+
   try{
     const result=await loadAdminDirectory('',30);
-    const rows=result.users;
-    if(els.adminAccountCount)els.adminAccountCount.textContent=`총 ${result.total.toLocaleString()}개`;
+    const rows=Array.isArray(result.users)?result.users:[];
+    const total=Number.isFinite(result.total)?result.total:rows.length;
+    if(els.adminAccountCount)els.adminAccountCount.textContent=`총 ${total.toLocaleString()}개`;
 
     els.adminRecentUsers.innerHTML=rows.length?rows.map(row=>`
       <button class="admin-recent-user" type="button" data-admin-user="${escapeHtml(row.username||'')}">
@@ -525,7 +818,7 @@ async function loadAdminRecentUsers(){
         </span>
         <b>◆ ${Number(row.gems||0).toLocaleString()}</b>
       </button>
-    `).join(''):`<div class="admin-message">현재 Iron Cell 독립계정이 없습니다.</div>`;
+    `).join(''):`<div class="admin-message">현재 sworder VS tank 독립계정이 없습니다.</div>`;
   }catch(error){
     els.adminRecentUsers.innerHTML=`<div class="admin-message error">${escapeHtml(adminFriendlyError(error))}</div>`;
   }
@@ -541,8 +834,16 @@ async function showAdmin(){
   els.lobbyScreen?.classList.remove('show');
   els.adminScreen?.classList.add('show');
   renderAdminCannons();
-  setAdminMessage('관리자 권한 확인 완료 · bidulgy','good');
-  void loadAdminRecentUsers();
+  setAdminMessage('관리자 권한 확인 완료 · 계정 목록 연결 중...','busy');
+  await loadAdminRecentUsers();
+
+  const visibleCount=els.adminRecentUsers?.querySelectorAll?.('[data-admin-user]')?.length||0;
+  setAdminMessage(
+    visibleCount
+      ? `관리자 연결 정상 · 최근 계정 ${visibleCount}개 표시`
+      : '관리자 연결 정상 · 표시할 계정을 확인해 주세요.',
+    visibleCount?'good':''
+  );
 }
 
 function hideGameMenus(){
@@ -671,13 +972,13 @@ async function enterSession(user){
     currentUsername = '';
     profile = null;
     showAuth();
-    setMessage('이 계정은 Iron Cell 전용 계정이 아닙니다. 회원가입 버튼으로 새 Iron Cell 계정을 만들어 주세요.', 'error');
+    setMessage('이 계정은 sworder VS tank 전용 계정이 아닙니다. 회원가입 버튼으로 새 sworder VS tank 계정을 만들어 주세요.', 'error');
     return false;
   }
 
   currentUser = user;
   currentUsername = usernameFromUser(user);
-  setMessage('Iron Cell 계정 데이터를 불러오는 중...', 'busy');
+  setMessage('sworder VS tank 계정 데이터를 불러오는 중...', 'busy');
   await ensureProfile();
   renderProfile();
   setMessage('');
@@ -700,7 +1001,7 @@ async function signup(){
   }
 
   setBusy(true);
-  setMessage('Iron Cell 전용 계정을 만드는 중...', 'busy');
+  setMessage('sworder VS tank 전용 계정을 만드는 중...', 'busy');
 
   try{
     const {data, error} = await client.auth.signUp({
@@ -757,7 +1058,7 @@ async function login(){
     });
 
     if(error || !data?.user){
-      setMessage('Iron Cell 아이디 또는 비밀번호를 확인하세요. 처음이라면 회원가입을 먼저 해주세요.', 'error');
+      setMessage('sworder VS tank 아이디 또는 비밀번호를 확인하세요. 처음이라면 회원가입을 먼저 해주세요.', 'error');
       return;
     }
 
