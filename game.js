@@ -47,7 +47,7 @@ const TANK_THEMES=Object.freeze({
 });
 
 const statsDef=[['maxHealth','최대 체력'],['regen','체력 회복'],['bulletDamage','탄환 피해'],['bulletSpeed','탄환 속도'],['reload','연사 속도'],['moveSpeed','이동 속도']];
-function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
+function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
 function resize(){const dpr=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(innerWidth*dpr);canvas.height=Math.round(innerHeight*dpr);canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
 const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function dist2(a,b){const dx=a.x-b.x,dy=a.y-b.y;return dx*dx+dy*dy}function norm(dx,dy){const d=Math.hypot(dx,dy)||1;return[dx/d,dy/d]}
@@ -128,7 +128,7 @@ function upsertRemotePlayer(payload){
       tx:safeRemoteNumber(payload.x,WORLD/2),ty:safeRemoteNumber(payload.y,WORLD/2),
       angle:safeRemoteNumber(payload.angle,0),targetAngle:safeRemoteNumber(payload.angle,0),
       vx:0,vy:0,r:27,hp:120,maxHp:120,level:1,score:0,kills:0,
-      name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',fortress:false,overclock:false,swordMode:false,lastSeen:performance.now()
+      name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',fortress:false,overclock:false,swordMode:false,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,lastSeen:performance.now()
     };
     remotePlayers.set(id,r);
   }
@@ -420,13 +420,17 @@ function receiveRemoteSkill(payload){
   if(slot===3&&cannon==='error'){
     const tx=safeRemoteNumber(payload.targetX,x),ty=safeRemoteNumber(payload.targetY,y);
     const mode=String(payload.mode||'toggle');
+    const remote=remotePlayers.get(String(payload.ownerId||''));
+    const swingDir=safeRemoteNumber(payload.swingDir,0);
+
     if(mode==='basicSwing'){
-      spawnCombatFx('errorSwordSwing',x,y,{angle,color:'#72ff43',life:.32,radius:128,cannon:'error'});
+      spawnCombatFx('errorSwordSwing',x,y,{angle,color:'#72ff43',life:.38,radius:182,cannon:'error'});
+      if(remote)triggerErrorSwordSwing(remote,1,.34,swingDir);
     }else{
       spawnCombatFx('errorSwordDash',x,y,{angle,color:'#72ff43',life:.55,radius:Math.hypot(tx-x,ty-y)||360,cannon:'error'});
-      spawnCombatFx('errorSwordSwing',tx,ty,{angle,color:'#72ff43',life:.44,radius:170,cannon:'error'});
+      spawnCombatFx('errorSwordSwing',tx,ty,{angle,color:'#72ff43',life:.50,radius:242,cannon:'error'});
+      if(remote)triggerErrorSwordSwing(remote,1.35,.46,swingDir);
     }
-    const remote=remotePlayers.get(String(payload.ownerId||''));
     if(remote)remote.swordMode=payload.swordMode===true;
     return;
   }
@@ -629,6 +633,57 @@ function angleDifference(a,b){
   if(d<-Math.PI)d+=TAU;
   return d;
 }
+
+function triggerErrorSwordSwing(entity,power=1,duration=.32,forcedDir=0){
+  if(!entity)return 1;
+  const now=performance.now();
+  let dir=Number(forcedDir)||0;
+  if(!dir){
+    dir=(entity.swordSwingDir||1)*-1;
+  }
+  dir=dir<0?-1:1;
+  entity.swordSwingDir=dir;
+  entity.swordSwingStartedAt=now;
+  entity.swordSwingUntil=now+Math.max(.18,Number(duration)||.32)*1000;
+  entity.swordSwingPower=Math.max(.5,Number(power)||1);
+  return dir;
+}
+function getErrorSwordSwingPose(entity){
+  const now=performance.now();
+  const start=Number(entity?.swordSwingStartedAt)||0;
+  const end=Number(entity?.swordSwingUntil)||0;
+  const dir=(Number(entity?.swordSwingDir)||1)<0?-1:1;
+  const power=Math.max(.5,Number(entity?.swordSwingPower)||1);
+
+  if(start>0&&end>start&&now<end){
+    const u=clamp((now-start)/(end-start),0,1);
+    // Fast opening, strong follow-through and a small settle at the end.
+    const eased=u<.72
+      ? 1-Math.pow(1-u/.72,3)
+      : 1-.07*Math.sin((u-.72)/.28*Math.PI);
+    const amplitude=1.18+Math.min(.34,(power-1)*.42);
+    const from=-amplitude*dir;
+    const to=amplitude*dir;
+    return {
+      active:true,
+      angle:from+(to-from)*eased,
+      scale:1+.10*Math.sin(Math.PI*u)*Math.min(1.4,power),
+      progress:u,
+      dir,
+      power
+    };
+  }
+
+  return {
+    active:false,
+    angle:-.10+Math.sin(performance.now()*.004)*.035,
+    scale:1,
+    progress:1,
+    dir,
+    power:1
+  };
+}
+
 function errorSwordArcDamage(x,y,angle,damage,range=135,halfAngle=.82){
   const r2=range*range;
   for(let i=shapes.length-1;i>=0;i--){
@@ -691,14 +746,18 @@ function activateSkill3(){
   }
 
   player.x=tx;player.y=ty;player.vx=Math.cos(a)*150;player.vy=Math.sin(a)*150;
-  errorSwordArcDamage(player.x,player.y,a,p.damage*3.0,170,1.05);
-  spawnCombatFx('errorSwordSwing',player.x,player.y,{angle:a,color:'#72ff43',life:.44,radius:170,cannon:'error'});
-  burst(player.x,player.y,'#72ff43',20);burst(player.x,player.y,'#ff42df',16);burst(player.x,player.y,'#42eaff',10);
+  const swingDir=triggerErrorSwordSwing(player,1.35,.46);
+  // T 돌진 베기는 일반 평타보다 훨씬 넓은 범위를 휩쓴다.
+  errorSwordArcDamage(player.x,player.y,a,p.damage*3.0,235,1.28);
+  spawnCombatFx('errorSwordSwing',player.x,player.y,{
+    angle:a,color:'#72ff43',life:.50,radius:242,cannon:'error'
+  });
+  burst(player.x,player.y,'#72ff43',24);burst(player.x,player.y,'#ff42df',19);burst(player.x,player.y,'#42eaff',13);
   shake=Math.max(shake,10);
 
   sendOnline('skill',{
     slot:3,mode:'toggle',ownerId:onlineSelfId,cannon:'error',
-    x:ox,y:oy,targetX:tx,targetY:ty,angle:a,swordMode:player.errorSwordMode
+    x:ox,y:oy,targetX:tx,targetY:ty,angle:a,swordMode:player.errorSwordMode,swingDir
   });
   broadcastLocalState(true);
   camera.x=player.x-innerWidth/2;camera.y=player.y-innerHeight/2;
@@ -1045,8 +1104,12 @@ function fire(e){
   if(cannon==='error'&&e.errorSwordMode){
     // 검 모드 기본 평타: 켄지처럼 검만 휘두른다. 평상시에는 검기가 절대 나오지 않는다.
     e.fireCd=Math.max(.18,p.reload*.88);
-    errorSwordArcDamage(e.x,e.y,a,p.damage*1.30,125,.86);
-    spawnCombatFx('errorSwordSwing',e.x,e.y,{angle:a,color:'#72ff43',life:.32,radius:128,cannon:'error'});
+    const swingDir=triggerErrorSwordSwing(e,1,.34);
+    // 기본 검 평타 판정 범위 확대: 125 -> 175, 부채꼴 각도도 확대.
+    errorSwordArcDamage(e.x,e.y,a,p.damage*1.30,175,1.15);
+    spawnCombatFx('errorSwordSwing',e.x,e.y,{
+      angle:a,color:'#72ff43',life:.38,radius:182,cannon:'error'
+    });
 
     const rBoostActive=performance.now()<(e.overclockUntil||0);
     if(rBoostActive){
@@ -1060,7 +1123,7 @@ function fire(e){
     sendOnline('skill',{
       slot:3,mode:'basicSwing',ownerId:onlineSelfId,cannon:'error',
       x:e.x,y:e.y,targetX:e.x,targetY:e.y,angle:a,swordMode:true,
-      rBlade:rBoostActive
+      rBlade:rBoostActive,swingDir
     });
     e.vx-=Math.cos(a)*10;e.vy-=Math.sin(a)*10;
     return;
@@ -1514,17 +1577,54 @@ function drawPlayerCannon(cannon,r){
   else{ctx.beginPath();ctx.roundRect(r*.22,-7,r+23,14,4);ctx.fill();ctx.stroke()}
 }
 
-function drawErrorSword(r,t){
+function drawErrorSword(e,r,t){
+  const pose=getErrorSwordSwingPose(e);
   ctx.save();
-  ctx.rotate(-.10+Math.sin(t*4)*.035);
-  ctx.shadowColor='#72ff43';ctx.shadowBlur=16;
-  ctx.fillStyle='#0b0d10';ctx.strokeStyle='#72ff43';ctx.lineWidth=3;
-  ctx.beginPath();ctx.moveTo(r*.10,-6);ctx.lineTo(r+62,-4);ctx.lineTo(r+82,0);ctx.lineTo(r+62,4);ctx.lineTo(r*.10,6);ctx.closePath();ctx.fill();ctx.stroke();
-  ctx.strokeStyle='#ff42df';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r+5,-8);ctx.lineTo(r+70,-6);ctx.stroke();
-  ctx.strokeStyle='#42eaff';ctx.beginPath();ctx.moveTo(r+8,8);ctx.lineTo(r+68,6);ctx.stroke();
-  ctx.fillStyle='#dfffff';ctx.fillRect(r+58,-2,18,4);
+  ctx.rotate(pose.angle);
+  ctx.scale(pose.scale,pose.scale);
+
+  // During the swing, draw short RGB after-image trails behind the actual blade.
+  if(pose.active){
+    const trailAlpha=.18*(1-pose.progress*.45);
+    for(let k=3;k>=1;k--){
+      const back=-pose.dir*k*.095;
+      ctx.save();
+      ctx.rotate(back);
+      ctx.globalAlpha=trailAlpha*(1-k*.12);
+      ctx.strokeStyle=k%2?'#ff42df':'#42eaff';
+      ctx.lineWidth=4;
+      ctx.beginPath();
+      ctx.moveTo(r*.15,0);
+      ctx.lineTo(r+98,0);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  ctx.shadowColor='#72ff43';ctx.shadowBlur=20;
+  ctx.fillStyle='#0b0d10';ctx.strokeStyle='#72ff43';ctx.lineWidth=3.5;
+
+  // Blade is slightly longer so the visual matches the enlarged hit range.
+  ctx.beginPath();
+  ctx.moveTo(r*.10,-7);
+  ctx.lineTo(r+76,-5);
+  ctx.lineTo(r+102,0);
+  ctx.lineTo(r+76,5);
+  ctx.lineTo(r*.10,7);
+  ctx.closePath();ctx.fill();ctx.stroke();
+
+  ctx.strokeStyle='#ff42df';ctx.lineWidth=2.3;
+  ctx.beginPath();ctx.moveTo(r+5,-9);ctx.lineTo(r+88,-7);ctx.stroke();
+
+  ctx.strokeStyle='#42eaff';
+  ctx.beginPath();ctx.moveTo(r+8,9);ctx.lineTo(r+86,7);ctx.stroke();
+
+  ctx.fillStyle='#dfffff';
+  ctx.fillRect(r+71,-2,23,4);
+
   ctx.shadowBlur=0;
-  ctx.fillStyle='#24272c';ctx.fillRect(r*.04,-12,10,24);
+  ctx.fillStyle='#24272c';
+  ctx.fillRect(r*.04,-13,11,26);
   ctx.restore();
 }
 
@@ -1557,7 +1657,7 @@ function drawTank(e){
   }
 
   // ERROR 검 모드에서는 포신 대신 ERROR 검을 든다.
-  if(swordModeActive)drawErrorSword(r,t);else drawPlayerCannon(cannon,r);
+  if(swordModeActive)drawErrorSword(e,r,t);else drawPlayerCannon(cannon,r);
 
   ctx.shadowColor=theme.glow;ctx.shadowBlur=cannon==='standard'?7:13;
   ctx.fillStyle=theme.body;ctx.strokeStyle=theme.edge;ctx.lineWidth=5;
@@ -1754,13 +1854,24 @@ function drawCombatEffects(){
     }else if(f.type==='chainArc'){
       const[x2,y2]=worldToScreen(f.x2,f.y2);ctx.restore();ctx.save();ctx.globalAlpha=Math.min(1,p*1.4);ctx.strokeStyle='#8af7ff';ctx.lineWidth=3;ctx.shadowColor='#6cf4ff';ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(x,y);const mx=(x+x2)/2+rand(-18,18),my=(y+y2)/2+rand(-18,18);ctx.lineTo(mx,my);ctx.lineTo(x2,y2);ctx.stroke();ctx.shadowBlur=0;
     }else if(f.type==='errorSwordSwing'){
-      ctx.shadowColor='#72ff43';ctx.shadowBlur=18;
-      ctx.strokeStyle='#72ff43';ctx.lineWidth=10*p+2;
-      ctx.beginPath();ctx.arc(0,0,f.radius*(.45+.45*q),-.95,.95);ctx.stroke();
-      ctx.strokeStyle='#ff42df';ctx.lineWidth=5*p+1;
-      ctx.beginPath();ctx.arc(4,0,f.radius*(.50+.42*q),-.90,.90);ctx.stroke();
-      ctx.strokeStyle='#42eaff';ctx.lineWidth=2.5;
-      ctx.beginPath();ctx.arc(-3,0,f.radius*(.40+.50*q),-1.02,1.02);ctx.stroke();ctx.shadowBlur=0;
+      // Wide slash trail matching the enlarged melee cone.
+      ctx.shadowColor='#72ff43';ctx.shadowBlur=23;
+      ctx.lineCap='round';
+
+      ctx.strokeStyle='#72ff43';ctx.lineWidth=13*p+3;
+      ctx.beginPath();ctx.arc(0,0,f.radius*(.46+.46*q),-1.34,1.34);ctx.stroke();
+
+      ctx.strokeStyle='#ff42df';ctx.lineWidth=7*p+1;
+      ctx.beginPath();ctx.arc(5,0,f.radius*(.51+.43*q),-1.27,1.27);ctx.stroke();
+
+      ctx.strokeStyle='#42eaff';ctx.lineWidth=3.3;
+      ctx.beginPath();ctx.arc(-4,0,f.radius*(.41+.51*q),-1.40,1.40);ctx.stroke();
+
+      ctx.globalAlpha*=.48;
+      ctx.strokeStyle='#eaffff';ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(0,0,f.radius*(.56+.38*q),-1.18,1.18);ctx.stroke();
+
+      ctx.shadowBlur=0;ctx.lineCap='butt';
     }else if(f.type==='errorSwordCast'){
       ctx.shadowColor='#72ff43';ctx.shadowBlur=22;
       ctx.strokeStyle='#72ff43';ctx.lineWidth=8*p+2;
