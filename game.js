@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
-const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill')};
+const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill')};
 const TAU=Math.PI*2,WORLD=4200,GRID=56;
 const NORMAL_SHAPE_TARGET=95;
 const CENTRAL_PENTAGON_TARGET=220;
@@ -25,14 +25,15 @@ const CANNON_SKILLS=Object.freeze({
   rocket:{name:'미사일 폭격',cooldown:21,color:'#ff9b4a'},
   ring:{name:'차원 절단',cooldown:20,color:'#c09aff'},
   nova:{name:'초신성',cooldown:24,color:'#74efff'},
-  error:{name:'SYSTEM CRASH',cooldown:27,color:'#7dff48'}
+  error:{name:'ERROR 검기',cooldown:27,color:'#7dff48'}
 });
 const CANNON_SKILLS_2=Object.freeze({
   rocket:{name:'강철 요새',cooldown:28,color:'#ffc06a',kind:'fortress'},
   ring:{name:'공간 도약',cooldown:16,color:'#e2caff',kind:'warp'},
   nova:{name:'중력 특이점',cooldown:30,color:'#8fa8ff',kind:'gravity'},
-  error:{name:'OVERCLOCK.EXE',cooldown:34,color:'#ff46dc',kind:'overclock'}
+  error:{name:'GLITCH DRIVE',cooldown:34,color:'#ff46dc',kind:'overclock'}
 });
+const ERROR_T_SKILL=Object.freeze({name:'GLITCH BLADE',cooldown:7,color:'#73ff45'});
 const TANK_THEMES=Object.freeze({
   standard:{body:'#55a7ff',edge:'#2868ad',glow:'#68b8ff'},
   rapid:{body:'#62c985',edge:'#2e8050',glow:'#85f2a8'},
@@ -46,7 +47,7 @@ const TANK_THEMES=Object.freeze({
 });
 
 const statsDef=[['maxHealth','최대 체력'],['regen','체력 회복'],['bulletDamage','탄환 피해'],['bulletSpeed','탄환 속도'],['reload','연사 속도'],['moveSpeed','이동 속도']];
-function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
+function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
 function resize(){const dpr=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(innerWidth*dpr);canvas.height=Math.round(innerHeight*dpr);canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
 const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function dist2(a,b){const dx=a.x-b.x,dy=a.y-b.y;return dx*dx+dy*dy}function norm(dx,dy){const d=Math.hypot(dx,dy)||1;return[dx/d,dy/d]}
@@ -127,7 +128,7 @@ function upsertRemotePlayer(payload){
       tx:safeRemoteNumber(payload.x,WORLD/2),ty:safeRemoteNumber(payload.y,WORLD/2),
       angle:safeRemoteNumber(payload.angle,0),targetAngle:safeRemoteNumber(payload.angle,0),
       vx:0,vy:0,r:27,hp:120,maxHp:120,level:1,score:0,kills:0,
-      name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',fortress:false,overclock:false,lastSeen:performance.now()
+      name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',fortress:false,overclock:false,swordMode:false,lastSeen:performance.now()
     };
     remotePlayers.set(id,r);
   }
@@ -144,6 +145,7 @@ function upsertRemotePlayer(payload){
   r.classType=String(payload.classType||r.classType||'basic');
   r.fortress=payload.fortress===true;
   r.overclock=payload.overclock===true;
+  r.swordMode=payload.swordMode===true;
   r.alive=payload.alive!==false;
   r.lastSeen=performance.now();
 }
@@ -171,7 +173,7 @@ function localNetworkState(){
     level:player.level,score:player.score,kills:player.kills,
     name:player.name,cannonType:player.cannonType||'standard',
     classType:player.classType||'basic',alive:!!player.alive,
-    fortress:performance.now()<(player.fortressUntil||0),overclock:performance.now()<(player.overclockUntil||0)
+    fortress:performance.now()<(player.fortressUntil||0),overclock:performance.now()<(player.overclockUntil||0),swordMode:player.cannonType==='error'&&player.errorSwordMode===true
   };
 }
 function sendOnline(event,payload){
@@ -373,10 +375,8 @@ function playerParams(){
   const now=performance.now();
   if(now<(player.fortressUntil||0)){move*=.70}
   if(now<(player.overclockUntil||0)){
-    move*=1.65;
-    reload*=.38;
-    bulletSpeed*=1.25;
-    damage*=.92;
+    // ERROR R은 이제 순수 기동 강화. 기존 3초 도약 기능은 activateSkill2에서 유지된다.
+    move*=1.85;
   }
   return{damage,bulletSpeed,reload:Math.max(.05,reload),move};
 }
@@ -411,6 +411,20 @@ function receiveRemoteSkill(payload){
   const angle=safeRemoteNumber(payload.angle);
   const slot=Math.floor(safeRemoteNumber(payload.slot,1));
 
+  if(slot===3&&cannon==='error'){
+    const tx=safeRemoteNumber(payload.targetX,x),ty=safeRemoteNumber(payload.targetY,y);
+    const mode=String(payload.mode||'toggle');
+    if(mode==='basicSwing'){
+      spawnCombatFx('errorSwordSwing',x,y,{angle,color:'#72ff43',life:.32,radius:128,cannon:'error'});
+    }else{
+      spawnCombatFx('errorSwordDash',x,y,{angle,color:'#72ff43',life:.55,radius:Math.hypot(tx-x,ty-y)||360,cannon:'error'});
+      spawnCombatFx('errorSwordSwing',tx,ty,{angle,color:'#72ff43',life:.44,radius:170,cannon:'error'});
+    }
+    const remote=remotePlayers.get(String(payload.ownerId||''));
+    if(remote)remote.swordMode=payload.swordMode===true;
+    return;
+  }
+
   if(slot===2){
     const def=CANNON_SKILLS_2[cannon];
     if(!def)return;
@@ -444,7 +458,7 @@ function receiveRemoteSkill(payload){
   }
 
   const color=CANNON_SKILLS[cannon]?.color||'#fff';
-  spawnCombatFx(`skill-${cannon}`,x,y,{angle,color,life:1.15,radius:cannon==='nova'?390:190,cannon});
+  spawnCombatFx(cannon==='error'?'errorSwordCast':`skill-${cannon}`,x,y,{angle,color,life:1.15,radius:cannon==='nova'?390:190,cannon});
 }
 function skillProjectile(cannon,angle,opts={}){
   const p=playerParams();
@@ -506,6 +520,13 @@ function refreshRealTimeSkillCooldowns(){
   }else{
     player.skill2Cd=0;
   }
+
+  if(player.skill3ReadyAt){
+    player.skill3Cd=Math.max(0,(player.skill3ReadyAt-now)/1000);
+    if(player.skill3Cd<=0){player.skill3Cd=0;player.skill3ReadyAt=0}
+  }else{
+    player.skill3Cd=0;
+  }
 }
 
 function updateSkillHud(){
@@ -563,7 +584,101 @@ function updateSkillHud(){
       }
     }
   }
+
+  const showThird=cannon==='error';
+  ui.skill3Btn?.classList.toggle('hidden',!showThird);
+  if(showThird){
+    const cd3=Math.max(0,player.skill3Cd||0),ready3=cd3<=.001;
+    if(ui.skill3Name)ui.skill3Name.textContent=player.errorSwordMode?'검 모드 ON':'GLITCH BLADE';
+    if(ui.skill3Cooldown)ui.skill3Cooldown.textContent=ready3?(player.errorSwordMode?'T · 검 모드 해제':'T · 검 모드 전환'):`${cd3.toFixed(1)}s`;
+    if(ui.skill3Fill)ui.skill3Fill.style.width=`${clamp((1-cd3/ERROR_T_SKILL.cooldown)*100,0,100)}%`;
+    if(ui.skill3Btn){
+      ui.skill3Btn.disabled=!ready3;
+      ui.skill3Btn.className=`skill-button skill3-button cannon-error ${player.errorSwordMode?'sword-on ':''}${ready3?'ready':'cooling'}`;
+    }
+  }
 }
+
+function angleDifference(a,b){
+  let d=(a-b+Math.PI)%TAU-Math.PI;
+  if(d<-Math.PI)d+=TAU;
+  return d;
+}
+function errorSwordArcDamage(x,y,angle,damage,range=135,halfAngle=.82){
+  const r2=range*range;
+  for(let i=shapes.length-1;i>=0;i--){
+    const s=shapes[i],dx=s.x-x,dy=s.y-y,d2=dx*dx+dy*dy;
+    if(d2>r2)continue;
+    const aa=Math.atan2(dy,dx);
+    if(Math.abs(angleDifference(aa,angle))>halfAngle)continue;
+    const d=Math.sqrt(d2)||1,scale=.55+.45*(1-d/range);
+    s.hp-=damage*scale;
+    s.vx+=Math.cos(angle)*120*scale;s.vy+=Math.sin(angle)*120*scale;
+    burst(s.x,s.y,Math.random()<.5?'#72ff43':'#ff42df',4);
+    if(s.hp<=0){gainXp(s.xp);burst(s.x,s.y,colorForShape(s.type),11);shapes.splice(i,1)}
+  }
+  for(const enemy of remotePlayers.values()){
+    if(!enemy.alive)continue;
+    const dx=enemy.x-x,dy=enemy.y-y,d2=dx*dx+dy*dy;
+    if(d2>r2)continue;
+    if(Math.abs(angleDifference(Math.atan2(dy,dx),angle))>halfAngle)continue;
+    const d=Math.sqrt(d2)||1,scale=.55+.45*(1-d/range);
+    sendDamage(enemy.id,damage*scale);
+  }
+}
+function spawnErrorSwordWave(angle,damageMul=1,opts={}){
+  const p=playerParams(),speed=p.bulletSpeed*(opts.speedMul||1.0),scale=opts.scale||1;
+  const b={
+    x:player.x+Math.cos(angle)*(player.r+30),y:player.y+Math.sin(angle)*(player.r+30),
+    vx:Math.cos(angle)*speed+player.vx*.08,vy:Math.sin(angle)*speed+player.vy*.08,
+    r:14*scale,damage:p.damage*damageMul,life:opts.life||1.75,
+    owner:player,ownerId:onlineSelfId,team:'player',cannon:'error',shape:'errorSwordWave',
+    pierce:opts.pierce||12,splashRadius:0,basicAttack:opts.basicAttack===true,
+    special:opts.special||'errorSwordWave',fragment:false,
+    hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()
+  };
+  bullets.push(b);broadcastShot(b);
+  return b;
+}
+function activateSkill3(){
+  if(!running||paused||!player?.alive||player.cannonType!=='error')return;
+  refreshRealTimeSkillCooldowns();
+  if(player.skill3Cd>0)return;
+
+  const now=performance.now(),wallNow=Date.now(),a=player.angle,p=playerParams();
+  const ox=player.x,oy=player.y;
+  player.skill3Cd=ERROR_T_SKILL.cooldown;
+  player.skill3Max=ERROR_T_SKILL.cooldown;
+  player.skill3ReadyAt=wallNow+ERROR_T_SKILL.cooldown*1000;
+  player.errorSwordMode=!player.errorSwordMode;
+
+  // T는 ON/OFF 어느 쪽이든 전방 돌진 + 검 베기를 수행한다.
+  const distance=360;
+  const tx=clamp(ox+Math.cos(a)*distance,player.r+10,WORLD-player.r-10);
+  const ty=clamp(oy+Math.sin(a)*distance,player.r+10,WORLD-player.r-10);
+  player.phaseUntil=now+420;
+
+  spawnCombatFx('errorSwordDash',ox,oy,{angle:a,color:'#72ff43',life:.55,radius:distance,cannon:'error'});
+  for(let k=1;k<=5;k++){
+    const t=k/6;
+    spawnCombatFx('errorDashTrace',ox+(tx-ox)*t,oy+(ty-oy)*t,{angle:a,color:'#72ff43',life:.30+k*.025,radius:45,cannon:'error'});
+  }
+
+  player.x=tx;player.y=ty;player.vx=Math.cos(a)*150;player.vy=Math.sin(a)*150;
+  errorSwordArcDamage(player.x,player.y,a,p.damage*3.0,170,1.05);
+  spawnCombatFx('errorSwordSwing',player.x,player.y,{angle:a,color:'#72ff43',life:.44,radius:170,cannon:'error'});
+  burst(player.x,player.y,'#72ff43',20);burst(player.x,player.y,'#ff42df',16);burst(player.x,player.y,'#42eaff',10);
+  shake=Math.max(shake,10);
+
+  sendOnline('skill',{
+    slot:3,mode:'toggle',ownerId:onlineSelfId,cannon:'error',
+    x:ox,y:oy,targetX:tx,targetY:ty,angle:a,swordMode:player.errorSwordMode
+  });
+  broadcastLocalState(true);
+  camera.x=player.x-innerWidth/2;camera.y=player.y-innerHeight/2;
+  updateSkillHud();
+}
+
 function activateSkill(){
   if(!running||paused||!player?.alive)return;
   const cannon=player.cannonType||'standard',def=CANNON_SKILLS[cannon];
@@ -573,7 +688,7 @@ function activateSkill(){
   player.skillReadyAt=Date.now()+def.cooldown*1000;
   const p=playerParams(),a=player.angle;
   sendOnline('skill',{ownerId:onlineSelfId,cannon,x:player.x,y:player.y,angle:a});
-  spawnCombatFx(`skill-${cannon}`,player.x,player.y,{angle:a,color:def.color,life:1.15,radius:cannon==='nova'?390:190,cannon});
+  spawnCombatFx(cannon==='error'?'errorSwordCast':`skill-${cannon}`,player.x,player.y,{angle:a,color:def.color,life:1.15,radius:cannon==='nova'?390:190,cannon});
 
   if(cannon==='standard'){
     // 기본포: 단순하지만 확실한 고위력 대형 관통탄.
@@ -626,9 +741,14 @@ function activateSkill(){
     for(let i=0;i<12;i++)skillProjectile('nova',i*TAU/12,{damageMul:.78,speedMul:.90,life:2.4,pierce:5,splashRadius:72});
     burst(player.x,player.y,'#8ff6ff',38);shake=Math.max(shake,15);
   }else if(cannon==='error'){
-    skillAreaDamage(player.x,player.y,245,p.damage*2.8,'#79ff47');
-    for(let i=0;i<24;i++)skillProjectile('error',i*TAU/24+rand(-.035,.035),{damageMul:.65,speedMul:1.25,life:2.5,pierce:16,splashRadius:94});
-    burst(player.x,player.y,'#79ff47',44);burst(player.x,player.y,'#ff46e8',20);shake=Math.max(shake,17);
+    // Q: SYSTEM CRASH를 없애고 초대형 ERROR 검기 1발로 변경.
+    errorSwordArcDamage(player.x,player.y,a,p.damage*1.8,150,.72);
+    const blade=spawnErrorSwordWave(a,4.8,{speedMul:1.30,life:2.75,pierce:28,scale:1.65,special:'errorQBlade'});
+    spawnAttackFx('error',blade.x,blade.y,a);
+    spawnCombatFx('errorSwordSwing',player.x,player.y,{angle:a,color:'#72ff43',life:.50,radius:155,cannon:'error'});
+    burst(player.x+Math.cos(a)*45,player.y+Math.sin(a)*45,'#72ff43',24);
+    burst(player.x+Math.cos(a)*45,player.y+Math.sin(a)*45,'#ff42df',18);
+    shake=Math.max(shake,14);
   }
   updateSkillHud();
 }
@@ -830,6 +950,18 @@ function fire(e){
   if(e!==player||e.fireCd>0)return;
   const a=e.angle,p=playerParams();e.fireCd=p.reload;
   const cannon=e.cannonType||'standard';e.basicShotCount=(e.basicShotCount||0)+1;const shotNo=e.basicShotCount;
+
+  if(cannon==='error'&&e.errorSwordMode){
+    // 검 모드: 기존 ERROR 탄환 대신 검을 휘두르고 매 평타마다 검기를 날린다.
+    e.fireCd=Math.max(.18,p.reload*.88);
+    errorSwordArcDamage(e.x,e.y,a,p.damage*1.30,125,.86);
+    spawnCombatFx('errorSwordSwing',e.x,e.y,{angle:a,color:'#72ff43',life:.32,radius:128,cannon:'error'});
+    spawnErrorSwordWave(a,.72,{speedMul:1.12,life:1.55,pierce:12,scale:.78,basicAttack:true,special:'errorBasicBlade'});
+    sendOnline('skill',{slot:3,mode:'basicSwing',ownerId:onlineSelfId,cannon:'error',x:e.x,y:e.y,targetX:e.x,targetY:e.y,angle:a,swordMode:true});
+    e.vx-=Math.cos(a)*10;e.vy-=Math.sin(a)*10;
+    return;
+  }
+
   let shots=[{angle:a,side:0,damageMul:1,special:''}];
   if(cannon==='standard'&&shotNo%5===0)shots=[{angle:a,side:0,damageMul:1.70,special:'precision'}];
   else if(cannon==='rapid'&&shotNo%8===0)shots=[{angle:a-.045,side:-3,damageMul:.58,special:'acceleratedBurst'},{angle:a,side:0,damageMul:.58,special:'acceleratedBurst'},{angle:a+.045,side:3,damageMul:.58,special:'acceleratedBurst'}];
@@ -1092,7 +1224,7 @@ function killPlayer(killerId=''){
   ui.deathLevel.textContent=player.level;
   ui.deathScore.textContent=player.score.toLocaleString();
   ui.deathKills.textContent=player.kills;
-  if(ui.deathGems)ui.deathGems.textContent=player.score.toLocaleString();
+  if(ui.deathGems)ui.deathGems.textContent=(player.score*2).toLocaleString();
   ui.deathScreen.classList.add('show');
   void saveCurrentRun(true);
 }
@@ -1277,6 +1409,21 @@ function drawPlayerCannon(cannon,r){
   }
   else{ctx.beginPath();ctx.roundRect(r*.22,-7,r+23,14,4);ctx.fill();ctx.stroke()}
 }
+
+function drawErrorSword(r,t){
+  ctx.save();
+  ctx.rotate(-.10+Math.sin(t*4)*.035);
+  ctx.shadowColor='#72ff43';ctx.shadowBlur=16;
+  ctx.fillStyle='#0b0d10';ctx.strokeStyle='#72ff43';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(r*.10,-6);ctx.lineTo(r+62,-4);ctx.lineTo(r+82,0);ctx.lineTo(r+62,4);ctx.lineTo(r*.10,6);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.strokeStyle='#ff42df';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r+5,-8);ctx.lineTo(r+70,-6);ctx.stroke();
+  ctx.strokeStyle='#42eaff';ctx.beginPath();ctx.moveTo(r+8,8);ctx.lineTo(r+68,6);ctx.stroke();
+  ctx.fillStyle='#dfffff';ctx.fillRect(r+58,-2,18,4);
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#24272c';ctx.fillRect(r*.04,-12,10,24);
+  ctx.restore();
+}
+
 function drawTank(e){
   if(!e.alive)return;
   const[x,y]=worldToScreen(e.x,e.y);
@@ -1292,6 +1439,7 @@ function drawTank(e){
 
   const fortressActive=isP?performance.now()<(e.fortressUntil||0):!!e.fortress;
   const overclockActive=isP?performance.now()<(e.overclockUntil||0):!!e.overclock;
+  const swordModeActive=cannon==='error'&&(isP?!!e.errorSwordMode:!!e.swordMode);
   if(fortressActive){
     ctx.strokeStyle='rgba(255,196,104,.92)';ctx.lineWidth=5;ctx.shadowColor='#ffc568';ctx.shadowBlur=14;
     ctx.beginPath();ctx.arc(0,0,r+13+Math.sin(t*6)*2,0,TAU);ctx.stroke();ctx.shadowBlur=0;
@@ -1304,8 +1452,8 @@ function drawTank(e){
     ctx.strokeRect(-r-6+Math.cos(t*17)*4,-r-11,(r+8)*2,(r+10)*2);
   }
 
-  // Cannon is drawn behind the hull.
-  drawPlayerCannon(cannon,r);
+  // ERROR 검 모드에서는 포신 대신 ERROR 검을 든다.
+  if(swordModeActive)drawErrorSword(r,t);else drawPlayerCannon(cannon,r);
 
   ctx.shadowColor=theme.glow;ctx.shadowBlur=cannon==='standard'?7:13;
   ctx.fillStyle=theme.body;ctx.strokeStyle=theme.edge;ctx.lineWidth=5;
@@ -1501,6 +1649,25 @@ function drawCombatEffects(){
       ctx.strokeStyle='#e3d4ff';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,f.radius*q,Math.PI*.65,Math.PI*1.35);ctx.stroke();
     }else if(f.type==='chainArc'){
       const[x2,y2]=worldToScreen(f.x2,f.y2);ctx.restore();ctx.save();ctx.globalAlpha=Math.min(1,p*1.4);ctx.strokeStyle='#8af7ff';ctx.lineWidth=3;ctx.shadowColor='#6cf4ff';ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(x,y);const mx=(x+x2)/2+rand(-18,18),my=(y+y2)/2+rand(-18,18);ctx.lineTo(mx,my);ctx.lineTo(x2,y2);ctx.stroke();ctx.shadowBlur=0;
+    }else if(f.type==='errorSwordSwing'){
+      ctx.shadowColor='#72ff43';ctx.shadowBlur=18;
+      ctx.strokeStyle='#72ff43';ctx.lineWidth=10*p+2;
+      ctx.beginPath();ctx.arc(0,0,f.radius*(.45+.45*q),-.95,.95);ctx.stroke();
+      ctx.strokeStyle='#ff42df';ctx.lineWidth=5*p+1;
+      ctx.beginPath();ctx.arc(4,0,f.radius*(.50+.42*q),-.90,.90);ctx.stroke();
+      ctx.strokeStyle='#42eaff';ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(-3,0,f.radius*(.40+.50*q),-1.02,1.02);ctx.stroke();ctx.shadowBlur=0;
+    }else if(f.type==='errorSwordCast'){
+      ctx.shadowColor='#72ff43';ctx.shadowBlur=22;
+      ctx.strokeStyle='#72ff43';ctx.lineWidth=8*p+2;
+      ctx.beginPath();ctx.moveTo(-25,0);ctx.lineTo(f.radius*q,0);ctx.stroke();
+      ctx.strokeStyle='#ff42df';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-15,-10);ctx.lineTo(f.radius*q*.85,-5);ctx.stroke();
+      ctx.strokeStyle='#42eaff';ctx.beginPath();ctx.moveTo(-15,10);ctx.lineTo(f.radius*q*.85,5);ctx.stroke();ctx.shadowBlur=0;
+    }else if(f.type==='errorSwordDash'){
+      ctx.globalAlpha*=.75;
+      ctx.strokeStyle='#72ff43';ctx.lineWidth=8*p+2;ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(f.radius*q,-8);ctx.stroke();
+      ctx.strokeStyle='#ff42df';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(f.radius*q*.92,0);ctx.stroke();
+      ctx.strokeStyle='#42eaff';ctx.beginPath();ctx.moveTo(0,8);ctx.lineTo(f.radius*q*.82,8);ctx.stroke();
     }else if(f.type==='errorImpact'){
       const pulse=.55+.45*Math.sin(performance.now()*.035+f.x*.02);
       ctx.globalAlpha*=pulse;
@@ -1718,6 +1885,24 @@ function drawBullets(){
       ctx.shadowBlur=0;
     }
 
+    // ERROR SWORD WAVE — 검의 궤적이 그대로 날아가는 RGB 초승달
+    else if(b.shape==='errorSwordWave'){
+      const big=b.special==='errorQBlade',sc=big?1.45:1;
+      ctx.shadowColor='#72ff43';ctx.shadowBlur=big?26:17;
+      ctx.globalAlpha=.26;
+      ctx.strokeStyle='#42eaff';ctx.lineWidth=big?12:8;
+      ctx.beginPath();ctx.arc(-5,0,24*sc,-1.05,1.05);ctx.stroke();
+      ctx.globalAlpha=1;
+      ctx.strokeStyle='#72ff43';ctx.lineWidth=big?7:5;
+      ctx.beginPath();ctx.arc(0,0,27*sc,-1.08,1.08);ctx.stroke();
+      ctx.strokeStyle='#ff42df';ctx.lineWidth=big?3.5:2.5;
+      ctx.beginPath();ctx.arc(4,0,31*sc,-1.02,1.02);ctx.stroke();
+      ctx.fillStyle='#f2ffff';ctx.beginPath();ctx.moveTo(22*sc,-5);ctx.lineTo(36*sc,0);ctx.lineTo(22*sc,5);ctx.closePath();ctx.fill();
+      ctx.globalAlpha=.35;
+      ctx.fillStyle='#72ff43';ctx.fillRect(-48*sc,-2,35*sc,3);
+      ctx.shadowBlur=0;ctx.globalAlpha=1;
+    }
+
     // ERROR — RGB channel-split glitch block with pixel debris
     else if(b.shape==='error'){
       const glitch=Math.sin(phase*4)>0?2.4:-2.4;
@@ -1775,32 +1960,36 @@ function drawMinimap(){
 }
 function drawMobileAimGuide(){
   if(!running||!player?.alive||!input.mobileAimActive)return;
-  const [px,py]=worldToScreen(player.x,player.y);
-  const tx=input.mouseX,ty=input.mouseY;
-  const a=Math.atan2(ty-py,tx-px);
-  const sx=px+Math.cos(a)*(player.r+18);
-  const sy=py+Math.sin(a)*(player.r+18);
+  const[px,py]=worldToScreen(player.x,player.y);
+  const a=Math.atan2(input.mouseY-py,input.mouseX-px);
+  const cannon=player.cannonType||'standard';
+  const range=cannon==='piercer'?610:cannon==='rocket'?455:cannon==='spread'?355:(cannon==='error'&&player.errorSwordMode)?390:500;
+  const halfWidth=cannon==='spread'?54:cannon==='rocket'?30:(cannon==='error'&&player.errorSwordMode)?40:23;
+  const sx=px+Math.cos(a)*(player.r+22),sy=py+Math.sin(a)*(player.r+22);
+  const ex=px+Math.cos(a)*range,ey=py+Math.sin(a)*range;
+  const nx=-Math.sin(a),ny=Math.cos(a);
 
   ctx.save();
-  ctx.lineCap='round';
-  ctx.setLineDash([10,8]);
-  ctx.lineWidth=2;
-  const grad=ctx.createLinearGradient(sx,sy,tx,ty);
-  grad.addColorStop(0,'rgba(105,205,255,.85)');
-  grad.addColorStop(1,'rgba(105,205,255,.18)');
-  ctx.strokeStyle=grad;
-  ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(tx,ty);ctx.stroke();
-  ctx.setLineDash([]);
-
-  ctx.strokeStyle='rgba(133,225,255,.92)';
-  ctx.lineWidth=2;
-  ctx.beginPath();ctx.arc(tx,ty,15,0,TAU);ctx.stroke();
+  // 브롤스타즈식으로 방향 전체가 보이는 반투명 공격 레인.
+  const grad=ctx.createLinearGradient(sx,sy,ex,ey);
+  grad.addColorStop(0,'rgba(215,248,255,.30)');
+  grad.addColorStop(.72,'rgba(125,220,255,.18)');
+  grad.addColorStop(1,'rgba(100,205,255,.08)');
+  ctx.fillStyle=grad;
   ctx.beginPath();
-  ctx.moveTo(tx-22,ty);ctx.lineTo(tx-8,ty);
-  ctx.moveTo(tx+8,ty);ctx.lineTo(tx+22,ty);
-  ctx.moveTo(tx,ty-22);ctx.lineTo(tx,ty-8);
-  ctx.moveTo(tx,ty+8);ctx.lineTo(tx,ty+22);
-  ctx.stroke();
+  ctx.moveTo(sx+nx*halfWidth*.55,sy+ny*halfWidth*.55);
+  ctx.lineTo(ex+nx*halfWidth,ey+ny*halfWidth);
+  ctx.arc(ex,ey,halfWidth,a+Math.PI/2,a-Math.PI/2,false);
+  ctx.lineTo(sx-nx*halfWidth*.55,sy-ny*halfWidth*.55);
+  ctx.closePath();ctx.fill();
+
+  ctx.strokeStyle='rgba(225,251,255,.72)';ctx.lineWidth=2.2;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(sx+nx*halfWidth*.55,sy+ny*halfWidth*.55);ctx.lineTo(ex+nx*halfWidth,ey+ny*halfWidth);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(sx-nx*halfWidth*.55,sy-ny*halfWidth*.55);ctx.lineTo(ex-nx*halfWidth,ey-ny*halfWidth);ctx.stroke();
+
+  ctx.fillStyle='rgba(93,208,255,.16)';ctx.strokeStyle='rgba(235,253,255,.94)';ctx.lineWidth=3;
+  ctx.beginPath();ctx.arc(ex,ey,halfWidth*.72,0,TAU);ctx.fill();ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.92)';ctx.beginPath();ctx.arc(ex,ey,4,0,TAU);ctx.fill();
   ctx.restore();
 }
 function update(dt){
@@ -1870,7 +2059,7 @@ async function startGame(){
   updateSkillHud();
   broadcastLocalState(true);
 }
-ui.startBtn.onclick=()=>void startGame();if(ui.skillBtn)ui.skillBtn.onclick=e=>{e.preventDefault();e.stopPropagation();activateSkill()};if(ui.skill2Btn)ui.skill2Btn.onclick=e=>{e.preventDefault();e.stopPropagation();activateSkill2()};ui.leaveBattleBtn.onclick=()=>void leaveBattleToLobby();ui.respawnBtn.onclick=()=>{ui.deathScreen.classList.remove('show');running=false;void disconnectOnlineArena();window.IronCellAuth?.showLobby?.();};
+ui.startBtn.onclick=()=>void startGame();if(ui.skillBtn)ui.skillBtn.onclick=e=>{e.preventDefault();e.stopPropagation();activateSkill()};if(ui.skill2Btn)ui.skill2Btn.onclick=e=>{e.preventDefault();e.stopPropagation();activateSkill2()};if(ui.skill3Btn)ui.skill3Btn.onclick=e=>{e.preventDefault();e.stopPropagation();activateSkill3()};ui.leaveBattleBtn.onclick=()=>void leaveBattleToLobby();ui.respawnBtn.onclick=()=>{ui.deathScreen.classList.remove('show');running=false;void disconnectOnlineArena();window.IronCellAuth?.showLobby?.();};
 function isEditableInputTarget(target){
   if(!(target instanceof Element))return false;
   return !!target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]');
@@ -1880,6 +2069,7 @@ addEventListener('keydown',e=>{
   input.keys.add(e.code);
   if(e.code==='KeyQ'&&!e.repeat){activateSkill();e.preventDefault()}
   if(e.code==='KeyR'&&!e.repeat){activateSkill2();e.preventDefault()}
+  if(e.code==='KeyT'&&!e.repeat){activateSkill3();e.preventDefault()}
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()
 });
 addEventListener('keyup',e=>{
@@ -1887,7 +2077,7 @@ addEventListener('keyup',e=>{
   input.keys.delete(e.code);
 });addEventListener('mousemove',e=>{input.mouseX=e.clientX;input.mouseY=e.clientY});addEventListener('mousedown',e=>{if(e.button===0)input.firing=true});addEventListener('mouseup',e=>{if(e.button===0)input.firing=false});addEventListener('blur',()=>{input.firing=false;input.mobileAimActive=false;input.keys.clear()});
 const moveZone=document.querySelector('#mobileMove'),knob=moveZone.querySelector('.stick-knob');let moveTouch=null;function moveTouchUpdate(t){const r=moveZone.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=t.clientX-cx,dy=t.clientY-cy;const max=42,d=Math.hypot(dx,dy)||1;if(d>max){dx=dx/d*max;dy=dy/d*max}input.moveX=dx/max;input.moveY=dy/max;knob.style.transform=`translate(${dx}px,${dy}px)`}moveZone.addEventListener('touchstart',e=>{const t=e.changedTouches[0];moveTouch=t.identifier;moveTouchUpdate(t);e.preventDefault()},{passive:false});moveZone.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===moveTouch)moveTouchUpdate(t);e.preventDefault()},{passive:false});function endMove(e){for(const t of e.changedTouches)if(t.identifier===moveTouch){moveTouch=null;input.moveX=0;input.moveY=0;knob.style.transform='none'}}moveZone.addEventListener('touchend',endMove,{passive:false});moveZone.addEventListener('touchcancel',endMove,{passive:false});
-const aimZone=document.querySelector('#mobileAim');let aimTouch=null;function aimUpdate(t){input.mouseX=t.clientX;input.mouseY=t.clientY;input.firing=true;input.mobileAimActive=true}aimZone.addEventListener('touchstart',e=>{const t=e.changedTouches[0];aimTouch=t.identifier;aimUpdate(t);e.preventDefault()},{passive:false});aimZone.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===aimTouch)aimUpdate(t);e.preventDefault()},{passive:false});function endAim(e){for(const t of e.changedTouches)if(t.identifier===aimTouch){aimTouch=null;input.firing=false;input.mobileAimActive=false}}aimZone.addEventListener('touchend',endAim,{passive:false});aimZone.addEventListener('touchcancel',endAim,{passive:false});
+const aimZone=document.querySelector('#mobileAim');let aimTouch=null;function aimUpdate(t){input.mouseX=t.clientX;input.mouseY=t.clientY;input.firing=true;input.mobileAimActive=true;aimZone.classList.add('aiming')}aimZone.addEventListener('touchstart',e=>{const t=e.changedTouches[0];aimTouch=t.identifier;aimUpdate(t);e.preventDefault()},{passive:false});aimZone.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===aimTouch)aimUpdate(t);e.preventDefault()},{passive:false});function endAim(e){for(const t of e.changedTouches)if(t.identifier===aimTouch){aimTouch=null;input.firing=false;input.mobileAimActive=false;aimZone.classList.remove('aiming')}}aimZone.addEventListener('touchend',endAim,{passive:false});aimZone.addEventListener('touchcancel',endAim,{passive:false});
 
 window.IronCellGame = {
   stopForLogout(){
@@ -1896,7 +2086,7 @@ window.IronCellGame = {
     input.firing=false;
     input.keys.clear();
     ui.deathScreen.classList.remove('show');
-    ui.skillHud?.classList.add('hidden');ui.skill2Btn?.classList.add('hidden');
+    ui.skillHud?.classList.add('hidden');ui.skill2Btn?.classList.add('hidden');ui.skill3Btn?.classList.add('hidden');
     ui.classPanel.classList.add('hidden');
     ui.startScreen.classList.remove('show');
     document.querySelector('#garageScreen')?.classList.remove('show');

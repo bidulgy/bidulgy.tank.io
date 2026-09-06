@@ -95,7 +95,7 @@ const CANNONS=Object.freeze({
   },
   error:{
     id:'error',name:'ERROR 캐논',rarity:'error',rarityLabel:'ERROR',
-    chance:.005,desc:'불안정한 글리치 탄환이 공간을 왜곡하며 관통합니다.',passive:'평타 · NULL OVERWRITE: 모든 탄환이 관통하며 명중마다 왜곡 폭발, 관통할수록 강화 · 5번째 사격은 NULL BREAK 5발',skill:'Q SYSTEM CRASH · 전방위 글리치 폭주',skill2:'R OVERCLOCK.EXE · 15초 강화 + 강화 중 R로 3초마다 글리치 도약'
+    chance:.005,desc:'불안정한 글리치 에너지와 ERROR 검을 사용하는 최고 등급 탱크입니다.',passive:'평타 · 기본은 NULL OVERWRITE, T 검 모드에서는 검 베기 + 매 평타 ERROR 검기',skill:'Q ERROR 검기 · 초대형 관통 검기를 전방으로 발사',skill2:'R GLITCH DRIVE · 15초 이동속도 증가 + 강화 중 R로 3초마다 도약',skill3:'T GLITCH BLADE · 7초 쿨 · 돌진하며 ERROR 검을 휘두르고 검 모드 ON/OFF'
   }
 });
 window.IronCellCannons=CANNONS;
@@ -260,7 +260,7 @@ function renderCannonGarage(){
       return `<button type="button" class="cannon-card rarity-card-${c.rarity} ${own?'':'locked'} ${eq?'equipped':''}" data-cannon="${c.id}" ${own?'':'disabled'}>
         <div class="cannon-card-head"><strong>${c.name}</strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span></div>
         <small class="cannon-chance">${chance}</small>
-        <p>${own?c.desc:'아직 획득하지 않은 대포입니다.'}</p>${own&&c.passive?`<div class="cannon-passive-line">● ${c.passive}</div>`:''}${own&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}${own&&c.skill2?`<div class="cannon-skill-line second">◆ ${c.skill2}</div>`:''}
+        <p>${own?c.desc:'아직 획득하지 않은 대포입니다.'}</p>${own&&c.passive?`<div class="cannon-passive-line">● ${c.passive}</div>`:''}${own&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}${own&&c.skill2?`<div class="cannon-skill-line second">◆ ${c.skill2}</div>`:''}${own&&c.skill3?`<div class="cannon-skill-line third">✦ ${c.skill3}</div>`:''}
         <div class="equip-label">${eq?'장착 중':own?'눌러서 장착':'미보유'}</div>
       </button>`;
     }).join('');
