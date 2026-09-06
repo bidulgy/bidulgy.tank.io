@@ -85,7 +85,7 @@ const CANNONS=Object.freeze({
     id:'scout',name:'스카우트',rarity:'starter',rarityLabel:'기본',chance:0,
     desc:'가볍고 빠른 기동형 탱크입니다.',
     passive:'평타 · 더블 탭: 4번째 사격마다 2발을 빠르게 발사',
-    skill:'Q 블링크 러시 · 조준 방향 순간 돌진 + 도착 충격파'
+    skill:'Q 그래플 훅 · 650거리 케이블을 꽂고 경로를 베며 목표 지점으로 끌려감'
   },
   bastion:{
     id:'bastion',name:'바스티온',rarity:'starter',rarityLabel:'기본',chance:0,
@@ -111,7 +111,7 @@ const CANNONS=Object.freeze({
     id:'needle',name:'니들러',rarity:'common',rarityLabel:'일반',chance:20.5,
     desc:'작고 매우 빠른 침형 탄환을 사용합니다.',
     passive:'평타 · 니들 코어: 6번째 탄이 강화되어 4회 관통',
-    skill:'Q 독침 지뢰 · 전방에 감응 지뢰 5개 설치'
+    skill:'Q 하푼 스파이크 · 820거리 초장침으로 적을 꿰고 자신 쪽으로 강하게 끌어당김'
   },
 
   // 희귀 25.63% / 3캐릭터
@@ -119,19 +119,19 @@ const CANNONS=Object.freeze({
     id:'spread',name:'산탄포',rarity:'rare',rarityLabel:'희귀',chance:8.543333,
     desc:'한 번에 5개의 산탄을 넓게 퍼뜨립니다.',
     passive:'평타 · 파편 확산: 명중 시 좌우 2차 파편 생성',
-    skill:'Q 충격 산탄 · 초대형 부채꼴 타격 + 강한 넉백'
+    skill:'Q 충격 산탄 · 전방 대형 산탄 폭풍 + 적을 밀고 자신도 강하게 뒤로 반동'
   },
   burst:{
     id:'burst',name:'버스트 캐논',rarity:'rare',rarityLabel:'희귀',chance:8.543333,
     desc:'좁은 범위에 3연발 탄막을 집중합니다.',
     passive:'평타 · 버스트 3연사: 매 사격 3발, 5번째는 5발',
-    skill:'Q 트리플 펄스 · 점점 커지는 충격파 3연속'
+    skill:'Q 리바운드 코어 · 목표 지점에 시한 코어를 던져 폭발 후 원반탄 16발 방사'
   },
   crystal:{
     id:'crystal',name:'크리스탈 샷',rarity:'rare',rarityLabel:'희귀',chance:8.543334,
     desc:'결정 파편처럼 넓게 갈라지는 탄환을 사용합니다.',
     passive:'평타 · 결정 분산: 4번째 사격마다 7갈래 파편',
-    skill:'Q 크리스탈 필드 · 목표 지점에 결정 지뢰 7개 전개'
+    skill:'Q 프리즘 게이트 · 7초간 게이트를 통과한 내 크리스탈탄을 3갈래로 굴절·복제'
   },
 
   // 에픽 10.255% / 3캐릭터
@@ -165,7 +165,7 @@ const CANNONS=Object.freeze({
     id:'thunder',name:'썬더 코어',rarity:'legendary',rarityLabel:'전설',chance:.666667,
     desc:'강한 전류가 담긴 플라즈마 코어를 발사합니다.',
     passive:'평타 · 삼중 번개: 4번째 사격마다 플라즈마 3발 + 최대 3연쇄',
-    skill:'Q 연쇄 낙뢰 · 가까운 적을 최대 10회 연속 추적 낙뢰'
+    skill:'Q 뇌운 폭격 · 목표 영역에 5초간 뇌운 생성, 계속 위치를 바꾸며 번개 낙하'
   },
   inferno:{
     id:'inferno',name:'인페르노',rarity:'legendary',rarityLabel:'전설',chance:.666666,
@@ -179,14 +179,14 @@ const CANNONS=Object.freeze({
     id:'rocket',name:'로켓포',rarity:'mythic',rarityLabel:'신화',chance:.166667,
     desc:'중장갑 로켓이 넓은 폭발 피해를 줍니다.',
     passive:'평타 · 소이 폭발: 폭발 지점에 2.4초 화염 지대',
-    skill:'Q 유도 포위폭격 · 목표 주변 10방향에서 로켓이 중앙으로 쇄도',
+    skill:'Q 미사일 레인 · 넓은 목표 지역에 5초간 경고표시 후 미사일이 연속 낙하',
     skill2:'R 강철 요새 · 6초간 받는 피해 70% 감소'
   },
   titan:{
     id:'titan',name:'타이탄',rarity:'mythic',rarityLabel:'신화',chance:.166667,
     desc:'거대한 중포와 높은 방어력을 가진 중전차입니다.',
     passive:'평타 · 중포 코어: 대형 폭발탄, 4번째는 쌍포격',
-    skill:'Q 지진 강타 · 4번 커지는 지진파 + 넉백',
+    skill:'Q 대지 절단 · 전방 760거리를 따라 6개의 지면 균열이 순차 폭발',
     skill2:'R 공성 모드 · 8초간 거의 정지하지만 공격력 55%↑·연사 2배'
   },
   phantom:{
@@ -202,7 +202,7 @@ const CANNONS=Object.freeze({
     id:'ring',name:'링 캐논',rarity:'secret',rarityLabel:'시크릿',chance:.033334,
     desc:'차원 에너지 링이 적들을 연속 관통합니다.',
     passive:'평타 · 회귀 링: 멀리 날아간 링이 사용자에게 되돌아옴',
-    skill:'Q 궤도 절단 · 5초간 주위를 회전하는 차원 칼날',
+    skill:'Q 게이트 리피터 · 6초간 포탈 생성, 내가 쏜 링 평타를 포탈에서도 한 번 더 복제',
     skill2:'R 귀환 포탈 · 전방 순간이동 후 2초 뒤 원래 위치로 자동 귀환'
   },
   chrono:{
@@ -239,8 +239,8 @@ const CANNONS=Object.freeze({
     id:'stellar',name:'스텔라',rarity:'galaxy',rarityLabel:'갤럭시',chance:.003333,
     desc:'별빛을 폭발시키는 광역 제압형 탱크입니다.',
     passive:'평타 · 쌍성: 기본 2발, 6번째 사격은 5발 성탄',
-    skill:'Q 별빛 성역 · 6초 치유 영역 + 적에게 지속 피해',
-    skill2:'R 부활의 별빛 · 체력 완전 회복 + 3초 무적 + 성역'
+    skill:'Q 별자리 결계 · 삼각형 별자리 내부의 아군은 회복, 적은 지속 피해',
+    skill2:'R 세컨드 스타 · 8초 동안 죽음 1회 예약, 죽으면 체력 58%로 부활 + 2.6초 무적'
   },
 
   // ERROR .005% / 3캐릭터

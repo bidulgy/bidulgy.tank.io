@@ -48,29 +48,29 @@ function projectileShapeForCannon(cannon){return PROJECTILE_SHAPE[cannon]||'stan
 
 const CANNON_SKILLS=Object.freeze({
   standard:{name:'궤도 포격',cooldown:14,color:'#69c8ff'},
-  scout:{name:'블링크 러시',cooldown:12,color:'#65d8ff'},
+  scout:{name:'그래플 훅',cooldown:12,color:'#65d8ff'},
   bastion:{name:'방벽 전개',cooldown:18,color:'#91b6d9'},
   rapid:{name:'오버드라이브',cooldown:16,color:'#70f3a0'},
   dual:{name:'트윈 드론',cooldown:18,color:'#79f0bf'},
-  needle:{name:'독침 지뢰',cooldown:17,color:'#b5ff89'},
+  needle:{name:'하푼 스파이크',cooldown:17,color:'#b5ff89'},
   spread:{name:'충격 산탄',cooldown:15,color:'#6ff3ff'},
-  burst:{name:'트리플 펄스',cooldown:16,color:'#58e6ef'},
-  crystal:{name:'크리스탈 필드',cooldown:18,color:'#a5f7ff'},
+  burst:{name:'리바운드 코어',cooldown:16,color:'#58e6ef'},
+  crystal:{name:'프리즘 게이트',cooldown:18,color:'#a5f7ff'},
   piercer:{name:'레일 스나이프',cooldown:17,color:'#c09aff'},
   laser:{name:'레이저 스윕',cooldown:20,color:'#e0b7ff'},
   drill:{name:'터널 브레이커',cooldown:19,color:'#b58aff'},
   plasma:{name:'플라즈마 케이지',cooldown:20,color:'#65ecff'},
-  thunder:{name:'연쇄 낙뢰',cooldown:18,color:'#fff06f'},
+  thunder:{name:'뇌운 폭격',cooldown:18,color:'#fff06f'},
   inferno:{name:'화염 장벽',cooldown:21,color:'#ff794f'},
-  rocket:{name:'유도 포위폭격',cooldown:21,color:'#ff9b4a'},
-  titan:{name:'지진 강타',cooldown:23,color:'#ffb05e'},
+  rocket:{name:'미사일 레인',cooldown:21,color:'#ff9b4a'},
+  titan:{name:'대지 절단',cooldown:23,color:'#ffb05e'},
   phantom:{name:'암살 표식',cooldown:19,color:'#b9a4ff'},
-  ring:{name:'궤도 절단',cooldown:20,color:'#c09aff'},
+  ring:{name:'게이트 리피터',cooldown:20,color:'#c09aff'},
   chrono:{name:'시간 정지',cooldown:22,color:'#9edcff'},
   void:{name:'보이드 싱크',cooldown:23,color:'#9f77ff'},
   nova:{name:'초신성 핵',cooldown:25,color:'#74efff'},
   comet:{name:'혜성 돌파',cooldown:20,color:'#67dfff'},
-  stellar:{name:'별빛 성역',cooldown:26,color:'#d6f7ff'},
+  stellar:{name:'별자리 결계',cooldown:26,color:'#d6f7ff'},
   error:{name:'ERROR 검기',cooldown:27,color:'#7dff48'},
   glitch:{name:'MIRROR ERROR',cooldown:24,color:'#ff4be1'},
   zero:{name:'ZERO LINE',cooldown:30,color:'#f0f0f0'}
@@ -84,7 +84,7 @@ const CANNON_SKILLS_2=Object.freeze({
   void:{name:'EVENT HORIZON',cooldown:31,color:'#9a7cff',kind:'eventHorizon'},
   nova:{name:'성운 위성',cooldown:30,color:'#8fa8ff',kind:'starOrbit'},
   comet:{name:'메테오 드라이브',cooldown:24,color:'#69e6ff',kind:'meteorDash'},
-  stellar:{name:'부활의 별빛',cooldown:34,color:'#e6fbff',kind:'resurrection'},
+  stellar:{name:'세컨드 스타',cooldown:34,color:'#e6fbff',kind:'resurrection'},
   error:{name:'GLITCH DRIVE',cooldown:34,color:'#ff46dc',kind:'overclock'},
   glitch:{name:'DESYNC CLONES',cooldown:32,color:'#ff50e7',kind:'cloneStorm'},
   zero:{name:'ABSOLUTE ZERO',cooldown:30,color:'#ffffff',kind:'freeze'}
@@ -129,7 +129,7 @@ const TANK_THEMES=Object.freeze({
 });
 
 const statsDef=[['maxHealth','최대 체력'],['regen','체력 회복'],['bulletDamage','탄환 피해'],['bulletSpeed','탄환 속도'],['reload','연사 속도'],['moveSpeed','이동 속도']];
-function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,siegeUntil:0,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
+function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,siegeUntil:0,stellarReviveUntil:0,stellarReviveReady:false,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
 function resize(){const dpr=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(innerWidth*dpr);canvas.height=Math.round(innerHeight*dpr);canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
 const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function dist2(a,b){const dx=a.x-b.x,dy=a.y-b.y;return dx*dx+dy*dy}function norm(dx,dy){const d=Math.hypot(dx,dy)||1;return[dx/d,dy/d]}
@@ -555,7 +555,7 @@ function receiveDamage(payload){
   player.regenTimer=0;
   burst(player.x,player.y,'#ff8a8a',5);
   shake=Math.max(shake,5);
-  if(player.hp<=0)killPlayer(String(payload?.sourceId||''));
+  if(player.hp<=0&&!tryStellarRevive())killPlayer(String(payload?.sourceId||''));
   broadcastLocalState(true);
 }
 function tankKillXp(victimLevel){
@@ -764,7 +764,7 @@ function receiveRemoteSkill(payload){
     const tx=safeRemoteNumber(payload.targetX,x),ty=safeRemoteNumber(payload.targetY,y);
     const radius=Math.max(20,safeRemoteNumber(payload.radius,180));
     const life=Math.max(.2,safeRemoteNumber(payload.life,2));
-    const zoneTypes=new Set(['artillery','barrier','rapidOverdrive','twinDrones','needleMine','pulseBurst','crystalMine','laserSweep','plasmaCage','flameWall','quake','orbitRing','timeField','gravity','supernovaCore','cometTrail','sanctuary','returnPortal','starOrbit','cloneStorm','absoluteZero']);
+    const zoneTypes=new Set(['artillery','barrier','rapidOverdrive','twinDrones','burstBomb','crystalPrism','laserSweep','plasmaCage','thunderStorm','flameWall','missileRain','earthFissure','ringGate','timeField','gravity','supernovaCore','cometTrail','constellation','secondStar','returnPortal','starOrbit','cloneStorm','absoluteZero']);
     if(zoneTypes.has(skillType)){
       skillZones.push({type:skillType,x:tx,y:ty,radius,life,maxLife:life,damage:0,tick:0,angle:safeRemoteNumber(payload.zoneAngle,angle),length:safeRemoteNumber(payload.length,0),width:safeRemoteNumber(payload.width,0),ownerId:String(payload.ownerId||''),networkRemote:true,pulses:0,interval:.4,data:{}});
     }else{
@@ -1215,6 +1215,34 @@ function addSkillZone(type,opts={}){
     pulses:opts.pulses||0,interval:opts.interval||.4,triggered:false,data:opts.data||{},originX:opts.originX,originY:opts.originY};
   skillZones.push(z);return z;
 }
+
+function pointInTriangle(px,py,ax,ay,bx,by,cx,cy){
+  const v0x=cx-ax,v0y=cy-ay,v1x=bx-ax,v1y=by-ay,v2x=px-ax,v2y=py-ay;
+  const dot00=v0x*v0x+v0y*v0y,dot01=v0x*v1x+v0y*v1y,dot02=v0x*v2x+v0y*v2y;
+  const dot11=v1x*v1x+v1y*v1y,dot12=v1x*v2x+v1y*v2y;
+  const inv=1/Math.max(.000001,dot00*dot11-dot01*dot01);
+  const u=(dot11*dot02-dot01*dot12)*inv,v=(dot00*dot12-dot01*dot02)*inv;
+  return u>=0&&v>=0&&u+v<=1;
+}
+function tryStellarRevive(){
+  if(!player?.stellarReviveReady)return false;
+  const now=performance.now();
+  if(now>(player.stellarReviveUntil||0)){
+    player.stellarReviveReady=false;
+    return false;
+  }
+  player.stellarReviveReady=false;
+  player.stellarReviveUntil=0;
+  player.hp=Math.max(1,player.maxHp*.58);
+  player.phaseUntil=now+2600;
+  player.vx=0;player.vy=0;
+  burst(player.x,player.y,'#ffffff',55);
+  burst(player.x,player.y,'#80ecff',36);
+  spawnCombatFx('stellarRevive',player.x,player.y,{angle:0,color:'#ffffff',life:1.5,radius:260,cannon:'stellar'});
+  broadcastLocalState(true);
+  return true;
+}
+
 function sendUniqueSkill(cannon,skillType,extra={}){
   sendOnline('skill',{ownerId:onlineSelfId,cannon,x:player.x,y:player.y,angle:player.angle,skillType,...extra});
 }
@@ -1256,9 +1284,12 @@ function activateSkill(errorChargeRatio=0){
     sendUniqueSkill(cannon,'artillery',{targetX:tx,targetY:ty,radius:310,life:1.25});
 
   }else if(cannon==='scout'){
-    const ox=player.x,oy=player.y,[tx,ty]=skillAimPoint(520);player.x=tx;player.y=ty;player.phaseUntil=now+420;player.vx=Math.cos(a)*180;player.vy=Math.sin(a)*180;
-    skillAreaDamage(tx,ty,115,p.damage*1.8,'#72ebff');spawnCombatFx('uniqueSkill',ox,oy,{angle:a,color:def.color,life:.55,radius:520,cannon});broadcastLocalState(true);
-    sendUniqueSkill(cannon,'blinkRush',{targetX:tx,targetY:ty,radius:115});
+    const ox=player.x,oy=player.y,[tx,ty]=skillAimPoint(650),len=Math.hypot(tx-ox,ty-oy),aa=Math.atan2(ty-oy,tx-ox);
+    damageSkillLine(ox,oy,aa,len,28,p.damage*2.0,'#75edff',70);
+    spawnCombatFx('grappleCable',ox,oy,{angle:aa,color:def.color,life:.62,radius:len,cannon});
+    player.x=tx;player.y=ty;player.phaseUntil=now+360;player.vx=Math.cos(aa)*250;player.vy=Math.sin(aa)*250;
+    skillAreaDamage(tx,ty,80,p.damage*.9,'#75edff');broadcastLocalState(true);
+    sendUniqueSkill(cannon,'grappleCable',{targetX:tx,targetY:ty,zoneAngle:aa,length:len,radius:80});
 
   }else if(cannon==='bastion'){
     const[tx,ty]=skillAimPoint(220);addSkillZone('barrier',{x:tx,y:ty,angle:a,length:330,width:34,radius:180,life:5.0});
@@ -1273,20 +1304,32 @@ function activateSkill(errorChargeRatio=0){
     sendUniqueSkill(cannon,'twinDrones',{targetX:player.x,targetY:player.y,radius:115,life:6.2});
 
   }else if(cannon==='needle'){
-    for(let k=1;k<=5;k++){const d=125*k;addSkillZone('needleMine',{x:player.x+Math.cos(a)*d,y:player.y+Math.sin(a)*d,radius:58,life:7,damage:p.damage*2.5,data:{armedAt:.55}})}
-    sendUniqueSkill(cannon,'needleMine',{targetX:player.x+Math.cos(a)*375,targetY:player.y+Math.sin(a)*375,radius:58,life:7});
+    const length=820,x2=player.x+Math.cos(a)*length,y2=player.y+Math.sin(a)*length;
+    damageSkillLine(player.x,player.y,a,length,24,p.damage*3.7,'#d2ff8b',0);
+    for(const s of shapes){
+      const hit=pointToLineInfo(s.x,s.y,player.x,player.y,x2,y2);
+      if(hit.d2>(24+s.r)*(24+s.r))continue;
+      const dx=player.x-s.x,dy=player.y-s.y,d=Math.hypot(dx,dy)||1;
+      reportShapeImpulse(s,dx/d*360,dy/d*360);
+    }
+    spawnCombatFx('harpoonCable',player.x,player.y,{angle:a,color:def.color,life:.72,radius:length,cannon});
+    sendUniqueSkill(cannon,'harpoonCable',{targetX:x2,targetY:y2,zoneAngle:a,length,radius:24});
 
   }else if(cannon==='spread'){
-    damageSkillCone(player.x,player.y,a,440,.68,p.damage*4.1,'#7ff7ff',420);spawnCombatFx('uniqueSkill',player.x,player.y,{angle:a,color:def.color,life:.6,radius:440,cannon});shake=Math.max(shake,13);
-    sendUniqueSkill(cannon,'shockCone',{targetX:player.x+Math.cos(a)*300,targetY:player.y+Math.sin(a)*300,radius:440});
+    damageSkillCone(player.x,player.y,a,500,.78,p.damage*4.2,'#7ff7ff',520);
+    player.vx-=Math.cos(a)*380;player.vy-=Math.sin(a)*380;
+    spawnCombatFx('shotgunBlast',player.x,player.y,{angle:a,color:def.color,life:.72,radius:500,cannon});shake=Math.max(shake,16);
+    sendUniqueSkill(cannon,'shotgunBlast',{targetX:player.x+Math.cos(a)*350,targetY:player.y+Math.sin(a)*350,radius:500});
 
   }else if(cannon==='burst'){
-    addSkillZone('pulseBurst',{x:player.x,y:player.y,radius:90,life:1.75,damage:p.damage*1.55,pulses:3,interval:.48,data:{next:0,index:0}});
-    sendUniqueSkill(cannon,'pulseBurst',{targetX:player.x,targetY:player.y,radius:300,life:1.75});
+    const[tx,ty]=skillAimPoint(520);
+    addSkillZone('burstBomb',{x:tx,y:ty,radius:170,life:1.25,damage:p.damage*2.0,data:{detonateAt:.10}});
+    sendUniqueSkill(cannon,'burstBomb',{targetX:tx,targetY:ty,radius:170,life:1.25});
 
   }else if(cannon==='crystal'){
-    const[tx,ty]=skillAimPoint(480);for(let i=0;i<7;i++){const q=i*TAU/7,r=i?150:0;addSkillZone('crystalMine',{x:tx+Math.cos(q)*r,y:ty+Math.sin(q)*r,radius:72,life:5.3,damage:p.damage*2.1,data:{armedAt:.7}})}
-    sendUniqueSkill(cannon,'crystalMine',{targetX:tx,targetY:ty,radius:225,life:5.3});
+    const[tx,ty]=skillAimPoint(360);
+    addSkillZone('crystalPrism',{x:tx,y:ty,radius:118,life:7.0,damage:0,tick:0,data:{seen:new Set()}});
+    sendUniqueSkill(cannon,'crystalPrism',{targetX:tx,targetY:ty,radius:118,life:7});
 
   }else if(cannon==='piercer'){
     damageSkillLine(player.x,player.y,a,1050,34,p.damage*6.2,'#d6bdff',110);spawnCombatFx('rail',player.x,player.y,{angle:a,color:def.color,life:.42,radius:1050,cannon});shake=Math.max(shake,15);
@@ -1305,28 +1348,32 @@ function activateSkill(errorChargeRatio=0){
     sendUniqueSkill(cannon,'plasmaCage',{targetX:tx,targetY:ty,radius:245,life:4.8});
 
   }else if(cannon==='thunder'){
-    chainLightningSkill(player.x,player.y,p.damage*2.35,10,390);burst(player.x,player.y,'#fff27a',34);shake=Math.max(shake,11);
-    sendUniqueSkill(cannon,'chainLightning',{targetX:player.x,targetY:player.y,radius:390});
+    const[tx,ty]=skillAimPoint(520);
+    addSkillZone('thunderStorm',{x:tx,y:ty,radius:300,life:5.0,damage:p.damage*1.65,tick:0,data:{next:.10,strikes:0}});
+    sendUniqueSkill(cannon,'thunderStorm',{targetX:tx,targetY:ty,radius:300,life:5});
 
   }else if(cannon==='inferno'){
     const[tx,ty]=skillAimPoint(360);addSkillZone('flameWall',{x:tx,y:ty,angle:a+Math.PI/2,length:560,width:92,radius:300,life:5.2,damage:p.damage*.42,tick:0});
     sendUniqueSkill(cannon,'flameWall',{targetX:tx,targetY:ty,zoneAngle:a+Math.PI/2,length:560,width:92,radius:300,life:5.2});
 
   }else if(cannon==='rocket'){
-    const[tx,ty]=skillAimPoint(500);for(let i=0;i<10;i++){const q=i*TAU/10,r=370,x=tx+Math.cos(q)*r,y=ty+Math.sin(q)*r,aa=Math.atan2(ty-y,tx-x);spawnSkillProjectileAt(cannon,x,y,aa,{damageMul:1.05,speedMul:.90,life:3.2,splashRadius:130,r:9,special:'encircleRocket'})}shake=Math.max(shake,10);
-    sendUniqueSkill(cannon,'encircleBarrage',{targetX:tx,targetY:ty,radius:370});
+    const[tx,ty]=skillAimPoint(540);
+    addSkillZone('missileRain',{x:tx,y:ty,radius:330,life:5.0,damage:p.damage*2.15,tick:0,data:{next:.15,count:0}});
+    sendUniqueSkill(cannon,'missileRain',{targetX:tx,targetY:ty,radius:330,life:5});
 
   }else if(cannon==='titan'){
-    addSkillZone('quake',{x:player.x,y:player.y,radius:90,life:1.9,damage:p.damage*1.7,pulses:4,interval:.38,data:{next:0,index:0}});shake=Math.max(shake,17);
-    sendUniqueSkill(cannon,'quake',{targetX:player.x,targetY:player.y,radius:430,life:1.9});
+    addSkillZone('earthFissure',{x:player.x,y:player.y,angle:a,length:760,width:110,radius:380,life:1.8,damage:p.damage*2.0,pulses:6,interval:.20,data:{next:0,index:0}});
+    shake=Math.max(shake,18);
+    sendUniqueSkill(cannon,'earthFissure',{targetX:player.x+Math.cos(a)*380,targetY:player.y+Math.sin(a)*380,zoneAngle:a,length:760,width:110,radius:380,life:1.8});
 
   }else if(cannon==='phantom'){
     const ox=player.x,oy=player.y,[tx,ty]=skillAimPoint(650);addSkillZone('phantomMark',{x:ox,y:oy,radius:150,life:1.15,damage:p.damage*3.2});player.x=tx;player.y=ty;player.phaseUntil=now+700;skillAreaDamage(tx,ty,145,p.damage*2.4,'#cabdff');broadcastLocalState(true);
     sendUniqueSkill(cannon,'phantomMark',{targetX:tx,targetY:ty,radius:150,life:1.15});
 
   }else if(cannon==='ring'){
-    addSkillZone('orbitRing',{x:player.x,y:player.y,radius:195,life:5.3,damage:p.damage*.60,tick:0,data:{next:0}});
-    sendUniqueSkill(cannon,'orbitRing',{targetX:player.x,targetY:player.y,radius:195,life:5.3});
+    const[tx,ty]=skillAimPoint(460);
+    addSkillZone('ringGate',{x:tx,y:ty,radius:92,life:6.0,damage:0,tick:0,data:{seen:new Set()}});
+    sendUniqueSkill(cannon,'ringGate',{targetX:tx,targetY:ty,radius:92,life:6});
 
   }else if(cannon==='chrono'){
     const[tx,ty]=skillAimPoint(440);addSkillZone('timeField',{x:tx,y:ty,radius:310,life:4.5,damage:0,tick:0});
@@ -1345,8 +1392,9 @@ function activateSkill(errorChargeRatio=0){
     sendUniqueSkill(cannon,'cometTrail',{targetX:(ox+tx)/2,targetY:(oy+ty)/2,zoneAngle:aa,length,width:100,radius:length/2,life:4});
 
   }else if(cannon==='stellar'){
-    addSkillZone('sanctuary',{x:player.x,y:player.y,radius:300,life:6.2,damage:p.damage*.23,tick:0,data:{heal:player.maxHp*.035}});player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.18);
-    sendUniqueSkill(cannon,'sanctuary',{targetX:player.x,targetY:player.y,radius:300,life:6.2});
+    const[tx,ty]=skillAimPoint(300);
+    addSkillZone('constellation',{x:tx,y:ty,radius:285,life:7.0,damage:p.damage*.36,tick:0,data:{heal:player.maxHp*.025}});
+    sendUniqueSkill(cannon,'constellation',{targetX:tx,targetY:ty,radius:285,life:7});
 
   }else if(cannon==='error'){
     const errorSwordQ=player.errorSwordMode===true;sendOnline('skill',{ownerId:onlineSelfId,cannon,x:player.x,y:player.y,angle:a,charge:errorSwordQ?clamp(Number(errorChargeRatio)||0,0,1):0,mode:errorSwordQ?'sword':'gun'});
@@ -1398,7 +1446,10 @@ function activateSkill2(){
     const ox=player.x,oy=player.y,[tx,ty]=skillAimPoint(1200),aa=Math.atan2(ty-oy,tx-ox);for(let i=1;i<=6;i++){const k=i/6,ex=ox+(tx-ox)*k,ey=oy+(ty-oy)*k;skillAreaDamage(ex,ey,120,p.damage*1.4,'#75efff');burst(ex,ey,'#75efff',14)}player.x=tx;player.y=ty;player.phaseUntil=now+650;spawnCombatFx('uniqueSkill',ox,oy,{angle:aa,color:def.color,life:.75,radius:1200,cannon});broadcastLocalState(true);sendUniqueSkill(cannon,'meteorDash',{targetX:tx,targetY:ty,radius:120});
 
   }else if(cannon==='stellar'){
-    player.hp=player.maxHp;player.phaseUntil=now+3000;addSkillZone('sanctuary',{x:player.x,y:player.y,radius:360,life:4,damage:p.damage*.18,tick:0,data:{heal:player.maxHp*.025}});sendUniqueSkill(cannon,'sanctuary',{targetX:player.x,targetY:player.y,radius:360,life:4});
+    player.stellarReviveUntil=now+8000;player.stellarReviveReady=true;
+    player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.20);
+    addSkillZone('secondStar',{x:player.x,y:player.y,radius:120,life:8.0,damage:0,tick:0});
+    sendUniqueSkill(cannon,'secondStar',{targetX:player.x,targetY:player.y,radius:120,life:8});
 
   }else if(cannon==='error'){
     player.overclockUntil=now+15000;player.errorDashReadyAt=wallNow;sendOnline('skill',{slot:2,mode:'boost',ownerId:onlineSelfId,cannon,x:player.x,y:player.y,angle:a});broadcastLocalState(true);
@@ -1758,7 +1809,7 @@ function handleShapeContact(){
   burst(player.x,player.y,hitShape.centralCluster?'#8ca6ff':colorForShape(hitShape.type),7);
   shake=Math.max(shake,4);
 
-  if(player.hp<=0)killPlayer('');
+  if(player.hp<=0&&!tryStellarRevive())killPlayer('');
 }
 
 
@@ -2190,8 +2241,120 @@ function updateSkillZones(dt){
     if(z.networkRemote)continue;
     const elapsed=z.maxLife-z.life;
 
-    if(z.type==='artillery'){
+    if(z.type==='burstBomb'){
+      const pulse=.75+.25*Math.sin(t*12);ctx.shadowColor='#65ecff';ctx.shadowBlur=20;ctx.strokeStyle='#8df6ff';ctx.lineWidth=5;ctx.beginPath();ctx.arc(0,0,z.radius*(.35+.1*pulse),0,TAU);ctx.stroke();for(let k=0;k<8;k++){const a=k*TAU/8+t*2;ctx.beginPath();ctx.moveTo(Math.cos(a)*28,Math.sin(a)*28);ctx.lineTo(Math.cos(a)*z.radius*.55,Math.sin(a)*z.radius*.55);ctx.stroke()}ctx.shadowBlur=0;
+    }else if(z.type==='crystalPrism'){
+      ctx.rotate(t*.6);ctx.shadowColor='#c8fbff';ctx.shadowBlur=20;ctx.strokeStyle='#dfffff';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(0,-z.radius);ctx.lineTo(z.radius*.866,z.radius*.5);ctx.lineTo(-z.radius*.866,z.radius*.5);ctx.closePath();ctx.stroke();ctx.globalAlpha*=.35;ctx.fillStyle='#72d9ff';ctx.fill();ctx.globalAlpha=1;ctx.shadowBlur=0;
+    }else if(z.type==='thunderStorm'){
+      ctx.fillStyle='rgba(80,95,115,.28)';for(let k=0;k<6;k++){const a=k*TAU/6+t*.14,rr=z.radius*(.25+(k%3)*.12);ctx.beginPath();ctx.arc(Math.cos(a)*rr,Math.sin(a)*rr*.45,60,0,TAU);ctx.fill()}ctx.strokeStyle='#fff47c';ctx.lineWidth=3;ctx.setLineDash([8,9]);ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.stroke();ctx.setLineDash([]);
+    }else if(z.type==='missileRain'){
+      ctx.fillStyle='rgba(255,120,60,.07)';ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.fill();ctx.strokeStyle='#ff9e55';ctx.lineWidth=3;ctx.setLineDash([6,10]);ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.stroke();ctx.setLineDash([]);for(let k=0;k<5;k++){const a=k*TAU/5+t*.25,rr=z.radius*.62;ctx.fillStyle='#ffcc8a';ctx.beginPath();ctx.arc(Math.cos(a)*rr,Math.sin(a)*rr,5,0,TAU);ctx.fill()}
+    }else if(z.type==='missileMarker'){
+      ctx.strokeStyle='#ff7040';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,z.radius*(.72+.18*Math.sin(t*15)),0,TAU);ctx.stroke();ctx.beginPath();ctx.moveTo(-z.radius,0);ctx.lineTo(z.radius,0);ctx.moveTo(0,-z.radius);ctx.lineTo(0,z.radius);ctx.stroke();
+    }else if(z.type==='earthFissure'){
+      ctx.rotate(z.angle);ctx.strokeStyle='#ffc17a';ctx.lineWidth=8;ctx.shadowColor='#ff9b4a';ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(0,0);for(let k=1;k<=8;k++){const x=z.length*k/8,y=(k%2?1:-1)*18;ctx.lineTo(x,y)}ctx.stroke();ctx.shadowBlur=0;
+    }else if(z.type==='ringGate'){
+      ctx.rotate(t*1.8);ctx.shadowColor='#c8aaff';ctx.shadowBlur=22;ctx.strokeStyle='#e6d8ff';ctx.lineWidth=7;ctx.beginPath();ctx.ellipse(0,0,z.radius,z.radius*.36,0,0,TAU);ctx.stroke();ctx.strokeStyle='#8d65e8';ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(0,0,z.radius*.68,z.radius*.22,Math.PI/2,0,TAU);ctx.stroke();ctx.shadowBlur=0;
+    }else if(z.type==='constellation'){
+      const r=z.radius,pts=[[0,-r],[-r*.866,r*.5],[r*.866,r*.5]];ctx.strokeStyle='#edffff';ctx.shadowColor='#b8f4ff';ctx.shadowBlur=18;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(...pts[0]);ctx.lineTo(...pts[1]);ctx.lineTo(...pts[2]);ctx.closePath();ctx.stroke();for(const pt of pts){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(pt[0],pt[1],9+Math.sin(t*5)*2,0,TAU);ctx.fill()}ctx.globalAlpha*=.12;ctx.fillStyle='#b8f4ff';ctx.beginPath();ctx.moveTo(...pts[0]);ctx.lineTo(...pts[1]);ctx.lineTo(...pts[2]);ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.globalAlpha=1;
+    }else if(z.type==='secondStar'){
+      ctx.rotate(t*.7);ctx.strokeStyle='#ffffff';ctx.shadowColor='#b9f6ff';ctx.shadowBlur=24;ctx.lineWidth=4;for(let k=0;k<8;k++){const a=k*TAU/8;ctx.beginPath();ctx.moveTo(Math.cos(a)*25,Math.sin(a)*25);ctx.lineTo(Math.cos(a)*z.radius,Math.sin(a)*z.radius);ctx.stroke()}ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,0,13,0,TAU);ctx.fill();ctx.shadowBlur=0;
+    }else if(z.type==='artillery'){
       if(!z.triggered&&z.life<.15){z.triggered=true;skillAreaDamage(z.x,z.y,z.radius,z.damage,'#8fd5ff');burst(z.x,z.y,'#dff7ff',40);shake=Math.max(shake,15)}
+      continue;
+    }
+    if(z.type==='burstBomb'){
+      if(!z.triggered&&z.life<(z.data.detonateAt||.10)){
+        z.triggered=true;
+        skillAreaDamage(z.x,z.y,z.radius,z.damage,'#67efff');
+        for(let k=0;k<16;k++){
+          spawnSkillProjectileAt('burst',z.x,z.y,k*TAU/16,{damageMul:.48,speedMul:1.18,life:1.55,pierce:2,r:6,shape:'burstDisc',special:'burstBombShard',curve:k%2?-1:1});
+        }
+        burst(z.x,z.y,'#9dfaff',38);shake=Math.max(shake,13);
+      }
+      continue;
+    }
+    if(z.type==='crystalPrism'){
+      z.data.seen=z.data.seen||new Set();
+      for(const b of [...bullets]){
+        if(b.networkRemote||b.team!=='player'||b.cannon!=='crystal'||b.fragment||b.prismClone)continue;
+        const d2=(b.x-z.x)**2+(b.y-z.y)**2;
+        if(d2>z.radius*z.radius||z.data.seen.has(b))continue;
+        z.data.seen.add(b);b.prismSplit=true;
+        const aa=Math.atan2(b.vy,b.vx),speed=Math.hypot(b.vx,b.vy);
+        for(const off of [-.30,.30]){
+          const c=spawnPassiveBullet({x:z.x,y:z.y,angle:aa+off,speed:speed*1.05,damage:b.damage*.72,life:Math.max(.6,b.life),r:5,cannon:'crystal',shape:'crystalShard',special:'prismClone',fragment:true});
+          c.prismClone=true;c.curve=off<0?-1:1;
+        }
+        spawnCombatFx('prismFlash',z.x,z.y,{angle:aa,color:'#c9fbff',life:.35,radius:90,cannon:'crystal'});
+      }
+      continue;
+    }
+    if(z.type==='thunderStorm'){
+      z.data.next=(z.data.next||0)-dt;
+      if(z.data.next<=0){
+        z.data.next=.38;z.data.strikes=(z.data.strikes||0)+1;
+        let tx=z.x+rand(-z.radius*.85,z.radius*.85),ty=z.y+rand(-z.radius*.85,z.radius*.85),target=null,best=150*150;
+        for(const s of shapes){const d2=(s.x-tx)**2+(s.y-ty)**2;if(d2<best&&Math.hypot(s.x-z.x,s.y-z.y)<z.radius){best=d2;target=s}}
+        if(target){tx=target.x;ty=target.y;applyShapeDamage(target,z.damage);if(target.hp<=0){gainXp(target.xp)}}
+        for(const e of remotePlayers.values()){if(!e.alive)continue;if((e.x-tx)**2+(e.y-ty)**2<75*75)sendDamage(e.id,z.damage*.85)}
+        spawnCombatFx('skyLightning',tx,ty-260,{angle:Math.PI/2,color:'#fff36f',life:.34,radius:260,cannon:'thunder'});
+        burst(tx,ty,'#fff37a',15);
+      }
+      continue;
+    }
+    if(z.type==='missileRain'){
+      z.data.next=(z.data.next||0)-dt;
+      if(z.data.next<=0){
+        z.data.next=.32;z.data.count=(z.data.count||0)+1;
+        const q=Math.random()*TAU,rr=Math.sqrt(Math.random())*z.radius*.88,mx=z.x+Math.cos(q)*rr,my=z.y+Math.sin(q)*rr;
+        addSkillZone('missileMarker',{x:mx,y:my,radius:78,life:.48,damage:z.damage,data:{detonateAt:.08}});
+      }
+      continue;
+    }
+    if(z.type==='missileMarker'){
+      if(!z.triggered&&z.life<(z.data.detonateAt||.08)){
+        z.triggered=true;skillAreaDamage(z.x,z.y,z.radius,z.damage,'#ff9b4a');burst(z.x,z.y,'#ffb35c',20);shake=Math.max(shake,5);
+      }
+      continue;
+    }
+    if(z.type==='earthFissure'){
+      z.data.next=(z.data.next||0)-dt;
+      if((z.data.index||0)<(z.pulses||6)&&z.data.next<=0){
+        const idx=z.data.index||0;z.data.index=idx+1;z.data.next=z.interval;
+        const d=(idx+1)*z.length/(z.pulses||6),fx=z.x+Math.cos(z.angle)*d,fy=z.y+Math.sin(z.angle)*d;
+        skillAreaDamage(fx,fy,z.width,z.damage*(1+.08*idx),'#ffc17a');
+        for(const s of shapes){const dd=Math.hypot(s.x-fx,s.y-fy)||1;if(dd<z.width*1.15)reportShapeImpulse(s,Math.cos(z.angle)*190,Math.sin(z.angle)*190)}
+        burst(fx,fy,'#ffc17a',22);
+      }
+      continue;
+    }
+    if(z.type==='ringGate'){
+      z.data.seen=z.data.seen||new Set();
+      for(const b of [...bullets]){
+        if(b.networkRemote||b.team!=='player'||b.cannon!=='ring'||!b.basicAttack||b.gateClone||z.data.seen.has(b))continue;
+        z.data.seen.add(b);
+        const aa=Math.atan2(b.vy,b.vx),speed=Math.hypot(b.vx,b.vy);
+        const c=spawnSkillProjectileAt('ring',z.x,z.y,aa,{damageMul:.72,speedMul:speed/Math.max(1,playerParams().bulletSpeed),life:Math.max(1,b.life),pierce:7,r:11,shape:'dimensionRing',special:'gateClone'});
+        c.gateClone=true;
+        spawnCombatFx('portalPulse',z.x,z.y,{angle:aa,color:'#d9c3ff',life:.30,radius:90,cannon:'ring'});
+      }
+      continue;
+    }
+    if(z.type==='constellation'){
+      z.tick=(z.tick||0)-dt;
+      if(z.tick<=0){
+        z.tick=.28;
+        const r=z.radius,ax=z.x,ay=z.y-r,bx=z.x-r*.866,by=z.y+r*.5,cx=z.x+r*.866,cy=z.y+r*.5;
+        if(pointInTriangle(player.x,player.y,ax,ay,bx,by,cx,cy))player.hp=Math.min(player.maxHp,player.hp+(z.data.heal||player.maxHp*.02));
+        for(let i=shapes.length-1;i>=0;i--){const s=shapes[i];if(!pointInTriangle(s.x,s.y,ax,ay,bx,by,cx,cy))continue;applyShapeDamage(s,z.damage);burst(s.x,s.y,'#e8ffff',3);if(s.hp<=0){gainXp(s.xp);shapes.splice(i,1)}}
+        for(const e of remotePlayers.values()){if(e.alive&&pointInTriangle(e.x,e.y,ax,ay,bx,by,cx,cy))sendDamage(e.id,z.damage*.75)}
+      }
+      continue;
+    }
+    if(z.type==='secondStar'){
+      z.x=player.x;z.y=player.y;
+      if(!player.stellarReviveReady||performance.now()>(player.stellarReviveUntil||0))z.life=.01;
       continue;
     }
     if(z.type==='barrier'){
@@ -2619,7 +2782,19 @@ function drawCombatEffects(){
   for(const f of combatFx){
     const[x,y]=worldToScreen(f.x,f.y),p=clamp(f.life/f.maxLife,0,1),q=1-p;
     ctx.save();ctx.translate(x,y);ctx.rotate(f.angle);ctx.globalAlpha=Math.min(1,p*1.35);
-    if(f.type==='uniqueSkill'){
+    if(f.type==='grappleCable'||f.type==='harpoonCable'){
+      ctx.strokeStyle=f.type==='grappleCable'?'#8ff3ff':'#d6ff8c';ctx.shadowColor=ctx.strokeStyle;ctx.shadowBlur=15;ctx.lineWidth=f.type==='grappleCable'?5:4;ctx.setLineDash(f.type==='grappleCable'?[12,7]:[]);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(f.radius,0);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.moveTo(f.radius,0);ctx.lineTo(f.radius-22,-10);ctx.lineTo(f.radius-22,10);ctx.closePath();ctx.fill();ctx.shadowBlur=0;
+    }else if(f.type==='shotgunBlast'){
+      ctx.fillStyle='rgba(105,242,255,.22)';ctx.strokeStyle='#9af9ff';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,f.radius*q,-.78,.78);ctx.closePath();ctx.fill();ctx.stroke();
+    }else if(f.type==='prismFlash'){
+      ctx.rotate(q*2);ctx.strokeStyle='#e5ffff';ctx.lineWidth=4;ctx.shadowColor='#b8f9ff';ctx.shadowBlur=16;ctx.beginPath();ctx.moveTo(0,-f.radius*q);ctx.lineTo(f.radius*q*.866,f.radius*q*.5);ctx.lineTo(-f.radius*q*.866,f.radius*q*.5);ctx.closePath();ctx.stroke();ctx.shadowBlur=0;
+    }else if(f.type==='portalPulse'){
+      ctx.rotate(q*3);ctx.strokeStyle='#ddc7ff';ctx.lineWidth=5;ctx.beginPath();ctx.ellipse(0,0,f.radius*q,f.radius*q*.3,0,0,TAU);ctx.stroke();
+    }else if(f.type==='skyLightning'){
+      ctx.strokeStyle='#fff36f';ctx.lineWidth=5*p+1;ctx.shadowColor='#fff36f';ctx.shadowBlur=18;ctx.beginPath();ctx.moveTo(0,0);for(let k=1;k<=8;k++){const yy=f.radius*k/8,xx=k===8?0:(k%2?14:-13);ctx.lineTo(xx,yy)}ctx.stroke();ctx.shadowBlur=0;
+    }else if(f.type==='stellarRevive'){
+      ctx.strokeStyle='#ffffff';ctx.lineWidth=6*p+1;ctx.shadowColor='#b9f6ff';ctx.shadowBlur=24;for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(0,0,f.radius*q*(.35+k*.22),0,TAU);ctx.stroke()}ctx.shadowBlur=0;
+    }else if(f.type==='uniqueSkill'){
       ctx.strokeStyle=f.color;ctx.lineWidth=5*p+1;ctx.shadowColor=f.color;ctx.shadowBlur=18;ctx.beginPath();ctx.arc(0,0,f.radius*q*.45,0,TAU);ctx.stroke();ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(f.radius*q,0);ctx.stroke();ctx.shadowBlur=0;
     }else if(f.type==='lightningLink'){
       ctx.strokeStyle=f.color;ctx.lineWidth=3*p+1;ctx.shadowColor=f.color;ctx.shadowBlur=14;ctx.beginPath();let px=0,py=0;ctx.moveTo(0,0);for(let k=1;k<=7;k++){const tt=k/7,xx=f.radius*tt,yy=(k===7?0:Math.sin(k*8+f.x*.01)*12*p);ctx.lineTo(xx,yy);px=xx;py=yy}ctx.stroke();ctx.shadowBlur=0;
