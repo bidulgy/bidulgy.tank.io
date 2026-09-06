@@ -4,14 +4,14 @@ const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
-const NORMAL_SHAPE_TARGET=360;
-const NORMAL_SHAPE_HARD_CAP=430;
-const CENTRAL_PENTAGON_TARGET=300;
+const NORMAL_SHAPE_TARGET=220;
+const NORMAL_SHAPE_HARD_CAP=260;
+const CENTRAL_PENTAGON_TARGET=180;
 const CENTRAL_PENTAGON_RADIUS=1400;
 const WORLD_SNAPSHOT_INTERVAL=300;
 
-const INITIAL_NORMAL_SHAPES=140;
-const INITIAL_CENTRAL_PENTAGONS=36;
+const INITIAL_NORMAL_SHAPES=90;
+const INITIAL_CENTRAL_PENTAGONS=24;
 
 const NORMAL_SPAWN_INTERVAL=.18;
 const CENTRAL_SPAWN_INTERVAL=.11;
@@ -20,7 +20,7 @@ const CENTRAL_SPAWN_BATCH=1;
 
 // 플레이어가 맵 구석/외곽으로 이동해도 주변이 비지 않도록 최소 밀도를 유지한다.
 const LOCAL_SHAPE_RADIUS=1650;
-const LOCAL_SHAPE_MIN=46;
+const LOCAL_SHAPE_MIN=28;
 const LOCAL_SHAPE_SPAWN_MIN_DISTANCE=430;
 const LOCAL_SHAPE_SPAWN_MAX_DISTANCE=1350;
 const LOCAL_SHAPE_RECYCLE_DISTANCE=3000;
@@ -447,11 +447,18 @@ function reportShapeDamage(s,amount,pushX=0,pushY=0){
 function applyShapeDamage(s,amount,pushX=0,pushY=0){
   if(!s)return false;
   amount=Math.max(0,Number(amount)||0);
-  if(amount<=0)return s.hp<=0;
-  s.hp-=amount;
+  const before=Math.max(0,Number(s.hp)||0);
+  if(amount<=0){
+    s.hp=before;
+    return s.hp<=0;
+  }
+
+  // V5.38: enemy HP can never become negative.
+  s.hp=Math.max(0,before-amount);
+
   if(pushX)s.vx=(s.vx||0)+pushX;
   if(pushY)s.vy=(s.vy||0)+pushY;
-  reportShapeDamage(s,amount,pushX,pushY);
+  reportShapeDamage(s,Math.min(amount,before),pushX,pushY);
   return s.hp<=0;
 }
 function reportShapeImpulse(s,dvx,dvy){
@@ -472,7 +479,7 @@ function receiveShapeDamage(payload){
   if(!s)return;
   const amount=Math.max(0,Math.min(100000,safeRemoteNumber(payload.amount,0)));
   if(amount<=0)return;
-  s.hp-=amount;
+  s.hp=Math.max(0,(Number(s.hp)||0)-amount);
   s.vx+=(safeRemoteNumber(payload.pushX,0));
   s.vy+=(safeRemoteNumber(payload.pushY,0));
   if(s.hp<=0){
@@ -2632,16 +2639,31 @@ function updateSkillZones(dt){
       z.x=player.x;z.y=player.y;z.tick=(z.tick||0)-dt;
       if(z.tick<=0){
         z.tick=.16;
-        for(const s of shapes){
-          const dx=s.x-z.x,dy=s.y-z.y,d=Math.hypot(dx,dy)||1;if(d>z.radius)continue;
-          const force=(1-d/z.radius)*330;reportShapeImpulse(s,dx/d*force,dy/d*force);applyShapeDamage(s,z.damage);
+
+        // V5.38: iterate backwards so dead shapes are removed on the same tick.
+        for(let i=shapes.length-1;i>=0;i--){
+          const s=shapes[i];
+          const dx=s.x-z.x,dy=s.y-z.y,d=Math.hypot(dx,dy)||1;
+          if(d>z.radius)continue;
+
+          const force=(1-d/z.radius)*330;
+          reportShapeImpulse(s,dx/d*force,dy/d*force);
+
+          if(applyShapeDamage(s,z.damage)){
+            gainXp(s.xp);
+            burst(s.x,s.y,colorForShape(s.type),10);
+            shapes.splice(i,1);
+          }
         }
+
         for(const b of bullets){
           if(b.team!=='remote')continue;
           const dx=b.x-z.x,dy=b.y-z.y,d=Math.hypot(dx,dy)||1;if(d>z.radius)continue;
           const force=(1-d/z.radius)*520;b.vx+=dx/d*force;b.vy+=dy/d*force;
         }
-        for(const e of remotePlayers.values()){if(e.alive&&Math.hypot(e.x-z.x,e.y-z.y)<=z.radius)sendDamage(e.id,z.damage*.55)}
+        for(const e of remotePlayers.values()){
+          if(e.alive&&Math.hypot(e.x-z.x,e.y-z.y)<=z.radius)sendDamage(e.id,z.damage*.55);
+        }
       }
       continue;
     }
