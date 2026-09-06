@@ -3,17 +3,33 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-const NORMAL_SHAPE_TARGET=95;
-const CENTRAL_PENTAGON_TARGET=220;
+// V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
+const NORMAL_SHAPE_TARGET=360;
+const NORMAL_SHAPE_HARD_CAP=430;
+const CENTRAL_PENTAGON_TARGET=300;
 const CENTRAL_PENTAGON_RADIUS=1400;
 const WORLD_SNAPSHOT_INTERVAL=300;
-const INITIAL_NORMAL_SHAPES=28;
-const INITIAL_CENTRAL_PENTAGONS=12;
-const NORMAL_SPAWN_INTERVAL=.45;
-const CENTRAL_SPAWN_INTERVAL=.11;
+
+const INITIAL_NORMAL_SHAPES=140;
+const INITIAL_CENTRAL_PENTAGONS=36;
+
+const NORMAL_SPAWN_INTERVAL=.09;
+const CENTRAL_SPAWN_INTERVAL=.065;
+const NORMAL_SPAWN_BATCH=4;
+const CENTRAL_SPAWN_BATCH=2;
+
+// 플레이어가 맵 구석/외곽으로 이동해도 주변이 비지 않도록 최소 밀도를 유지한다.
+const LOCAL_SHAPE_RADIUS=1650;
+const LOCAL_SHAPE_MIN=46;
+const LOCAL_SHAPE_SPAWN_MIN_DISTANCE=430;
+const LOCAL_SHAPE_SPAWN_MAX_DISTANCE=1350;
+const LOCAL_SHAPE_RECYCLE_DISTANCE=3000;
+const LOCAL_REBALANCE_INTERVAL=.28;
+const LOCAL_REBALANCE_BATCH=5;
 let running=false,paused=false,last=performance.now(),camera={x:0,y:0},shapes=[],bullets=[],particles=[],combatFx=[],skillZones=[],shake=0,classUpgradeShown=false,player,playerHistory=[];
 const remotePlayers=new Map();
 let onlineChannel=null,onlineReady=false,onlineSelfId='',lastStateSend=0,networkSerial=0,lastRunAutosave=0,runSaveBusy=false,normalSpawnTimer=0,centralSpawnTimer=0;
+let localRebalanceTimer=0,normalSpawnAnchorCursor=0;
 let worldHostId='',worldSnapshotSeq=0,lastWorldSnapshotSend=0,lastWorldSnapshotReceive=0,shapeSerial=0;
 const processedDamageIds=new Set();
 const input={keys:new Set(),mouseX:innerWidth/2,mouseY:innerHeight/2,firing:false,moveX:0,moveY:0,mobileAimActive:false};
@@ -134,17 +150,132 @@ function resize(){const dpr=Math.min(2,devicePixelRatio||1);canvas.width=Math.ro
 const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function dist2(a,b){const dx=a.x-b.x,dy=a.y-b.y;return dx*dx+dy*dy}function norm(dx,dy){const d=Math.hypot(dx,dy)||1;return[dx/d,dy/d]}
 function colorForShape(t){return t==='square'?'#f7c843':t==='triangle'?'#e86464':'#6b8df2'}function edgeForShape(t){return t==='square'?'#b99320':t==='triangle'?'#a83f42':'#425cb2'}
-function spawnShape(type=null){
+function activeShapeSpawnAnchors(){
+  const anchors=[];
+  if(player?.alive&&Number.isFinite(player.x)&&Number.isFinite(player.y)){
+    anchors.push({x:player.x,y:player.y,id:onlineSelfId||'local'});
+  }
+  for(const e of remotePlayers.values()){
+    if(!e?.alive||!Number.isFinite(e.x)||!Number.isFinite(e.y))continue;
+    anchors.push({x:e.x,y:e.y,id:String(e.id||e.name||anchors.length)});
+  }
+  return anchors;
+}
+function randomGlobalShapePoint(){
+  // 전역 스폰 중 일부는 외곽 벨트/코너에 의도적으로 배치한다.
+  if(Math.random()<.42){
+    const edgeDepth=1850;
+    const side=Math.floor(Math.random()*4);
+    if(side===0)return{x:rand(100,edgeDepth),y:rand(100,WORLD-100)};
+    if(side===1)return{x:rand(WORLD-edgeDepth,WORLD-100),y:rand(100,WORLD-100)};
+    if(side===2)return{x:rand(100,WORLD-100),y:rand(100,edgeDepth)};
+    return{x:rand(100,WORLD-100),y:rand(WORLD-edgeDepth,WORLD-100)};
+  }
+  return{x:rand(100,WORLD-100),y:rand(100,WORLD-100)};
+}
+function localShapePoint(anchor){
+  for(let attempt=0;attempt<18;attempt++){
+    const a=rand(0,TAU);
+    const d=rand(LOCAL_SHAPE_SPAWN_MIN_DISTANCE,LOCAL_SHAPE_SPAWN_MAX_DISTANCE);
+    const x=anchor.x+Math.cos(a)*d,y=anchor.y+Math.sin(a)*d;
+    if(x>=90&&x<=WORLD-90&&y>=90&&y<=WORLD-90)return{x,y};
+  }
+
+  // 모서리에서는 가능한 내부 방향이 적으므로 사각 범위 fallback.
+  return{
+    x:clamp(anchor.x+rand(-LOCAL_SHAPE_SPAWN_MAX_DISTANCE,LOCAL_SHAPE_SPAWN_MAX_DISTANCE),90,WORLD-90),
+    y:clamp(anchor.y+rand(-LOCAL_SHAPE_SPAWN_MAX_DISTANCE,LOCAL_SHAPE_SPAWN_MAX_DISTANCE),90,WORLD-90)
+  };
+}
+function chooseNormalSpawnPoint(preferLocal=true,forcedAnchor=null){
+  if(forcedAnchor)return localShapePoint(forcedAnchor);
+
+  const anchors=activeShapeSpawnAnchors();
+  if(preferLocal&&anchors.length&&Math.random()<.78){
+    const anchor=anchors[normalSpawnAnchorCursor++%anchors.length];
+    return localShapePoint(anchor);
+  }
+  return randomGlobalShapePoint();
+}
+function spawnShape(type=null,preferLocal=true,forcedAnchor=null){
   const t=type||(Math.random()<.57?'square':Math.random()<.78?'triangle':'pentagon');
   const c=t==='square'?{r:20,hp:36,xp:12,sides:4}:t==='triangle'?{r:24,hp:58,xp:22,sides:3}:{r:34,hp:145,xp:56,sides:5};
-  shapes.push({
+  const pos=chooseNormalSpawnPoint(preferLocal,forcedAnchor);
+  const shape={
     id:makeShapeId(),
-    type:t,x:rand(100,WORLD-100),y:rand(100,WORLD-100),
+    type:t,x:pos.x,y:pos.y,
     r:c.r,hp:c.hp,maxHp:c.hp,xp:c.xp,sides:c.sides,
     angle:rand(0,TAU),spin:rand(-.35,.35),vx:0,vy:0,
     centralCluster:false,spawnAge:0
-  });
+  };
+  shapes.push(shape);
+  return shape;
 }
+
+function minDistanceToActiveAnchors(shape,anchors){
+  let best=Infinity;
+  for(const a of anchors){
+    const d=Math.hypot(shape.x-a.x,shape.y-a.y);
+    if(d<best)best=d;
+  }
+  return best;
+}
+function recycleFarNormalShape(anchor,anchors){
+  let candidate=null,bestDistance=LOCAL_SHAPE_RECYCLE_DISTANCE;
+  for(const s of shapes){
+    if(s.centralCluster)continue;
+    const d=minDistanceToActiveAnchors(s,anchors);
+    if(d>bestDistance){
+      bestDistance=d;
+      candidate=s;
+    }
+  }
+  if(!candidate)return false;
+
+  const pos=localShapePoint(anchor);
+  const type=Math.random()<.57?'square':Math.random()<.78?'triangle':'pentagon';
+  const c=type==='square'?{r:20,hp:36,xp:12,sides:4}:type==='triangle'?{r:24,hp:58,xp:22,sides:3}:{r:34,hp:145,xp:56,sides:5};
+
+  candidate.type=type;
+  candidate.x=pos.x;candidate.y=pos.y;
+  candidate.r=c.r;candidate.hp=c.hp;candidate.maxHp=c.hp;candidate.xp=c.xp;candidate.sides=c.sides;
+  candidate.angle=rand(0,TAU);candidate.spin=rand(-.35,.35);
+  candidate.vx=0;candidate.vy=0;candidate.spawnAge=0;
+  candidate.centralCluster=false;
+  return true;
+}
+function ensureLocalShapeDensity(){
+  const anchors=activeShapeSpawnAnchors();
+  if(!anchors.length)return;
+
+  let normalCount=0;
+  for(const s of shapes)if(!s.centralCluster)normalCount++;
+
+  const radius2=LOCAL_SHAPE_RADIUS*LOCAL_SHAPE_RADIUS;
+  for(const anchor of anchors){
+    let nearby=0;
+    for(const s of shapes){
+      if(s.centralCluster)continue;
+      const dx=s.x-anchor.x,dy=s.y-anchor.y;
+      if(dx*dx+dy*dy<=radius2)nearby++;
+    }
+
+    let need=Math.min(LOCAL_REBALANCE_BATCH,Math.max(0,LOCAL_SHAPE_MIN-nearby));
+    while(need-->0){
+      // 우선 아무 플레이어에게도 보이지 않을 만큼 먼 도형을 재활용한다.
+      if(recycleFarNormalShape(anchor,anchors))continue;
+
+      // 재활용 대상이 없으면 hard cap까지 추가 스폰한다.
+      if(normalCount<NORMAL_SHAPE_HARD_CAP){
+        spawnShape(null,true,anchor);
+        normalCount++;
+      }else{
+        break;
+      }
+    }
+  }
+}
+
 function spawnCentralPentagon(){
   // 큰 맵에 맞춰 오각형 군집을 훨씬 넓게 퍼뜨린다.
   // 지수 1.18로 바꿔 중앙 과밀을 줄이고 바깥쪽에도 고르게 생성한다.
@@ -173,7 +304,11 @@ function populate(){
   shapes=[];bullets=[];particles=[];combatFx=[];skillZones=[];playerHistory=[];
   normalSpawnTimer=0;
   centralSpawnTimer=0;
-  for(let i=0;i<INITIAL_NORMAL_SHAPES;i++)spawnShape();
+  localRebalanceTimer=0;
+  normalSpawnAnchorCursor=0;
+
+  // 시작부터 월드 전체/외곽과 플레이어 주변을 동시에 채운다.
+  for(let i=0;i<INITIAL_NORMAL_SHAPES;i++)spawnShape(null,i%2===0);
   for(let i=0;i<INITIAL_CENTRAL_PENTAGONS;i++)spawnCentralPentagon();
 }
 
@@ -1860,15 +1995,24 @@ function updateShapes(dt){
 
   normalSpawnTimer-=dt;
   centralSpawnTimer-=dt;
+  localRebalanceTimer-=dt;
 
   if(normalCount<NORMAL_SHAPE_TARGET&&normalSpawnTimer<=0){
-    spawnShape();
+    const amount=Math.min(NORMAL_SPAWN_BATCH,NORMAL_SHAPE_TARGET-normalCount);
+    for(let i=0;i<amount;i++)spawnShape();
     normalSpawnTimer=NORMAL_SPAWN_INTERVAL;
   }
 
   if(centralCount<CENTRAL_PENTAGON_TARGET&&centralSpawnTimer<=0){
-    spawnCentralPentagon();
+    const amount=Math.min(CENTRAL_SPAWN_BATCH,CENTRAL_PENTAGON_TARGET-centralCount);
+    for(let i=0;i<amount;i++)spawnCentralPentagon();
     centralSpawnTimer=CENTRAL_SPAWN_INTERVAL;
+  }
+
+  // 총 목표가 이미 가득 차도 플레이어가 외곽/구석으로 이동하면 주변 적 밀도를 다시 채운다.
+  if(localRebalanceTimer<=0){
+    ensureLocalShapeDensity();
+    localRebalanceTimer=LOCAL_REBALANCE_INTERVAL;
   }
 }
 function makeRunId(){
