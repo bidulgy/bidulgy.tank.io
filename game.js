@@ -678,7 +678,7 @@ function playerParams(){
 
   if(cannon==='rapid'){damage*=.48;bulletSpeed*=1.06;reload*=.36}
   else if(cannon==='spread'){damage*=.50;bulletSpeed*=.90;reload*=1.30}
-  else if(family==='piercer'){damage*=1.15;bulletSpeed*=1.42;reload*=1.48}
+  else if(cannon==='piercer'){damage*=1.15;bulletSpeed*=1.42;reload*=1.48}
   else if(cannon==='plasma'){damage*=1.35;bulletSpeed*=.72;reload*=1.62}
   else if(cannon==='rocket'){damage*=2.15;bulletSpeed*=.60;reload*=2.20}
   else if(cannon==='ring'){damage*=.86;bulletSpeed*=1.05;reload*=1.15}
@@ -786,7 +786,7 @@ function receiveRemoteSkill(payload){
         maxLife:safeRemoteNumber(payload.life,cannon==='void'?6:5.5),
         damage:0,tick:0,ownerId:String(payload.ownerId||''),networkRemote:true
       });
-    }else if(family==='error'){
+    }else if(cannon==='error'){
       if(String(payload.mode||'')==='dash'){
         const tx=safeRemoteNumber(payload.targetX,x),ty=safeRemoteNumber(payload.targetY,y);
         spawnCombatFx('skill2-error',x,y,{angle,color:def.color,life:.60,radius:92,cannon});
@@ -1220,7 +1220,7 @@ function activateSkill(errorChargeRatio=0){
     for(let i=-4;i<=4;i++)skillProjectile(cannon,a+i*.12,{damageMul:.82,speedMul:.82,life:2.65,splashRadius:132});
     burst(player.x+Math.cos(a)*30,player.y+Math.sin(a)*30,'#ff704b',34);shake=Math.max(shake,12);
 
-  }else if(family==='rocket'){
+  }else if(cannon==='rocket'){
     for(let i=-5;i<=5;i++)skillProjectile(cannon,a+i*.13,{damageMul:.82,speedMul:.88,life:2.55,splashRadius:126});
     burst(player.x,player.y,'#ffae5d',24);shake=Math.max(shake,10);
 
@@ -2169,13 +2169,13 @@ function drawTank(e){
   ctx.shadowColor=theme.glow;ctx.shadowBlur=family==='standard'?7:13;
   ctx.fillStyle=theme.body;ctx.strokeStyle=theme.edge;ctx.lineWidth=5;
 
-  if(cannon==='piercer'){
+  if(family==='piercer'){
     polygon(0,0,r,6,Math.PI/6);ctx.fill();ctx.stroke();
-  }else if(cannon==='rocket'){
+  }else if(family==='rocket'){
     ctx.beginPath();ctx.roundRect(-r*.92,-r*.78,r*1.84,r*1.56,9);ctx.fill();ctx.stroke();
     ctx.fillStyle='#34414d';ctx.fillRect(-r-9,-r*.72,10,r*1.44);ctx.fillRect(r-1,-r*.72,10,r*1.44);
-  }else if(cannon==='error'){
-    ctx.fillStyle='#101315';ctx.strokeStyle='#71ff3d';
+  }else if(family==='error'){
+    ctx.fillStyle='#101315';ctx.strokeStyle=cannon==='zero'?'#f2f7ff':cannon==='glitch'?'#ff45df':'#71ff3d';
     ctx.beginPath();ctx.rect(-r*.82,-r*.82,r*1.64,r*1.64);ctx.fill();ctx.stroke();
   }else{
     ctx.beginPath();ctx.arc(0,0,r,0,TAU);ctx.fill();ctx.stroke();
@@ -2750,22 +2750,24 @@ function render(){
   drawMinimap();
 }
 let lastFrameErrorLog=0;
+function logFrameRecovery(kind,error){
+  const wallNow=Date.now();
+  if(wallNow-lastFrameErrorLog>1000){
+    lastFrameErrorLog=wallNow;
+    console.error(`Battle ${kind} recovered from error:`,error);
+  }
+}
 function frame(now){
   const dt=Math.min(.032,(now-last)/1000||0);
   last=now;
-  try{
-    if(running&&!paused)update(dt);
-    render();
-  }catch(error){
-    // Never allow a transient ERROR skill/network exception to kill requestAnimationFrame.
-    const wallNow=Date.now();
-    if(wallNow-lastFrameErrorLog>1000){
-      lastFrameErrorLog=wallNow;
-      console.error('Battle frame recovered from error:',error);
-    }
-  }finally{
-    requestAnimationFrame(frame);
+
+  // Update and render are deliberately isolated. A gameplay/network bug must not blank the canvas.
+  if(running&&!paused){
+    try{update(dt)}catch(error){logFrameRecovery('update',error)}
   }
+  try{render()}catch(error){logFrameRecovery('render',error)}
+
+  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 async function startGame(){
