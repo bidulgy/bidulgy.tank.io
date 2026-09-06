@@ -79,19 +79,19 @@ const CANNONS=Object.freeze({
     id:'standard',name:'기본포',rarity:'starter',rarityLabel:'기본',chance:0,
     desc:'균형 잡힌 기본 단발포입니다.',
     passive:'평타 · 정밀 코어: 5번째 탄이 1.7배 피해 + 2회 관통',
-    skill:'Q 코어 포격 · 3.2배 피해의 대형 관통탄'
+    skill:'Q 궤도 포격 · 조준 지점에 1.25초 후 대형 포격 낙하'
   },
   scout:{
     id:'scout',name:'스카우트',rarity:'starter',rarityLabel:'기본',chance:0,
     desc:'가볍고 빠른 기동형 탱크입니다.',
     passive:'평타 · 더블 탭: 4번째 사격마다 2발을 빠르게 발사',
-    skill:'Q 스피드 발리 · 전방에 고속탄 7발'
+    skill:'Q 블링크 러시 · 조준 방향 순간 돌진 + 도착 충격파'
   },
   bastion:{
     id:'bastion',name:'바스티온',rarity:'starter',rarityLabel:'기본',chance:0,
     desc:'느리지만 강한 중장갑 포격형 탱크입니다.',
     passive:'평타 · 철갑 코어: 6번째 탄이 2.2배 피해 + 3회 관통',
-    skill:'Q 수호 포격 · 범위 충격파 + 중철갑탄 + 체력 회복'
+    skill:'Q 방벽 전개 · 5초간 적 탄환을 막는 에너지 벽'
   },
 
   // 일반 61.5% / 3캐릭터
@@ -99,19 +99,19 @@ const CANNONS=Object.freeze({
     id:'rapid',name:'기관포',rarity:'common',rarityLabel:'일반',chance:20.5,
     desc:'작은 탄환을 매우 빠르게 연속 발사합니다.',
     passive:'평타 · 가속 탄띠: 8번째 사격마다 3발 동시 가속탄',
-    skill:'Q 탄환 폭주 · 전방에 고속탄 15발 집중 난사'
+    skill:'Q 오버드라이브 · 2.8초간 자동 초고속 난사'
   },
   dual:{
     id:'dual',name:'듀얼 캐논',rarity:'common',rarityLabel:'일반',chance:20.5,
     desc:'양쪽 포신에서 두 발을 동시에 발사합니다.',
     passive:'평타 · 트윈 링크: 기본 2발, 7번째 사격은 4발',
-    skill:'Q 듀얼 러시 · 좁은 전방에 24발 연속 난사'
+    skill:'Q 트윈 드론 · 6초간 회전 드론 2기가 자동 사격'
   },
   needle:{
     id:'needle',name:'니들러',rarity:'common',rarityLabel:'일반',chance:20.5,
     desc:'작고 매우 빠른 침형 탄환을 사용합니다.',
     passive:'평타 · 니들 코어: 6번째 탄이 강화되어 4회 관통',
-    skill:'Q 니들 레인 · 전방에 관통 니들 14발'
+    skill:'Q 독침 지뢰 · 전방에 감응 지뢰 5개 설치'
   },
 
   // 희귀 25.63% / 3캐릭터
@@ -119,19 +119,19 @@ const CANNONS=Object.freeze({
     id:'spread',name:'산탄포',rarity:'rare',rarityLabel:'희귀',chance:8.543333,
     desc:'한 번에 5개의 산탄을 넓게 퍼뜨립니다.',
     passive:'평타 · 파편 확산: 명중 시 좌우 2차 파편 생성',
-    skill:'Q 산탄 폭풍 · 넓은 부채꼴로 파편탄 25발 발사'
+    skill:'Q 충격 산탄 · 초대형 부채꼴 타격 + 강한 넉백'
   },
   burst:{
     id:'burst',name:'버스트 캐논',rarity:'rare',rarityLabel:'희귀',chance:8.543333,
     desc:'좁은 범위에 3연발 탄막을 집중합니다.',
     passive:'평타 · 버스트 3연사: 매 사격 3발, 5번째는 5발',
-    skill:'Q 버스트 웨이브 · 부채꼴 21발 집중 포격'
+    skill:'Q 트리플 펄스 · 점점 커지는 충격파 3연속'
   },
   crystal:{
     id:'crystal',name:'크리스탈 샷',rarity:'rare',rarityLabel:'희귀',chance:8.543334,
     desc:'결정 파편처럼 넓게 갈라지는 탄환을 사용합니다.',
     passive:'평타 · 결정 분산: 4번째 사격마다 7갈래 파편',
-    skill:'Q 크리스탈 노바 · 18방향 결정탄 방출'
+    skill:'Q 크리스탈 필드 · 목표 지점에 결정 지뢰 7개 전개'
   },
 
   // 에픽 10.255% / 3캐릭터
@@ -139,19 +139,19 @@ const CANNONS=Object.freeze({
     id:'piercer',name:'관통포',rarity:'epic',rarityLabel:'에픽',chance:3.418333,
     desc:'길쭉한 철갑탄이 여러 적을 연속 관통합니다.',
     passive:'평타 · 관통 가속: 관통할수록 공격력 8%·탄속 4% 증가',
-    skill:'Q 레일 브레이커 · 4.1배 피해·16회 관통 초고속 레일탄'
+    skill:'Q 레일 스나이프 · 화면을 가르는 즉발 초장거리 관통선'
   },
   laser:{
     id:'laser',name:'레이저 랜서',rarity:'epic',rarityLabel:'에픽',chance:3.418333,
     desc:'초고속 레일 레이저로 일직선을 압박합니다.',
     passive:'평타 · 삼중 증폭: 3번째 레일탄이 1.75배 강화',
-    skill:'Q 트리플 레이 · 고위력 레일탄 3발 동시 발사'
+    skill:'Q 레이저 스윕 · 2초 동안 전방을 훑는 회전 레이저'
   },
   drill:{
     id:'drill',name:'드릴 캐논',rarity:'epic',rarityLabel:'에픽',chance:3.418334,
     desc:'느리지만 강력한 드릴탄이 적을 깊게 관통합니다.',
     passive:'평타 · 회전 드릴: 기본 8회 관통, 4번째 탄은 초대형 드릴',
-    skill:'Q 오버 드릴 · 6.5배 피해·26회 관통 초대형 드릴탄'
+    skill:'Q 터널 브레이커 · 오래 남아 모든 것을 관통하는 거대 드릴'
   },
 
   // 전설 2% / 3캐릭터
@@ -159,19 +159,19 @@ const CANNONS=Object.freeze({
     id:'plasma',name:'플라즈마포',rarity:'legendary',rarityLabel:'전설',chance:.666667,
     desc:'플라즈마 구체와 전기 연결선으로 공격합니다.',
     passive:'평타 · 연쇄 방전: 명중 시 주변 최대 2명에게 45% 번개 피해',
-    skill:'Q 전류 폭주 · 8방향 플라즈마 전기망'
+    skill:'Q 플라즈마 케이지 · 전기 육각 감옥의 테두리가 지속 감전'
   },
   thunder:{
     id:'thunder',name:'썬더 코어',rarity:'legendary',rarityLabel:'전설',chance:.666667,
     desc:'강한 전류가 담긴 플라즈마 코어를 발사합니다.',
     passive:'평타 · 삼중 번개: 4번째 사격마다 플라즈마 3발 + 최대 3연쇄',
-    skill:'Q 썬더 서클 · 12방향 플라즈마 폭발'
+    skill:'Q 연쇄 낙뢰 · 가까운 적을 최대 10회 연속 추적 낙뢰'
   },
   inferno:{
     id:'inferno',name:'인페르노',rarity:'legendary',rarityLabel:'전설',chance:.666666,
     desc:'고열 화염탄이 폭발하고 불길을 남깁니다.',
     passive:'평타 · 화염 포화: 5번째 사격마다 소이탄 3발',
-    skill:'Q 헬파이어 · 전방에 대형 화염탄 9발'
+    skill:'Q 화염 장벽 · 5초간 긴 불의 벽 생성'
   },
 
   // 신화 .5% / 3캐릭터
@@ -179,22 +179,22 @@ const CANNONS=Object.freeze({
     id:'rocket',name:'로켓포',rarity:'mythic',rarityLabel:'신화',chance:.166667,
     desc:'중장갑 로켓이 넓은 폭발 피해를 줍니다.',
     passive:'평타 · 소이 폭발: 폭발 지점에 2.4초 화염 지대',
-    skill:'Q 미사일 폭격 · 전방 다연장 로켓 일제사',
+    skill:'Q 유도 포위폭격 · 목표 주변 10방향에서 로켓이 중앙으로 쇄도',
     skill2:'R 강철 요새 · 6초간 받는 피해 70% 감소'
   },
   titan:{
     id:'titan',name:'타이탄',rarity:'mythic',rarityLabel:'신화',chance:.166667,
     desc:'거대한 중포와 높은 방어력을 가진 중전차입니다.',
     passive:'평타 · 중포 코어: 대형 폭발탄, 4번째는 쌍포격',
-    skill:'Q 타이탄 포화 · 12방향 중로켓 일제사',
-    skill2:'R 타이탄 장갑 · 8초간 피해 70% 감소 + 체력 18% 회복'
+    skill:'Q 지진 강타 · 4번 커지는 지진파 + 넉백',
+    skill2:'R 공성 모드 · 8초간 거의 정지하지만 공격력 55%↑·연사 2배'
   },
   phantom:{
     id:'phantom',name:'팬텀',rarity:'mythic',rarityLabel:'신화',chance:.166666,
     desc:'순간 이동과 고속 레일탄을 사용하는 암살형 탱크입니다.',
     passive:'평타 · 팬텀 레일: 5번째 사격마다 3발 레일탄',
-    skill:'Q 팬텀 스트라이크 · 전방 돌진 후 레일탄 9발',
-    skill2:'R 페이즈 워프 · 조준 방향 900 순간이동 + 무적'
+    skill:'Q 암살 표식 · 순간이동 후 출발점이 지연 폭발',
+    skill2:'R 위상 은신 · 5초간 완전 위상 무적'
   },
 
   // 시크릿 .1% / 3캐릭터
@@ -202,22 +202,22 @@ const CANNONS=Object.freeze({
     id:'ring',name:'링 캐논',rarity:'secret',rarityLabel:'시크릿',chance:.033334,
     desc:'차원 에너지 링이 적들을 연속 관통합니다.',
     passive:'평타 · 회귀 링: 멀리 날아간 링이 사용자에게 되돌아옴',
-    skill:'Q 차원 절단 · 16방향 관통 링 방출',
-    skill2:'R 공간 도약 · 조준 방향으로 장거리 순간이동'
+    skill:'Q 궤도 절단 · 5초간 주위를 회전하는 차원 칼날',
+    skill2:'R 귀환 포탈 · 전방 순간이동 후 2초 뒤 원래 위치로 자동 귀환'
   },
   chrono:{
     id:'chrono',name:'크로노',rarity:'secret',rarityLabel:'시크릿',chance:.033333,
     desc:'시간 링을 겹쳐 쏘며 빠르게 위치를 바꿉니다.',
     passive:'평타 · 타임 듀오: 3번째 사격마다 회귀 링 2발',
-    skill:'Q 크로노 서클 · 20방향 고속 링 방출',
-    skill2:'R 타임 스킵 · 560 순간이동 + Q 쿨타임 일부 단축'
+    skill:'Q 시간 정지 · 영역 안 적/탄환을 4.5초간 극도로 감속',
+    skill2:'R 시간 역행 · 약 4초 전 위치와 체력 상태로 되돌아감'
   },
   void:{
     id:'void',name:'보이드',rarity:'secret',rarityLabel:'시크릿',chance:.033333,
     desc:'공간을 압축하는 보이드 탄환과 중력장을 사용합니다.',
     passive:'평타 · 보이드 펄스: 4번째 사격마다 3개의 폭발성 보이드탄',
-    skill:'Q 보이드 싱크 · 목표 지점에 소형 중력장 생성',
-    skill2:'R 보이드 필드 · 6초 대형 중력장'
+    skill:'Q 보이드 싱크 · 지속 중력장으로 적을 중심에 끌어당김',
+    skill2:'R EVENT HORIZON · 7초간 초대형 중력장'
   },
 
   // 갤럭시 .01% / 3캐릭터
@@ -225,22 +225,22 @@ const CANNONS=Object.freeze({
     id:'nova',name:'노바 캐논',rarity:'galaxy',rarityLabel:'갤럭시',chance:.003334,
     desc:'별 모양 노바탄이 관통과 폭발을 동시에 일으킵니다.',
     passive:'평타 · 성운 분열: 첫 명중 시 작은 별 파편 4개 생성',
-    skill:'Q 초신성 · 광역 폭발 + 노바탄 전방위 방출',
-    skill2:'R 중력 특이점 · 지속형 중력장을 생성해 적을 끌어당김'
+    skill:'Q 초신성 핵 · 2.3초 충전 뒤 초대형 폭발',
+    skill2:'R 성운 위성 · 7초간 공격하는 별 위성 5개가 주위를 공전'
   },
   comet:{
     id:'comet',name:'코멧',rarity:'galaxy',rarityLabel:'갤럭시',chance:.003333,
     desc:'고속 혜성탄으로 전장을 가로지르는 기동형 탱크입니다.',
     passive:'평타 · 혜성 꼬리: 5번째 사격마다 노바탄 3발',
-    skill:'Q 코멧 스톰 · 전방 부채꼴 혜성탄 19발',
-    skill2:'R 혜성 도약 · 조준 방향 1100 초장거리 순간이동'
+    skill:'Q 혜성 돌파 · 장거리 돌진하며 피해 궤적을 남김',
+    skill2:'R 메테오 드라이브 · 1200 거리 초고속 돌진 + 경로 6회 폭발'
   },
   stellar:{
     id:'stellar',name:'스텔라',rarity:'galaxy',rarityLabel:'갤럭시',chance:.003333,
     desc:'별빛을 폭발시키는 광역 제압형 탱크입니다.',
     passive:'평타 · 쌍성: 기본 2발, 6번째 사격은 5발 성탄',
-    skill:'Q 스텔라 버스트 · 대광역 폭발 + 16방향 별탄',
-    skill2:'R 성광 장막 · 6초 피해 감소 + 체력 25% 회복'
+    skill:'Q 별빛 성역 · 6초 치유 영역 + 적에게 지속 피해',
+    skill2:'R 부활의 별빛 · 체력 완전 회복 + 3초 무적 + 성역'
   },
 
   // ERROR .005% / 3캐릭터
@@ -256,15 +256,15 @@ const CANNONS=Object.freeze({
     id:'glitch',name:'GLITCH-13',rarity:'error',rarityLabel:'ERROR',chance:.001667,
     desc:'분열되는 글리치탄으로 화면을 뒤덮는 ERROR 개체입니다.',
     passive:'평타 · 패킷 분열: 기본 2발, 6번째 사격은 7발 글리치탄',
-    skill:'Q PACKET STORM · 36방향 ERROR 탄환 방출',
-    skill2:'R DESYNC · 12초간 이동속도 초가속'
+    skill:'Q MIRROR ERROR · 6개 분신 위치에서 동시에 패킷탄 발사',
+    skill2:'R DESYNC CLONES · 8.5초간 분신 4기가 자동 사격'
   },
   zero:{
     id:'zero',name:'ZERO',rarity:'error',rarityLabel:'ERROR',chance:.001666,
     desc:'극단적인 단발 화력과 공간 삭제 능력을 가진 ERROR 개체입니다.',
     passive:'평타 · ZERO CORE: 강한 관통탄, 4번째 사격은 3중 NULL 탄',
-    skill:'Q ZERO BEAM · 9배 피해·40회 관통 초대형 NULL 탄환',
-    skill2:'R ZERO SHIFT · 1200 순간이동 + 1.2초 위상 무적'
+    skill:'Q ZERO LINE · 초장거리 즉발 삭제 광선 + 적 탄환 제거',
+    skill2:'R ABSOLUTE ZERO · 4초간 대영역 적/탄환을 거의 정지'
   }
 });
 window.IronCellCannons=CANNONS;
