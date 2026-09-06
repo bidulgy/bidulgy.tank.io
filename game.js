@@ -42,7 +42,7 @@ const TANK_THEMES=Object.freeze({
 });
 
 const statsDef=[['maxHealth','최대 체력'],['regen','체력 회복'],['bulletDamage','탄환 피해'],['bulletSpeed','탄환 속도'],['reload','연사 속도'],['moveSpeed','이동 속도']];
-function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
+function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
 function resize(){const dpr=Math.min(2,devicePixelRatio||1);canvas.width=Math.round(innerWidth*dpr);canvas.height=Math.round(innerHeight*dpr);canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
 const rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function dist2(a,b){const dx=a.x-b.x,dy=a.y-b.y;return dx*dx+dy*dy}function norm(dx,dy){const d=Math.hypot(dx,dy)||1;return[dx/d,dy/d]}
@@ -188,7 +188,8 @@ function broadcastShot(b){
     id:`${onlineSelfId}:${++networkSerial}`,
     ownerId:onlineSelfId,
     x:b.x,y:b.y,vx:b.vx,vy:b.vy,r:b.r,life:b.life,
-    cannon:b.cannon,shape:b.shape,pierce:b.pierce||1,splashRadius:b.splashRadius||0
+    cannon:b.cannon,shape:b.shape,pierce:b.pierce||1,splashRadius:b.splashRadius||0,
+    basicAttack:b.basicAttack===true,special:b.special||'',fragment:b.fragment===true,returned:b.returned===true
   });
 }
 function addRemoteShot(payload){
@@ -204,7 +205,10 @@ function addRemoteShot(payload){
     team:'remote',networkRemote:true,
     cannon:String(payload.cannon||'standard'),
     shape:String(payload.shape||'round'),
-    pierce:1,splashRadius:0,hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()
+    pierce:Math.max(1,safeRemoteNumber(payload.pierce,1)),
+    splashRadius:Math.max(0,safeRemoteNumber(payload.splashRadius,0)),
+    basicAttack:payload.basicAttack===true,special:String(payload.special||''),fragment:payload.fragment===true,returned:payload.returned===true,
+    hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()
   });
 }
 function sendDamage(targetId,amount){
@@ -687,42 +691,78 @@ function activateSkill2(){
   updateSkillHud();
 }
 
+function spawnPassiveBullet(opts){
+  const a=opts.angle,speed=opts.speed;
+  const b={x:opts.x,y:opts.y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,r:opts.r||4,damage:opts.damage,life:opts.life||.7,owner:player,ownerId:onlineSelfId,team:'player',cannon:opts.cannon,shape:opts.shape||'round',pierce:opts.pierce||1,splashRadius:opts.splashRadius||0,basicAttack:false,special:opts.special||'',fragment:opts.fragment===true,hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()};
+  bullets.push(b);broadcastShot(b);return b;
+}
+function spawnSpreadFragments(parent,x,y){
+  if(parent.fragment||parent.shrapnelDone)return;parent.shrapnelDone=true;
+  const base=Math.atan2(parent.vy,parent.vx),speed=Math.max(280,Math.hypot(parent.vx,parent.vy)*.82);
+  for(const off of [-.42,.42])spawnPassiveBullet({x,y,angle:base+off,speed,damage:parent.damage*.28,life:.60,r:3,cannon:'spread',shape:'pellet',special:'shrapnel',fragment:true});
+  spawnCombatFx('spreadShardBurst',x,y,{angle:base,color:'#74f5ff',life:.30,radius:35,cannon:'spread'});
+}
+function spawnNovaFragments(parent,x,y){
+  if(parent.fragment||parent.novaSplit)return;parent.novaSplit=true;
+  const speed=Math.max(320,Math.hypot(parent.vx,parent.vy)*.74);
+  for(let k=0;k<4;k++)spawnPassiveBullet({x,y,angle:k*TAU/4+Math.PI/4,speed,damage:parent.damage*.30,life:.78,r:5,cannon:'nova',shape:'nova',special:'novaFragment',fragment:true});
+  spawnCombatFx('novaFragmentBurst',x,y,{angle:0,color:'#84f5ff',life:.42,radius:50,cannon:'nova'});
+}
+function chainPlasmaBasicHit(parent,x,y,primaryShape=null,primaryPlayerId=''){
+  if(!parent.basicAttack||parent.plasmaChainDone)return;parent.plasmaChainDone=true;
+  const range=280,range2=range*range,candidates=[];
+  for(const s of shapes){if(s===primaryShape||s.hp<=0)continue;const dx=s.x-x,dy=s.y-y,d2=dx*dx+dy*dy;if(d2<=range2)candidates.push({kind:'shape',target:s,d2})}
+  for(const enemy of remotePlayers.values()){if(!enemy.alive||enemy.id===primaryPlayerId)continue;const dx=enemy.x-x,dy=enemy.y-y,d2=dx*dx+dy*dy;if(d2<=range2)candidates.push({kind:'player',target:enemy,d2})}
+  candidates.sort((a,b)=>a.d2-b.d2);
+  for(const c of candidates.slice(0,2)){
+    const tx=c.target.x,ty=c.target.y,damage=parent.damage*.45;
+    combatFx.push({type:'chainArc',x,y,x2:tx,y2:ty,angle:0,color:'#84f8ff',life:.28,maxLife:.28,radius:0,size:1,ownerId:onlineSelfId,cannon:'plasma'});
+    if(c.kind==='shape'){c.target.hp-=damage;burst(tx,ty,'#89f8ff',5);if(c.target.hp<=0){const idx=shapes.indexOf(c.target);if(idx>=0){gainXp(c.target.xp);burst(tx,ty,colorForShape(c.target.type),10);shapes.splice(idx,1)}}}
+    else{sendDamage(c.target.id,damage);burst(tx,ty,'#89f8ff',5)}
+  }
+}
+function createRocketBurnZone(parent,x,y){
+  if(!parent.basicAttack||parent.burnSpawned)return;parent.burnSpawned=true;
+  skillZones.push({type:'burn',x,y,radius:105,life:2.4,maxLife:2.4,damage:parent.damage*.13,tick:0,ownerId:onlineSelfId,networkRemote:false});
+}
+function maybeReturnRingBullet(b){
+  if(!b.basicAttack||b.shape!=='ring'||b.returned||b.life>.82)return;
+  const owner=b.networkRemote?remotePlayers.get(b.ownerId):player;if(!owner||owner.alive===false)return;
+  const dx=owner.x-b.x,dy=owner.y-b.y,[nx,ny]=norm(dx,dy),speed=Math.max(280,Math.hypot(b.vx,b.vy));
+  b.vx=nx*speed;b.vy=ny*speed;b.returned=true;b.life+=1.20;b.pierce=Math.max(b.pierce||1,4);b.hitTargets=new Set();b.hitIds=new Set();
+  spawnCombatFx('ringReturn',b.x,b.y,{angle:Math.atan2(b.vy,b.vx),color:'#dfceff',life:.45,radius:46,cannon:'ring'});
+}
+
 function fire(e){
   if(e!==player||e.fireCd>0)return;
   const a=e.angle,p=playerParams();e.fireCd=p.reload;
-  const cannon=e.cannonType||'standard';
-  let shots=[{angle:a,side:0,damageMul:1}];
-  if(cannon==='spread')shots=[-.25,-.125,0,.125,.25].map(v=>({angle:a+v,side:0,damageMul:1}));
-  if(cannon==='nova')shots=[-.10,0,.10].map(v=>({angle:a+v,side:0,damageMul:.78}));
-  if(cannon==='error')shots=[{angle:a,side:0,damageMul:1}];
+  const cannon=e.cannonType||'standard';e.basicShotCount=(e.basicShotCount||0)+1;const shotNo=e.basicShotCount;
+  let shots=[{angle:a,side:0,damageMul:1,special:''}];
+  if(cannon==='standard'&&shotNo%5===0)shots=[{angle:a,side:0,damageMul:1.70,special:'precision'}];
+  else if(cannon==='rapid'&&shotNo%8===0)shots=[{angle:a-.045,side:-3,damageMul:.58,special:'acceleratedBurst'},{angle:a,side:0,damageMul:.58,special:'acceleratedBurst'},{angle:a+.045,side:3,damageMul:.58,special:'acceleratedBurst'}];
+  else if(cannon==='spread')shots=[-.25,-.125,0,.125,.25].map(v=>({angle:a+v,side:0,damageMul:1,special:'shrapnelCarrier'}));
+  else if(cannon==='nova')shots=[-.10,0,.10].map(v=>({angle:a+v,side:0,damageMul:.78,special:'nebulaCarrier'}));
+  else if(cannon==='error'&&shotNo%5===0)shots=[{angle:a-.07,side:-5,damageMul:.45,special:'glitchEcho'},{angle:a,side:0,damageMul:1,special:'glitchMaster'},{angle:a+.07,side:5,damageMul:.45,special:'glitchEcho'}];
   for(const shot of shots){
     const sa=shot.angle,px=-Math.sin(sa)*shot.side,py=Math.cos(sa)*shot.side;
-    const b={
-      x:e.x+Math.cos(sa)*(e.r+18)+px,y:e.y+Math.sin(sa)*(e.r+18)+py,
-      vx:Math.cos(sa)*p.bulletSpeed+e.vx*.18,vy:Math.sin(sa)*p.bulletSpeed+e.vy*.18,
-      r:6,damage:p.damage*shot.damageMul,life:1.65,owner:e,ownerId:onlineSelfId,
-      team:'player',cannon,shape:'round',pierce:1,splashRadius:0,
-      hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()
-    };
+    const b={x:e.x+Math.cos(sa)*(e.r+18)+px,y:e.y+Math.sin(sa)*(e.r+18)+py,vx:Math.cos(sa)*p.bulletSpeed+e.vx*.18,vy:Math.sin(sa)*p.bulletSpeed+e.vy*.18,r:6,damage:p.damage*shot.damageMul,life:1.65,owner:e,ownerId:onlineSelfId,team:'player',cannon,shape:'round',pierce:1,splashRadius:0,basicAttack:true,special:shot.special||'',fragment:false,hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()};
+    if(cannon==='standard'&&shot.special==='precision'){b.r=8;b.life=1.95;b.pierce=2}
     if(cannon==='rapid'){b.r=4;b.life=1.35;b.shape='capsule'}
     if(cannon==='spread'){b.r=4;b.life=.95;b.shape='pellet'}
-    if(cannon==='piercer'){b.r=5;b.life=1.75;b.shape='rail';b.pierce=4}
-    if(cannon==='plasma'){b.r=13;b.life=2.15;b.shape='plasma';b.splashRadius=72}
-    if(cannon==='rocket'){b.r=8;b.life=2.15;b.shape='rocket';b.splashRadius=112}
-    if(cannon==='ring'){b.r=12;b.life=1.85;b.shape='ring';b.pierce=8}
+    if(cannon==='piercer'){b.r=5;b.life=1.75;b.shape='rail';b.pierce=4;b.special='penetrationAccel'}
+    if(cannon==='plasma'){b.r=13;b.life=2.15;b.shape='plasma';b.splashRadius=72;b.special='chainDischarge'}
+    if(cannon==='rocket'){b.r=8;b.life=2.15;b.shape='rocket';b.splashRadius=112;b.special='incendiary'}
+    if(cannon==='ring'){b.r=12;b.life=1.85;b.shape='ring';b.pierce=8;b.special='returnRing'}
     if(cannon==='nova'){b.r=10;b.life=1.90;b.shape='nova';b.pierce=3;b.splashRadius=46}
     if(cannon==='error'){b.r=9;b.life=2.05;b.shape='error';b.pierce=12;b.splashRadius=82}
-    bullets.push(b);
-    broadcastShot(b);
-    spawnAttackFx(cannon,b.x,b.y,sa);
+    bullets.push(b);broadcastShot(b);spawnAttackFx(cannon,b.x,b.y,sa);
   }
-  const recoil=cannon==='rocket'?22:cannon==='error'?27:cannon==='nova'?17:12;
-  e.vx-=Math.cos(a)*recoil;
-  e.vy-=Math.sin(a)*recoil;
+  const recoil=cannon==='rocket'?22:cannon==='error'?27:cannon==='nova'?17:12;e.vx-=Math.cos(a)*recoil;e.vy-=Math.sin(a)*recoil;
 }
 function burst(x,y,color,count=8){for(let i=0;i<count;i++){const a=rand(0,TAU),sp=rand(45,180);particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:rand(.28,.7),color,r:rand(2,5)})}}
 function applySplashDamage(b,x,y){
   if(!b.splashRadius||b.team!=='player')return;
+  if(b.cannon==='rocket'&&b.basicAttack)createRocketBurnZone(b,x,y);
   const radius=b.splashRadius,r2=radius*radius,base=b.damage*(b.cannon==='rocket'?.72:.58);
   for(let i=shapes.length-1;i>=0;i--){
     const s=shapes[i],dx=s.x-x,dy=s.y-y,d2=dx*dx+dy*dy;if(d2>r2)continue;
@@ -934,7 +974,7 @@ function killPlayer(killerId=''){
   ui.deathLevel.textContent=player.level;
   ui.deathScore.textContent=player.score.toLocaleString();
   ui.deathKills.textContent=player.kills;
-  if(ui.deathGems)ui.deathGems.textContent=(player.score*5).toLocaleString();
+  if(ui.deathGems)ui.deathGems.textContent=player.score.toLocaleString();
   ui.deathScreen.classList.add('show');
   void saveCurrentRun(true);
 }
@@ -1002,6 +1042,7 @@ function updateBullets(dt){
     const b=bullets[i];
     b.life-=dt;
     b.x+=b.vx*dt;b.y+=b.vy*dt;
+    maybeReturnRingBullet(b);
     if(b.life<=0||b.x<0||b.y<0||b.x>WORLD||b.y>WORLD){
       bullets.splice(i,1);continue;
     }
@@ -1023,6 +1064,9 @@ function updateBullets(dt){
         s.hp-=b.damage;
         const[nx,ny]=norm(b.vx,b.vy);s.vx+=nx*75;s.vy+=ny*75;
         burst(b.x,b.y,colorForShape(s.type),3);
+        if(b.basicAttack&&b.cannon==='spread')spawnSpreadFragments(b,b.x,b.y);
+        if(b.basicAttack&&b.cannon==='nova')spawnNovaFragments(b,b.x,b.y);
+        if(b.basicAttack&&b.cannon==='plasma')chainPlasmaBasicHit(b,b.x,b.y,s,'');
         if(s.hp<=0){
           if(b.owner===player)gainXp(s.xp);
           shapes.splice(j,1);
@@ -1031,7 +1075,9 @@ function updateBullets(dt){
         if(b.splashRadius){
           applySplashDamage(b,b.x,b.y);remove=true;
         }else if((b.pierce||1)>1){
-          b.pierce--;b.damage*=.88;
+          b.pierce--;
+          if(b.basicAttack&&b.cannon==='piercer'){b.damage*=1.08;b.vx*=1.04;b.vy*=1.04;spawnCombatFx('pierceAccel',b.x,b.y,{angle:Math.atan2(b.vy,b.vx),color:'#c8a8ff',life:.24,radius:28,cannon:'piercer'})}
+          else b.damage*=.88;
         }else remove=true;
       }
     }
@@ -1044,10 +1090,15 @@ function updateBullets(dt){
           b.hitIds?.add(enemy.id);
           sendDamage(enemy.id,b.damage);
           burst(b.x,b.y,'#ff8a8a',4);
+          if(b.basicAttack&&b.cannon==='spread')spawnSpreadFragments(b,b.x,b.y);
+          if(b.basicAttack&&b.cannon==='nova')spawnNovaFragments(b,b.x,b.y);
+          if(b.basicAttack&&b.cannon==='plasma')chainPlasmaBasicHit(b,b.x,b.y,null,enemy.id);
           if(b.splashRadius){
             applySplashDamage(b,b.x,b.y);remove=true;
           }else if((b.pierce||1)>1){
-            b.pierce--;b.damage*=.88;
+            b.pierce--;
+            if(b.basicAttack&&b.cannon==='piercer'){b.damage*=1.08;b.vx*=1.04;b.vy*=1.04;spawnCombatFx('pierceAccel',b.x,b.y,{angle:Math.atan2(b.vy,b.vx),color:'#c8a8ff',life:.24,radius:28,cannon:'piercer'})}
+            else b.damage*=.88;
           }else remove=true;
           break;
         }
@@ -1061,37 +1112,14 @@ function updateParticles(dt){for(let i=particles.length-1;i>=0;i--){const p=part
 function updateCombatFx(dt){for(let i=combatFx.length-1;i>=0;i--){combatFx[i].life-=dt;if(combatFx[i].life<=0)combatFx.splice(i,1)}}
 function updateSkillZones(dt){
   for(let zi=skillZones.length-1;zi>=0;zi--){
-    const z=skillZones[zi];
-    z.life-=dt;
-    if(z.life<=0){skillZones.splice(zi,1);continue}
-    if(z.networkRemote)continue;
-
-    z.tick-=dt;
-    const doTick=z.tick<=0;
-    if(doTick)z.tick=.22;
-
+    const z=skillZones[zi];z.life-=dt;if(z.life<=0){skillZones.splice(zi,1);continue}if(z.networkRemote)continue;
+    z.tick-=dt;const doTick=z.tick<=0;if(doTick)z.tick=z.type==='burn'?.25:.22;
     for(let i=shapes.length-1;i>=0;i--){
-      const s=shapes[i],dx=z.x-s.x,dy=z.y-s.y,d=Math.hypot(dx,dy)||1;
-      if(d>z.radius)continue;
-      const force=(1-d/z.radius)*820;
-      s.vx+=dx/d*force*dt;
-      s.vy+=dy/d*force*dt;
-      if(doTick){
-        s.hp-=z.damage;
-        burst(s.x,s.y,'#8da9ff',2);
-        if(s.hp<=0){
-          gainXp(s.xp);burst(s.x,s.y,colorForShape(s.type),10);shapes.splice(i,1);
-        }
-      }
+      const s=shapes[i],dx=z.x-s.x,dy=z.y-s.y,d=Math.hypot(dx,dy)||1;if(d>z.radius)continue;
+      if(z.type==='gravity'){const force=(1-d/z.radius)*820;s.vx+=dx/d*force*dt;s.vy+=dy/d*force*dt}
+      if(doTick){s.hp-=z.damage;burst(s.x,s.y,z.type==='burn'?'#ff9a42':'#8da9ff',z.type==='burn'?3:2);if(s.hp<=0){gainXp(s.xp);burst(s.x,s.y,colorForShape(s.type),10);shapes.splice(i,1)}}
     }
-
-    if(doTick){
-      for(const enemy of remotePlayers.values()){
-        if(!enemy.alive)continue;
-        const dx=z.x-enemy.x,dy=z.y-enemy.y;
-        if(dx*dx+dy*dy<=z.radius*z.radius)sendDamage(enemy.id,z.damage*.75);
-      }
-    }
+    if(doTick)for(const enemy of remotePlayers.values()){if(!enemy.alive)continue;const dx=z.x-enemy.x,dy=z.y-enemy.y;if(dx*dx+dy*dy<=z.radius*z.radius)sendDamage(enemy.id,z.damage*(z.type==='burn'?1:.75))}
   }
 }
 function cameraUpdate(){const tx=player.x-innerWidth/2,ty=player.y-innerHeight/2;camera.x+=(tx-camera.x)*.12;camera.y+=(ty-camera.y)*.12;camera.x=clamp(camera.x,0,Math.max(0,WORLD-innerWidth));camera.y=clamp(camera.y,0,Math.max(0,WORLD-innerHeight))}
@@ -1285,28 +1313,18 @@ function drawPlasmaTethers(){
 function drawSkillZones(){
   const t=performance.now()*.001;
   for(const z of skillZones){
-    if(z.type!=='gravity')continue;
-    const[x,y]=worldToScreen(z.x,z.y);
-    const p=clamp(z.life/z.maxLife,0,1);
-    ctx.save();ctx.translate(x,y);
-    ctx.globalAlpha=Math.min(1,p*1.3);
-    ctx.strokeStyle='rgba(132,159,255,.75)';
-    ctx.lineWidth=3;
-    ctx.shadowColor='#829dff';ctx.shadowBlur=16;
-    for(let i=0;i<4;i++){
-      const rr=z.radius*(.18+i*.19)+Math.sin(t*3+i)*8;
-      ctx.beginPath();
-      ctx.arc(0,0,rr,t*(i%2?-.8:.8)+i,TAU+t*(i%2?-.8:.8)+i);
-      ctx.stroke();
+    const[x,y]=worldToScreen(z.x,z.y),p=clamp(z.life/z.maxLife,0,1);ctx.save();ctx.translate(x,y);ctx.globalAlpha=Math.min(1,p*1.3);
+    if(z.type==='gravity'){
+      ctx.strokeStyle='rgba(132,159,255,.75)';ctx.lineWidth=3;ctx.shadowColor='#829dff';ctx.shadowBlur=16;
+      for(let i=0;i<4;i++){const rr=z.radius*(.18+i*.19)+Math.sin(t*3+i)*8;ctx.beginPath();ctx.arc(0,0,rr,t*(i%2?-.8:.8)+i,TAU+t*(i%2?-.8:.8)+i);ctx.stroke()}
+      ctx.fillStyle='rgba(30,38,92,.22)';ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.fill();ctx.fillStyle='#dbe3ff';ctx.shadowBlur=22;ctx.beginPath();ctx.arc(0,0,12+Math.sin(t*8)*3,0,TAU);ctx.fill();
+    }else if(z.type==='burn'){
+      ctx.fillStyle='rgba(255,90,25,.13)';ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.fill();ctx.strokeStyle='rgba(255,155,58,.70)';ctx.lineWidth=3;ctx.shadowColor='#ff7b2f';ctx.shadowBlur=14;ctx.beginPath();ctx.arc(0,0,z.radius*(.92+.04*Math.sin(t*7)),0,TAU);ctx.stroke();
+      for(let k=0;k<14;k++){const q=k*TAU/14+t*(k%2?1.1:-.8),rr=z.radius*(.18+(k%5)*.15),fx=Math.cos(q)*rr,fy=Math.sin(q)*rr,h=8+10*(.5+.5*Math.sin(t*9+k));ctx.fillStyle=k%3===0?'rgba(255,218,93,.82)':'rgba(255,98,35,.74)';ctx.beginPath();ctx.moveTo(fx-4,fy+4);ctx.quadraticCurveTo(fx,fy-h,fx+4,fy+4);ctx.closePath();ctx.fill()}
     }
-    ctx.fillStyle='rgba(30,38,92,.22)';
-    ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.fill();
-    ctx.fillStyle='#dbe3ff';ctx.shadowBlur=22;
-    ctx.beginPath();ctx.arc(0,0,12+Math.sin(t*8)*3,0,TAU);ctx.fill();
     ctx.restore();
   }
 }
-
 function drawCombatEffects(){
   for(const f of combatFx){
     const[x,y]=worldToScreen(f.x,f.y),p=clamp(f.life/f.maxLife,0,1),q=1-p;
@@ -1343,6 +1361,16 @@ function drawCombatEffects(){
       ctx.strokeStyle='#9db1ff';ctx.lineWidth=5*p+1;ctx.shadowColor='#859fff';ctx.shadowBlur=18;
       for(let i=0;i<8;i++){const a=i*TAU/8+q;ctx.beginPath();ctx.moveTo(Math.cos(a)*f.radius*.2,Math.sin(a)*f.radius*.2);ctx.lineTo(Math.cos(a)*f.radius*q,Math.sin(a)*f.radius*q);ctx.stroke()}
       ctx.shadowBlur=0;
+    }else if(f.type==='spreadShardBurst'){
+      ctx.strokeStyle='#7bf6ff';ctx.lineWidth=2.5;for(const off of [-.42,.42]){ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(off)*f.radius*q,Math.sin(off)*f.radius*q);ctx.stroke()}
+    }else if(f.type==='novaFragmentBurst'){
+      ctx.strokeStyle='#8bf5ff';ctx.lineWidth=2;ctx.shadowColor='#8bf5ff';ctx.shadowBlur=10;for(let i=0;i<4;i++){const aa=i*TAU/4+Math.PI/4;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(aa)*f.radius*q,Math.sin(aa)*f.radius*q);ctx.stroke()}ctx.shadowBlur=0;
+    }else if(f.type==='pierceAccel'){
+      ctx.strokeStyle='#d2baff';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,f.radius*q,0,TAU);ctx.stroke();
+    }else if(f.type==='ringReturn'){
+      ctx.strokeStyle='#e3d4ff';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,f.radius*q,Math.PI*.65,Math.PI*1.35);ctx.stroke();
+    }else if(f.type==='chainArc'){
+      const[x2,y2]=worldToScreen(f.x2,f.y2);ctx.restore();ctx.save();ctx.globalAlpha=Math.min(1,p*1.4);ctx.strokeStyle='#8af7ff';ctx.lineWidth=3;ctx.shadowColor='#6cf4ff';ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(x,y);const mx=(x+x2)/2+rand(-18,18),my=(y+y2)/2+rand(-18,18);ctx.lineTo(mx,my);ctx.lineTo(x2,y2);ctx.stroke();ctx.shadowBlur=0;
     }else if(f.type==='errorDashTrace'){
       const flicker=.55+.45*Math.sin(performance.now()*.04+f.x*.03);
       ctx.globalAlpha*=flicker;
@@ -1545,6 +1573,11 @@ function drawBullets(){
       ctx.globalAlpha=1;ctx.shadowBlur=0;
     }
 
+    if(b.special==='precision'){ctx.shadowColor='#ffffff';ctx.shadowBlur=18;ctx.strokeStyle='rgba(220,250,255,.95)';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(0,0,b.r+7+Math.sin(time*10)*2,0,TAU);ctx.stroke();ctx.shadowBlur=0}
+    else if(b.special==='acceleratedBurst'){ctx.strokeStyle='rgba(115,255,170,.78)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-28,-7);ctx.lineTo(-5,-7);ctx.moveTo(-28,7);ctx.lineTo(-5,7);ctx.stroke()}
+    else if(b.special==='glitchEcho'){ctx.globalAlpha=.72;ctx.strokeStyle='#ff45e2';ctx.lineWidth=2;ctx.strokeRect(-14,-11,26,22)}
+    else if(b.special==='novaFragment'){ctx.globalAlpha=.8;ctx.strokeStyle='#bffcff';ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(0,0,8,0,TAU);ctx.stroke()}
+    else if(b.special==='shrapnel'){ctx.globalAlpha=.8;ctx.fillStyle='#eaffff';ctx.beginPath();ctx.arc(0,0,2,0,TAU);ctx.fill()}
     ctx.restore();
   }
 }

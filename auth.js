@@ -62,39 +62,39 @@ const els = {
 const CANNONS=Object.freeze({
   standard:{
     id:'standard',name:'기본포',rarity:'starter',rarityLabel:'기본',
-    chance:0,desc:'균형 잡힌 기본 단발포입니다.'
+    chance:0,desc:'균형 잡힌 기본 단발포입니다.',passive:'평타 · 정밀 코어: 5번째 탄이 1.7배 피해 + 2회 관통'
   },
   rapid:{
     id:'rapid',name:'기관포',rarity:'common',rarityLabel:'일반',
-    chance:60,desc:'작은 탄환을 매우 빠르게 연속 발사합니다.'
+    chance:61.5,desc:'작은 탄환을 매우 빠르게 연속 발사합니다.',passive:'평타 · 가속 탄띠: 8번째 사격마다 3발 동시 가속탄'
   },
   spread:{
     id:'spread',name:'산탄포',rarity:'rare',rarityLabel:'희귀',
-    chance:25,desc:'한 번에 5개의 산탄을 넓게 퍼뜨립니다.'
+    chance:25.63,desc:'한 번에 5개의 산탄을 넓게 퍼뜨립니다.',passive:'평타 · 파편 확산: 명중 시 좌우 2차 파편 생성'
   },
   piercer:{
     id:'piercer',name:'관통포',rarity:'epic',rarityLabel:'에픽',
-    chance:10,desc:'길쭉한 철갑탄이 여러 적을 연속 관통합니다.'
+    chance:10.255,desc:'길쭉한 철갑탄이 여러 적을 연속 관통합니다.',passive:'평타 · 관통 가속: 관통할수록 공격력 8%·탄속 4% 증가'
   },
   plasma:{
     id:'plasma',name:'플라즈마포',rarity:'legendary',rarityLabel:'전설',
-    chance:3,desc:'플라즈마 구체와 전기 연결선으로 공격합니다.',skill:'전류 폭주 · 8방향 플라즈마 전기망'
+    chance:2,desc:'플라즈마 구체와 전기 연결선으로 공격합니다.',passive:'평타 · 연쇄 방전: 명중 시 주변 최대 2명에게 45% 번개 피해',skill:'전류 폭주 · 8방향 플라즈마 전기망'
   },
   rocket:{
     id:'rocket',name:'로켓포',rarity:'mythic',rarityLabel:'신화',
-    chance:1.2,desc:'중장갑 로켓이 넓은 폭발 피해를 줍니다.',skill:'Q 미사일 폭격 · 전방 다연장 로켓 일제사',skill2:'R 강철 요새 · 6초간 받는 피해 70% 감소'
+    chance:.5,desc:'중장갑 로켓이 넓은 폭발 피해를 줍니다.',passive:'평타 · 소이 폭발: 폭발 지점에 2.4초 화염 지대',skill:'Q 미사일 폭격 · 전방 다연장 로켓 일제사',skill2:'R 강철 요새 · 6초간 받는 피해 70% 감소'
   },
   ring:{
     id:'ring',name:'링 캐논',rarity:'secret',rarityLabel:'시크릿',
-    chance:.5,desc:'차원 에너지 링이 적들을 연속 관통합니다.',skill:'Q 차원 절단 · 16방향 관통 링 방출',skill2:'R 공간 도약 · 조준 방향으로 장거리 순간이동'
+    chance:.1,desc:'차원 에너지 링이 적들을 연속 관통합니다.',passive:'평타 · 회귀 링: 멀리 날아간 링이 사용자에게 되돌아옴',skill:'Q 차원 절단 · 16방향 관통 링 방출',skill2:'R 공간 도약 · 조준 방향으로 장거리 순간이동'
   },
   nova:{
     id:'nova',name:'노바 캐논',rarity:'galaxy',rarityLabel:'갤럭시',
-    chance:.25,desc:'별 모양 노바탄이 관통과 폭발을 동시에 일으킵니다.',skill:'Q 초신성 · 광역 폭발 + 노바탄 전방위 방출',skill2:'R 중력 특이점 · 지속형 중력장을 생성해 적을 끌어당김'
+    chance:.01,desc:'별 모양 노바탄이 관통과 폭발을 동시에 일으킵니다.',passive:'평타 · 성운 분열: 첫 명중 시 작은 별 파편 4개 생성',skill:'Q 초신성 · 광역 폭발 + 노바탄 전방위 방출',skill2:'R 중력 특이점 · 지속형 중력장을 생성해 적을 끌어당김'
   },
   error:{
     id:'error',name:'ERROR 캐논',rarity:'error',rarityLabel:'ERROR',
-    chance:.05,desc:'불안정한 글리치 탄환이 공간을 왜곡하며 관통합니다.',skill:'Q SYSTEM CRASH · 전방위 글리치 폭주',skill2:'R OVERCLOCK.EXE · 15초 강화 + 강화 중 R로 3초마다 글리치 도약'
+    chance:.005,desc:'불안정한 글리치 탄환이 공간을 왜곡하며 관통합니다.',passive:'평타 · 글리치 복제: 5번째 사격마다 양옆 복제탄 2발 추가',skill:'Q SYSTEM CRASH · 전방위 글리치 폭주',skill2:'R OVERCLOCK.EXE · 15초 강화 + 강화 중 R로 3초마다 글리치 도약'
   }
 });
 window.IronCellCannons=CANNONS;
@@ -219,7 +219,7 @@ function renderCannonGarage(){
       return `<button type="button" class="cannon-card rarity-card-${c.rarity} ${own?'':'locked'} ${eq?'equipped':''}" data-cannon="${c.id}" ${own?'':'disabled'}>
         <div class="cannon-card-head"><strong>${c.name}</strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span></div>
         <small class="cannon-chance">${chance}</small>
-        <p>${own?c.desc:'아직 획득하지 않은 대포입니다.'}</p>${own&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}${own&&c.skill2?`<div class="cannon-skill-line second">◆ ${c.skill2}</div>`:''}
+        <p>${own?c.desc:'아직 획득하지 않은 대포입니다.'}</p>${own&&c.passive?`<div class="cannon-passive-line">● ${c.passive}</div>`:''}${own&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}${own&&c.skill2?`<div class="cannon-skill-line second">◆ ${c.skill2}</div>`:''}
         <div class="equip-label">${eq?'장착 중':own?'눌러서 장착':'미보유'}</div>
       </button>`;
     }).join('');
