@@ -180,21 +180,21 @@ const CANNONS=Object.freeze({
     desc:'중장갑 로켓이 넓은 폭발 피해를 줍니다.',
     passive:'평타 · 소이 폭발: 폭발 지점에 2.4초 화염 지대',
     skill:'Q 미사일 레인 · 넓은 목표 지역에 5초간 경고표시 후 미사일이 연속 낙하',
-    skill2:'R 강철 요새 · 6초간 받는 피해 70% 감소'
+    skill2:'R IRON DOME · 6초 중장갑 돔 + 피해 70% 감소 + 체력 12% 회복'
   },
   titan:{
     id:'titan',name:'타이탄',rarity:'mythic',rarityLabel:'신화',chance:.166667,
     desc:'거대한 중포와 높은 방어력을 가진 중전차입니다.',
     passive:'평타 · 중포 코어: 대형 폭발탄, 4번째는 쌍포격',
     skill:'Q 대지 절단 · 전방 760거리를 따라 6개의 지면 균열이 순차 폭발',
-    skill2:'R 공성 모드 · 8초간 거의 정지하지만 공격력 55%↑·연사 2배'
+    skill2:'R 공성 변환 · 8초 포대 변신, 공격력/연사 강화 + 자동 중포 사격'
   },
   phantom:{
     id:'phantom',name:'팬텀',rarity:'mythic',rarityLabel:'신화',chance:.166666,
     desc:'순간 이동과 고속 레일탄을 사용하는 암살형 탱크입니다.',
     passive:'평타 · 팬텀 레일: 5번째 사격마다 3발 레일탄',
     skill:'Q 암살 표식 · 순간이동 후 출발점이 지연 폭발',
-    skill2:'R 위상 은신 · 5초간 완전 위상 무적'
+    skill2:'R SPECTER CLOAK · 5초 완전 위상 무적 + 이동 경로 유령 잔상'
   },
 
   // 시크릿 .1% / 3캐릭터
@@ -203,21 +203,21 @@ const CANNONS=Object.freeze({
     desc:'차원 에너지 링이 적들을 연속 관통합니다.',
     passive:'평타 · 회귀 링: 멀리 날아간 링이 사용자에게 되돌아옴',
     skill:'Q 게이트 리피터 · 6초간 포탈 생성, 내가 쏜 링 평타를 포탈에서도 한 번 더 복제',
-    skill2:'R 귀환 포탈 · 전방 순간이동 후 2초 뒤 원래 위치로 자동 귀환'
+    skill2:'R RING PARRY · 5.8초 회전 방어링, 적 탄환을 반격 링으로 되돌림'
   },
   chrono:{
     id:'chrono',name:'크로노',rarity:'secret',rarityLabel:'시크릿',chance:.033333,
     desc:'시간 링을 겹쳐 쏘며 빠르게 위치를 바꿉니다.',
     passive:'평타 · 타임 듀오: 3번째 사격마다 회귀 링 2발',
     skill:'Q 시간 정지 · 영역 안 적/탄환을 4.5초간 극도로 감속',
-    skill2:'R 시간 역행 · 약 4초 전 위치와 체력 상태로 되돌아감'
+    skill2:'R REWIND 4s · 약 4초 전 위치/체력/속도로 되감기 + 시간 잔상'
   },
   void:{
     id:'void',name:'보이드',rarity:'secret',rarityLabel:'시크릿',chance:.033333,
     desc:'공간을 압축하는 보이드 탄환과 중력장을 사용합니다.',
     passive:'평타 · 보이드 펄스: 4번째 사격마다 3개의 폭발성 보이드탄',
     skill:'Q 보이드 싱크 · 지속 중력장으로 적을 중심에 끌어당김',
-    skill2:'R EVENT HORIZON · 7초간 초대형 중력장'
+    skill2:'R ANTI-MATTER · 6.6초 자신 주변 반중력장, 적/도형/탄환을 바깥으로 밀어냄'
   },
 
   // 갤럭시 .01% / 3캐릭터
@@ -226,21 +226,21 @@ const CANNONS=Object.freeze({
     desc:'별 모양 노바탄이 관통과 폭발을 동시에 일으킵니다.',
     passive:'평타 · 성운 분열: 첫 명중 시 작은 별 파편 4개 생성',
     skill:'Q 초신성 핵 · 2.3초 충전 뒤 초대형 폭발',
-    skill2:'R 성운 위성 · 7초간 공격하는 별 위성 5개가 주위를 공전'
+    skill2:'R ORBITAL FIVE · 7초간 공격 위성 5기가 플레이어 주위를 공전'
   },
   comet:{
     id:'comet',name:'코멧',rarity:'galaxy',rarityLabel:'갤럭시',chance:.003333,
     desc:'고속 혜성탄으로 전장을 가로지르는 기동형 탱크입니다.',
     passive:'평타 · 혜성 꼬리: 5번째 사격마다 노바탄 3발',
     skill:'Q 혜성 돌파 · 장거리 돌진하며 피해 궤적을 남김',
-    skill2:'R 메테오 드라이브 · 1200 거리 초고속 돌진 + 경로 6회 폭발'
+    skill2:'R METEOR SHOWER · 이동하지 않고 지정 지역에 6.2초간 혜성 연속 낙하'
   },
   stellar:{
     id:'stellar',name:'스텔라',rarity:'galaxy',rarityLabel:'갤럭시',chance:.003333,
     desc:'별빛을 폭발시키는 광역 제압형 탱크입니다.',
     passive:'평타 · 쌍성: 기본 2발, 6번째 사격은 5발 성탄',
-    skill:'Q 별자리 결계 · 삼각형 별자리 내부의 아군은 회복, 적은 지속 피해',
-    skill2:'R 세컨드 스타 · 8초 동안 죽음 1회 예약, 죽으면 체력 58%로 부활 + 2.6초 무적'
+    skill:'Q 별자리 결계 · 8초 대형 삼각 결계 · 즉시 15% 회복 + 내부 지속 회복 강화 + 적 지속 피해 강화',
+    skill2:'R SECOND STAR · 12초 동안 죽음 1회 예약 · 시전 즉시 30% 회복 · 사망 시 체력 75% 부활 + 4초 무적 + 부활 충격파'
   },
 
   // ERROR .005% / 3캐릭터
@@ -257,7 +257,7 @@ const CANNONS=Object.freeze({
     desc:'분열되는 글리치탄으로 화면을 뒤덮는 ERROR 개체입니다.',
     passive:'평타 · 패킷 분열: 기본 2발, 6번째 사격은 7발 글리치탄',
     skill:'Q MIRROR ERROR · 6개 분신 위치에서 동시에 패킷탄 발사',
-    skill2:'R DESYNC CLONES · 8.5초간 분신 4기가 자동 사격'
+    skill2:'R DATA WARP · 900거리 순간 전송 + 이동 경로에 6개의 지연 글리치 폭발'
   },
   zero:{
     id:'zero',name:'ZERO',rarity:'error',rarityLabel:'ERROR',chance:.001666,
