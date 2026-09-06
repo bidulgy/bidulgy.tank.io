@@ -57,7 +57,18 @@ const els = {
   lobbyBestLevel: document.querySelector('#lobbyBestLevel'),
   lobbyBestScore: document.querySelector('#lobbyBestScore'),
   lobbyBestKills: document.querySelector('#lobbyBestKills'),
-  pilotName: document.querySelector('#nameInput')
+  pilotName: document.querySelector('#nameInput'),
+  lobbyAdmin: document.querySelector('#lobbyAdminBtn'),
+  adminScreen: document.querySelector('#adminScreen'),
+  adminBack: document.querySelector('#adminBackBtn'),
+  adminMessage: document.querySelector('#adminMessage'),
+  adminUsername: document.querySelector('#adminUsernameInput'),
+  adminSearch: document.querySelector('#adminSearchBtn'),
+  adminTarget: document.querySelector('#adminTargetCard'),
+  adminGemAmount: document.querySelector('#adminGemAmount'),
+  adminCannonGrid: document.querySelector('#adminCannonGrid'),
+  adminRecentUsers: document.querySelector('#adminRecentUsers'),
+  adminRefresh: document.querySelector('#adminRefreshBtn')
 };
 
 const CANNONS=Object.freeze({
@@ -104,6 +115,9 @@ let currentUser = null;
 let currentUsername = '';
 let profile = null;
 let authBusy = false;
+let adminEnabled = false;
+let adminTargetUsername = '';
+let adminTargetData = null;
 
 function normalizeUsername(value){
   return String(value || '').trim().toLowerCase();
@@ -293,10 +307,151 @@ function renderProfile(){
   renderCannonGarage();
 }
 
+
+function setAdminMessage(text='',type=''){
+  if(!els.adminMessage)return;
+  els.adminMessage.textContent=text;
+  els.adminMessage.className=`admin-message ${type}`.trim();
+}
+function adminFriendlyError(error){
+  const msg=String(error?.message||error||'').toLowerCase();
+  if(msg.includes('admin_required'))return '관리자 권한이 없습니다.';
+  if(msg.includes('user_not_found'))return '해당 Iron Cell 계정을 찾지 못했습니다.';
+  if(msg.includes('invalid_username'))return '아이디 형식을 확인하세요.';
+  if(msg.includes('cannot_remove_standard'))return '기본포는 회수할 수 없습니다.';
+  return String(error?.message||error||'서버 요청 실패');
+}
+function renderAdminCannons(){
+  if(!els.adminCannonGrid)return;
+  els.adminCannonGrid.innerHTML=Object.values(CANNONS).map(c=>`
+    <div class="admin-cannon-item">
+      <strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span> ${c.name}</strong>
+      <div class="admin-cannon-buttons">
+        <button type="button" data-admin-cannon="${c.id}" data-admin-owned="true">지급</button>
+        <button type="button" data-admin-cannon="${c.id}" data-admin-owned="false">회수</button>
+      </div>
+    </div>
+  `).join('');
+}
+function renderAdminTarget(data){
+  adminTargetData=data||null;
+  if(!els.adminTarget)return;
+  if(!data){
+    els.adminTarget.className='admin-target-card empty';
+    els.adminTarget.textContent='검색할 계정 아이디를 입력하세요.';
+    return;
+  }
+  const p=data.profile||{};
+  const owned=Array.isArray(p.owned_cannons)?p.owned_cannons:[];
+  els.adminTarget.className='admin-target-card';
+  els.adminTarget.innerHTML=`
+    <div class="admin-target-stat"><small>아이디</small><b>${escapeHtml(data.username||'-')}</b></div>
+    <div class="admin-target-stat"><small>보석</small><b>${Number(p.gems||0).toLocaleString()}</b></div>
+    <div class="admin-target-stat"><small>최고 점수</small><b>${Number(p.best_score||0).toLocaleString()}</b></div>
+    <div class="admin-target-stat"><small>최고 LV</small><b>${Number(p.best_level||1).toLocaleString()}</b></div>
+    <div class="admin-target-stat"><small>총 전투</small><b>${Number(p.total_runs||0).toLocaleString()}</b></div>
+    <div class="admin-target-stat"><small>총 처치</small><b>${Number(p.total_kills||0).toLocaleString()}</b></div>
+    <div class="admin-target-stat"><small>장착 대포</small><b>${escapeHtml(CANNONS[p.equipped_cannon]?.name||p.equipped_cannon||'기본포')}</b></div>
+    <div class="admin-target-stat"><small>보유 대포</small><b>${owned.length.toLocaleString()}종</b></div>
+  `;
+}
+async function refreshAdminAccess(){
+  if(!currentUser){
+    adminEnabled=false;
+    els.lobbyAdmin?.classList.add('hidden');
+    return false;
+  }
+  try{
+    const {data,error}=await client.rpc('iron_cell_admin_is_admin');
+    if(error)throw error;
+    adminEnabled=data===true;
+  }catch(error){
+    console.warn('Admin access check failed:',error);
+    adminEnabled=false;
+  }
+  els.lobbyAdmin?.classList.toggle('hidden',!adminEnabled);
+  return adminEnabled;
+}
+async function adminLookup(usernameValue=els.adminUsername?.value){
+  if(!adminEnabled)return;
+  const username=normalizeUsername(usernameValue);
+  if(!validUsername(username)){
+    setAdminMessage('검색할 아이디 형식을 확인하세요.','error');return;
+  }
+  setAdminMessage('계정을 불러오는 중...','busy');
+  const {data,error}=await client.rpc('iron_cell_admin_lookup_user',{p_username:username});
+  if(error){setAdminMessage(adminFriendlyError(error),'error');return}
+  adminTargetUsername=username;
+  if(els.adminUsername)els.adminUsername.value=username;
+  renderAdminTarget(data);
+  setAdminMessage(`${username} 계정을 불러왔습니다.`,'good');
+}
+async function adminChangeGems(mode){
+  if(!adminEnabled||!adminTargetUsername){
+    setAdminMessage('먼저 관리할 계정을 검색하세요.','error');return;
+  }
+  const amount=Math.max(0,Math.floor(Number(els.adminGemAmount?.value||0)));
+  if(!Number.isFinite(amount)){
+    setAdminMessage('보석 수량을 확인하세요.','error');return;
+  }
+  setAdminMessage('보석 정보를 변경하는 중...','busy');
+  const {data,error}=await client.rpc('iron_cell_admin_change_gems',{
+    p_username:adminTargetUsername,p_mode:mode,p_amount:amount
+  });
+  if(error){setAdminMessage(adminFriendlyError(error),'error');return}
+  renderAdminTarget({username:adminTargetUsername,profile:data?.profile||{}});
+  setAdminMessage(`보석 변경 완료 · ${Number(data?.profile?.gems||0).toLocaleString()}개`,'good');
+  void loadAdminRecentUsers();
+  if(adminTargetUsername===currentUsername)await refreshProfile();
+}
+async function adminSetCannon(cannon,owned){
+  if(!adminEnabled||!adminTargetUsername){
+    setAdminMessage('먼저 관리할 계정을 검색하세요.','error');return;
+  }
+  setAdminMessage(`${CANNONS[cannon]?.name||cannon} ${owned?'지급':'회수'} 중...`,'busy');
+  const {data,error}=await client.rpc('iron_cell_admin_set_cannon',{
+    p_username:adminTargetUsername,p_cannon:cannon,p_owned:owned
+  });
+  if(error){setAdminMessage(adminFriendlyError(error),'error');return}
+  renderAdminTarget({username:adminTargetUsername,profile:data?.profile||{}});
+  setAdminMessage(`${CANNONS[cannon]?.name||cannon} ${owned?'지급':'회수'} 완료`,'good');
+  if(adminTargetUsername===currentUsername)await refreshProfile();
+}
+async function loadAdminRecentUsers(){
+  if(!adminEnabled||!els.adminRecentUsers)return;
+  const {data,error}=await client.rpc('iron_cell_admin_recent_users',{p_limit:30});
+  if(error){
+    els.adminRecentUsers.innerHTML=`<div class="admin-message error">${escapeHtml(adminFriendlyError(error))}</div>`;
+    return;
+  }
+  const rows=Array.isArray(data)?data:[];
+  els.adminRecentUsers.innerHTML=rows.length?rows.map(row=>`
+    <button class="admin-recent-user" type="button" data-admin-user="${escapeHtml(row.username||'')}">
+      <span><strong>${escapeHtml(row.username||'-')}</strong><small>LV ${Number(row.best_level||1)} · SCORE ${Number(row.best_score||0).toLocaleString()}</small></span>
+      <b>◆ ${Number(row.gems||0).toLocaleString()}</b>
+    </button>
+  `).join(''):'<div class="admin-message">표시할 계정이 없습니다.</div>';
+}
+async function showAdmin(){
+  if(!await refreshAdminAccess()){
+    setAdminMessage('관리자 권한이 없습니다.','error');
+    showLobby();return;
+  }
+  els.authScreen?.classList.remove('show');
+  els.startScreen?.classList.remove('show');
+  els.garageScreen?.classList.remove('show');
+  els.lobbyScreen?.classList.remove('show');
+  els.adminScreen?.classList.add('show');
+  renderAdminCannons();
+  setAdminMessage('관리자 권한 확인 완료 · bidulgy','good');
+  void loadAdminRecentUsers();
+}
+
 function hideGameMenus(){
   els.startScreen?.classList.remove('show');
   els.garageScreen?.classList.remove('show');
   els.lobbyScreen?.classList.remove('show');
+  els.adminScreen?.classList.remove('show');
 }
 function showAuth(){
   hideGameMenus();
@@ -306,8 +461,10 @@ function showLobby(){
   els.authScreen?.classList.remove('show');
   els.startScreen?.classList.remove('show');
   els.garageScreen?.classList.remove('show');
+  els.adminScreen?.classList.remove('show');
   els.lobbyScreen?.classList.add('show');
   renderProfile();
+  void refreshAdminAccess();
 }
 function showGarage(){
   els.authScreen?.classList.remove('show');
@@ -524,6 +681,10 @@ async function logout(){
     currentUser = null;
     currentUsername = '';
     profile = null;
+    adminEnabled = false;
+    adminTargetUsername = '';
+    adminTargetData = null;
+    els.lobbyAdmin?.classList.add('hidden');
     if(els.password) els.password.value = '';
     if(els.pilotName) delete els.pilotName.dataset.userEdited;
     showAuth();
@@ -643,6 +804,31 @@ async function boot(){
 els.login?.addEventListener('click', login);
 els.signup?.addEventListener('click', signup);
 els.logout?.addEventListener('click', logout);
+document.addEventListener('click', event => {
+  const target=event.target instanceof Element?event.target:null;
+  const gemButton=target?.closest?.('[data-admin-gem]');
+  const cannonButton=target?.closest?.('[data-admin-cannon]');
+  const userButton=target?.closest?.('[data-admin-user]');
+
+  if(gemButton){
+    event.preventDefault();event.stopPropagation();
+    void adminChangeGems(String(gemButton.dataset.adminGem||''));
+    return;
+  }
+  if(cannonButton){
+    event.preventDefault();event.stopPropagation();
+    void adminSetCannon(
+      String(cannonButton.dataset.adminCannon||''),
+      String(cannonButton.dataset.adminOwned||'')==='true'
+    );
+    return;
+  }
+  if(userButton){
+    event.preventDefault();event.stopPropagation();
+    void adminLookup(String(userButton.dataset.adminUser||''));
+  }
+},true);
+
 // Gacha buttons use delegated events so both the new multi-pull UI
 // and an older cached/single-button index.html continue to work.
 document.addEventListener('click', event => {
@@ -663,10 +849,17 @@ els.garageLobby?.addEventListener('click',showLobby);
 els.garageBackLobby?.addEventListener('click',showLobby);
 els.lobbyBattle?.addEventListener('click',showDeploy);
 els.lobbyArsenal?.addEventListener('click',showGarage);
+els.lobbyAdmin?.addEventListener('click',()=>void showAdmin());
+els.adminBack?.addEventListener('click',showLobby);
+els.adminSearch?.addEventListener('click',()=>void adminLookup());
+els.adminRefresh?.addEventListener('click',()=>void loadAdminRecentUsers());
 els.backLobby?.addEventListener('click',showLobby);
 
 els.password?.addEventListener('keydown', event => {
   if(event.key === 'Enter') login();
+});
+els.adminUsername?.addEventListener('keydown', event => {
+  if(event.key === 'Enter') void adminLookup();
 });
 els.username?.addEventListener('keydown', event => {
   if(event.key === 'Enter') els.password?.focus();

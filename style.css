@@ -507,3 +507,94 @@
   .skill-button.ready{transform:scale(1.02)}
   .mobile-tip{display:none!important}
 }
+
+
+/* ===== V5.21 ADMIN PANEL ===== */
+.lobby-menu-button.admin{
+  border-color:rgba(255,105,96,.22);
+  background:linear-gradient(135deg,rgba(75,24,27,.86),rgba(29,23,42,.94));
+}
+.lobby-menu-button.admin .menu-icon{color:#ff9a91}
+.admin-panel-card{
+  width:min(1040px,calc(100vw - 30px));
+  max-height:calc(100vh - 34px);
+  overflow:auto;
+  padding:25px;
+  border-radius:22px;
+  border:1px solid rgba(128,176,215,.18);
+  background:linear-gradient(155deg,rgba(14,23,37,.98),rgba(9,15,27,.99));
+  box-shadow:0 28px 80px rgba(0,0,0,.50);
+}
+.admin-panel-head,.admin-section-title{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+}
+.admin-panel-head{margin-bottom:18px}
+.admin-panel-head h1{margin:2px 0 5px;font-size:30px}
+.admin-panel-head p{margin:0;color:#8fa2b7}
+.admin-panel-head p b{color:#ff9a91}
+.admin-message{
+  min-height:20px;margin:0 0 13px;padding:0 4px;
+  font-size:12px;font-weight:800;color:#91a4b9;
+}
+.admin-message.good{color:#78efae}.admin-message.error{color:#ff8c87}.admin-message.busy{color:#8bdfff}
+.admin-section{
+  padding:17px;border-radius:16px;border:1px solid rgba(128,176,215,.13);
+  background:rgba(15,27,43,.66);margin-bottom:14px;
+}
+.admin-section-title{margin-bottom:12px}
+.admin-section-title small{font-size:9px;letter-spacing:.16em;color:#657b91}
+.admin-section-title h2{margin:2px 0 0;font-size:16px}
+.admin-search-row{display:grid;grid-template-columns:1fr 110px;gap:9px}
+.admin-search-row input,.admin-number-input{
+  width:100%;box-sizing:border-box;padding:12px 13px;border-radius:10px;
+  border:1px solid rgba(128,176,215,.18);outline:0;
+  background:#09131f;color:#e8f4ff;font:inherit;
+}
+.admin-search-row input:focus,.admin-number-input:focus{border-color:#56c8ff;box-shadow:0 0 0 2px rgba(65,188,255,.10)}
+.admin-target-card{
+  margin-top:11px;padding:13px;border-radius:12px;
+  background:rgba(7,16,27,.82);border:1px solid rgba(128,176,215,.11);
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;
+}
+.admin-target-card.empty{display:block;color:#6f8398}
+.admin-target-stat{padding:8px;border-radius:9px;background:rgba(255,255,255,.025)}
+.admin-target-stat small{display:block;font-size:8px;color:#62778d;margin-bottom:3px}
+.admin-target-stat b{font-size:13px;color:#eaf6ff;word-break:break-all}
+.admin-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:14px}
+.admin-action-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:9px}
+.admin-action{
+  min-height:39px;border:1px solid rgba(128,176,215,.18);border-radius:9px;
+  background:#132338;color:#d9eaff;font-weight:900;cursor:pointer;
+}
+.admin-action.positive{border-color:rgba(75,224,145,.28);color:#80efb3}
+.admin-action.negative{border-color:rgba(255,91,91,.27);color:#ff9b99}
+.admin-cannon-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.admin-cannon-item{
+  padding:10px;border-radius:10px;background:#0a1724;border:1px solid rgba(128,176,215,.12)
+}
+.admin-cannon-item strong{display:block;font-size:11px;margin-bottom:8px}
+.admin-cannon-buttons{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.admin-cannon-buttons button{
+  border:0;border-radius:7px;padding:7px 4px;font-size:9px;font-weight:900;cursor:pointer;
+  background:#15344a;color:#89dfff;
+}
+.admin-cannon-buttons button:last-child{background:#351c26;color:#ff9b9b}
+.admin-recent-users{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.admin-recent-user{
+  display:grid;grid-template-columns:1fr auto;gap:9px;align-items:center;
+  padding:10px 12px;border:1px solid rgba(128,176,215,.11);
+  border-radius:10px;background:#091622;color:#d8eaff;cursor:pointer;text-align:left;
+}
+.admin-recent-user:hover{border-color:rgba(86,200,255,.35)}
+.admin-recent-user strong{font-size:11px}.admin-recent-user small{display:block;color:#6f8498;font-size:8px;margin-top:2px}
+.admin-recent-user b{color:#82e6ff;font-size:10px}
+.secondary-action.compact{padding:8px 11px;font-size:9px}
+
+@media(max-width:760px){
+  .admin-panel-card{padding:16px;width:calc(100vw - 18px);max-height:calc(100vh - 18px)}
+  .admin-panel-head h1{font-size:23px}
+  .admin-grid{grid-template-columns:1fr}
+  .admin-target-card{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .admin-cannon-grid{grid-template-columns:repeat(2,1fr)}
+  .admin-recent-users{grid-template-columns:1fr}
+}
