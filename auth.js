@@ -320,6 +320,15 @@ function lockAdminUi(){
 function normalizeUsername(value){
   return String(value || '').trim().toLowerCase();
 }
+function escapeHtml(value){
+  return String(value ?? '').replace(/[&<>"']/g,ch=>({
+    '&':'&amp;',
+    '<':'&lt;',
+    '>':'&gt;',
+    '"':'&quot;',
+    "'":'&#39;'
+  })[ch]);
+}
 const IRON_CELL_EMAIL_DOMAIN = 'players.example.com';
 const IRON_CELL_EMAIL_PREFIX = 'ic_';
 const IRON_CELL_NAMESPACE = 'iron-cell-arena';
@@ -811,12 +820,12 @@ function renderAdminSearchResults(rows,query){
 
   els.adminSearchResults.classList.remove('hidden');
   els.adminSearchResults.innerHTML=list.length?list.map(row=>`
-    <button class="admin-search-result" type="button" data-admin-user="${escapeHtml(row.username||'')}">
+    <button class="admin-search-result" type="button" data-admin-user="${escapeHtml(row?.username||'')}">
       <span>
-        <strong>${escapeHtml(row.username||'-')}</strong>
-        <small>LV ${Number(row.best_level||1)} · SCORE ${Number(row.best_score||0).toLocaleString()}</small>
+        <strong>${escapeHtml(row?.username||'-')}</strong>
+        <small>LV ${Math.max(1,Number(row?.best_level||1))} · SCORE ${Math.max(0,Number(row?.best_score||0)).toLocaleString()}</small>
       </span>
-      <b>◆ ${Number(row.gems||0).toLocaleString()}</b>
+      <b>◆ ${Math.max(0,Number(row?.gems||0)).toLocaleString()}</b>
     </button>
   `).join(''):`<div class="admin-search-empty">"${escapeHtml(query)}"가 포함된 sworder VS tank 계정이 없습니다.</div>`;
 }
@@ -876,9 +885,23 @@ function scheduleAdminDirectorySearch(){
 async function adminLookup(usernameValue=els.adminUsername?.value){
   if(!adminEnabled)return;
   const username=normalizeUsername(usernameValue);
+
+  if(!username){
+    setAdminMessage('검색할 계정 아이디를 입력하세요.','error');
+    hideAdminSearchResults();
+    return;
+  }
+
+  // V5.42: 1~2글자는 정확검색 오류가 아니라 후보검색으로 처리.
+  if(/^[a-z0-9_]{1,2}$/.test(username)){
+    setAdminMessage(`"${username}" 포함 계정을 검색했습니다.`,'good');
+    await searchAdminDirectory(username);
+    return;
+  }
+
   if(!validUsername(username)){
-    setAdminMessage('검색할 아이디 형식을 확인하세요.','error');
-    if(username)void searchAdminDirectory(username);
+    setAdminMessage('아이디는 영문 소문자, 숫자, 밑줄로 1~20자 검색할 수 있습니다.','error');
+    renderAdminSearchResults([],username);
     return;
   }
 
@@ -948,27 +971,57 @@ async function adminSetCannon(cannon,owned){
 }
 async function loadAdminRecentUsers(){
   if(!adminEnabled||!els.adminRecentUsers)return;
-  els.adminRecentUsers.innerHTML='<div class="admin-message busy">최근 가입 계정을 불러오는 중...</div>';
+
+  els.adminRecentUsers.innerHTML=
+    '<div class="admin-message busy">최근 가입 계정을 불러오는 중...</div>';
   if(els.adminAccountCount)els.adminAccountCount.textContent='불러오는 중…';
 
   try{
     const result=await loadAdminDirectory('',30);
-    const rows=Array.isArray(result.users)?result.users:[];
-    const total=Number.isFinite(result.total)?result.total:rows.length;
-    if(els.adminAccountCount)els.adminAccountCount.textContent=`총 ${total.toLocaleString()}개`;
+    const rows=Array.isArray(result?.users)?result.users:[];
+    const total=Number.isFinite(Number(result?.total))
+      ? Number(result.total)
+      : rows.length;
 
-    els.adminRecentUsers.innerHTML=rows.length?rows.map(row=>`
-      <button class="admin-recent-user" type="button" data-admin-user="${escapeHtml(row.username||'')}">
-        <span>
-          <strong>${escapeHtml(row.username||'-')}</strong>
-          <small>LV ${Number(row.best_level||1)} · SCORE ${Number(row.best_score||0).toLocaleString()}</small>
-          <time>${escapeHtml(formatAdminDate(row.created_at))} 가입</time>
-        </span>
-        <b>◆ ${Number(row.gems||0).toLocaleString()}</b>
-      </button>
-    `).join(''):`<div class="admin-message">현재 sworder VS tank 독립계정이 없습니다.</div>`;
+    if(els.adminAccountCount)
+      els.adminAccountCount.textContent=`총 ${total.toLocaleString()}개`;
+
+    const html=rows.map(row=>{
+      const username=escapeHtml(row?.username||'-');
+      const userAttr=escapeHtml(row?.username||'');
+      const level=Math.max(1,Number(row?.best_level||1));
+      const score=Math.max(0,Number(row?.best_score||0));
+      const gems=Math.max(0,Number(row?.gems||0));
+      const joined=escapeHtml(formatAdminDate(row?.created_at));
+
+      return `
+        <button class="admin-recent-user" type="button" data-admin-user="${userAttr}">
+          <span>
+            <strong>${username}</strong>
+            <small>LV ${level} · SCORE ${score.toLocaleString()}</small>
+            <time>${joined} 가입</time>
+          </span>
+          <b>◆ ${gems.toLocaleString()}</b>
+        </button>`;
+    }).join('');
+
+    els.adminRecentUsers.innerHTML=html ||
+      '<div class="admin-message">현재 sworder VS tank 독립계정이 없습니다.</div>';
+
+    return rows;
   }catch(error){
-    els.adminRecentUsers.innerHTML=`<div class="admin-message error">${escapeHtml(adminFriendlyError(error))}</div>`;
+    console.error('Recent admin account load failed:',error);
+    if(els.adminAccountCount)els.adminAccountCount.textContent='불러오기 실패';
+
+    // Do not depend on another potentially failing renderer in the catch path.
+    const safeMessage=String(adminFriendlyError(error)||'최근 가입 계정 조회 실패')
+      .replace(/[&<>"']/g,ch=>({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      })[ch]);
+
+    els.adminRecentUsers.innerHTML=
+      `<div class="admin-message error">${safeMessage}</div>`;
+    return [];
   }
 }
 async function showAdmin(){
@@ -993,18 +1046,22 @@ async function showAdmin(){
   setAdminMessage('관리자 권한 확인 완료 · 계정 목록 연결 중...','busy');
 
   try{
-    await loadAdminRecentUsers();
+    const recentRows=await loadAdminRecentUsers();
 
     const visibleCount=
       els.adminRecentUsers?.querySelectorAll?.('[data-admin-user]')?.length||0;
     const totalText=String(els.adminAccountCount?.textContent||'').trim();
 
-    setAdminMessage(
-      visibleCount
-        ? `관리자 연결 정상 · 최근 ${visibleCount}개 표시 · ${totalText}`
-        : `관리자 연결 정상 · ${totalText}`,
-      'good'
-    );
+    if(totalText==='불러오기 실패'){
+      setAdminMessage('관리자 권한은 정상이나 최근 가입 계정 조회에 실패했습니다. 새로고침을 눌러 다시 시도하세요.','error');
+    }else{
+      setAdminMessage(
+        visibleCount
+          ? `관리자 연결 정상 · 최근 ${visibleCount}개 표시 · ${totalText}`
+          : `관리자 연결 정상 · ${totalText}`,
+        'good'
+      );
+    }
   }catch(error){
     setAdminMessage(adminFriendlyError(error),'error');
   }
