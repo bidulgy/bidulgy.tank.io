@@ -6,17 +6,12 @@ const TAU=Math.PI*2,WORLD=12600,GRID=56;
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
-const CENTRAL_PENTAGON_TARGET=180;
-const CENTRAL_PENTAGON_RADIUS=1400;
 const WORLD_SNAPSHOT_INTERVAL=480;
 
 const INITIAL_NORMAL_SHAPES=90;
-const INITIAL_CENTRAL_PENTAGONS=24;
 
 const NORMAL_SPAWN_INTERVAL=.18;
-const CENTRAL_SPAWN_INTERVAL=.11;
 const NORMAL_SPAWN_BATCH=3;
-const CENTRAL_SPAWN_BATCH=1;
 
 // 플레이어가 맵 구석/외곽으로 이동해도 주변이 비지 않도록 최소 밀도를 유지한다.
 const LOCAL_SHAPE_RADIUS=1650;
@@ -28,7 +23,7 @@ const LOCAL_REBALANCE_INTERVAL=.42;
 const LOCAL_REBALANCE_BATCH=3;
 let running=false,paused=false,last=performance.now(),camera={x:0,y:0},shapes=[],bullets=[],particles=[],combatFx=[],skillZones=[],shake=0,classUpgradeShown=false,player,playerHistory=[];
 const remotePlayers=new Map();
-let onlineChannel=null,onlineReady=false,onlineSelfId='',lastStateSend=0,networkSerial=0,lastRunAutosave=0,runSaveBusy=false,normalSpawnTimer=0,centralSpawnTimer=0;
+let onlineChannel=null,onlineReady=false,onlineSelfId='',lastStateSend=0,networkSerial=0,lastRunAutosave=0,runSaveBusy=false,normalSpawnTimer=0;
 let onlineReconnectTimer=0,onlineReconnectBusy=false,lastNetworkStateReceive=0;
 const REMOTE_STATE_INTERVAL=120;
 const REMOTE_PLAYER_STALE_MS=15000;
@@ -215,7 +210,7 @@ function spawnShape(type=null,preferLocal=true,forcedAnchor=null){
     type:t,x:pos.x,y:pos.y,
     r:c.r,hp:c.hp,maxHp:c.hp,xp:c.xp,sides:c.sides,
     angle:rand(0,TAU),spin:rand(-.35,.35),vx:0,vy:0,
-    centralCluster:false,spawnAge:0
+    spawnAge:0
   };
   shapes.push(shape);
   return shape;
@@ -232,7 +227,6 @@ function minDistanceToActiveAnchors(shape,anchors){
 function recycleFarNormalShape(anchor,anchors){
   let candidate=null,bestDistance=LOCAL_SHAPE_RECYCLE_DISTANCE;
   for(const s of shapes){
-    if(s.centralCluster)continue;
     const d=minDistanceToActiveAnchors(s,anchors);
     if(d>bestDistance){
       bestDistance=d;
@@ -250,21 +244,18 @@ function recycleFarNormalShape(anchor,anchors){
   candidate.r=c.r;candidate.hp=c.hp;candidate.maxHp=c.hp;candidate.xp=c.xp;candidate.sides=c.sides;
   candidate.angle=rand(0,TAU);candidate.spin=rand(-.35,.35);
   candidate.vx=0;candidate.vy=0;candidate.spawnAge=0;
-  candidate.centralCluster=false;
   return true;
 }
 function ensureLocalShapeDensity(){
   const anchors=activeShapeSpawnAnchors();
   if(!anchors.length)return;
 
-  let normalCount=0;
-  for(const s of shapes)if(!s.centralCluster)normalCount++;
+  let normalCount=shapes.length;
 
   const radius2=LOCAL_SHAPE_RADIUS*LOCAL_SHAPE_RADIUS;
   for(const anchor of anchors){
     let nearby=0;
     for(const s of shapes){
-      if(s.centralCluster)continue;
       const dx=s.x-anchor.x,dy=s.y-anchor.y;
       if(dx*dx+dy*dy<=radius2)nearby++;
     }
@@ -285,40 +276,15 @@ function ensureLocalShapeDensity(){
   }
 }
 
-function spawnCentralPentagon(){
-  // 큰 맵에 맞춰 오각형 군집을 훨씬 넓게 퍼뜨린다.
-  // 지수 1.18로 바꿔 중앙 과밀을 줄이고 바깥쪽에도 고르게 생성한다.
-  const a=rand(0,TAU);
-  const radius=Math.pow(Math.random(),1.18)*CENTRAL_PENTAGON_RADIUS;
-  const jitter=rand(-28,28);
-  let x=clamp(WORLD/2+Math.cos(a)*(radius+jitter),70,WORLD-70);
-  let y=clamp(WORLD/2+Math.sin(a)*(radius+jitter),70,WORLD-70);
-  if(player?.alive){
-    const dx=x-player.x,dy=y-player.y,d=Math.hypot(dx,dy);
-    if(d<125){
-      const push=(125-d)+rand(20,65),n=d||1;
-      x=clamp(x+dx/n*push,70,WORLD-70);
-      y=clamp(y+dy/n*push,70,WORLD-70);
-    }
-  }
-  shapes.push({
-    id:makeShapeId(),
-    type:'pentagon',
-    x,y,r:34,hp:145,maxHp:145,xp:56,sides:5,
-    angle:rand(0,TAU),spin:rand(-.42,.42),vx:0,vy:0,
-    centralCluster:true,spawnAge:0
-  });
-}
 function populate(){
   shapes=[];bullets=[];particles=[];combatFx=[];skillZones=[];playerHistory=[];
   normalSpawnTimer=0;
-  centralSpawnTimer=0;
   localRebalanceTimer=0;
   normalSpawnAnchorCursor=0;
 
-  // 시작부터 월드 전체/외곽과 플레이어 주변을 동시에 채운다.
+  // V5.44: 중앙 전용 오각형 군집 없음.
+  // 삼각형/사각형/오각형 모두 동일한 일반 스폰 규칙을 사용한다.
   for(let i=0;i<INITIAL_NORMAL_SHAPES;i++)spawnShape(null,i%2===0);
-  for(let i=0;i<INITIAL_CENTRAL_PENTAGONS;i++)spawnCentralPentagon();
 }
 
 function setNetworkStatus(state,text){
@@ -394,7 +360,8 @@ function serializeShape(s){
     x:s.x,y:s.y,vx:s.vx||0,vy:s.vy||0,
     r:s.r,hp:s.hp,maxHp:s.maxHp,xp:s.xp,sides:s.sides,
     angle:s.angle,spin:s.spin,
-    centralCluster:s.centralCluster===true,
+    // V5.44 compatibility field: central clusters were removed.
+    centralCluster:false,
     spawnAge:s.spawnAge||0
   };
 }
@@ -436,7 +403,8 @@ function applyWorldSnapshot(payload){
     s.sides=Math.max(3,Math.floor(safeRemoteNumber(raw.sides,s.sides||4)));
     s.angle=safeRemoteNumber(raw.angle,s.angle||0);
     s.spin=safeRemoteNumber(raw.spin,s.spin||0);
-    s.centralCluster=raw.centralCluster===true;
+    // Older clients may still send this field, but V5.44 never keeps a central cluster.
+    s.centralCluster=false;
     s.spawnAge=Math.max(0,safeRemoteNumber(raw.spawnAge,s.spawnAge||0));
     next.push(s);
   }
@@ -2263,6 +2231,7 @@ function updatePlayer(dt){if(!player.alive)return;refreshRealTimeSkillCooldowns(
 player.angle=heldSkillAim.active&&Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:normalAimAngle;let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);if(input.firing||input.keys.has('Space'))fire(player);handleShapeContact();if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}recordPlayerHistory()
 function updateShapes(dt){
   const host=isWorldHost();
+
   for(const s of shapes){
     s.spawnAge=(s.spawnAge||0)+dt;
     s.angle+=s.spin*dt;
@@ -2271,26 +2240,24 @@ function updateShapes(dt){
     s.vx*=Math.pow(.05,dt);
     s.vy*=Math.pow(.05,dt);
 
-    // 군집 복귀/월드 생성은 한 명의 월드 호스트만 계산한다.
+    // V5.44: 이전 버전에서 넘겨받은 중앙 군집 표시가 있으면
+    // 새 호스트가 한 번만 일반 월드 위치로 풀어준다.
     if(host&&s.centralCluster){
-      const dx=WORLD/2-s.x,dy=WORLD/2-s.y,d=Math.hypot(dx,dy)||1;
-      if(d>CENTRAL_PENTAGON_RADIUS*1.18){
-        s.vx+=dx/d*22*dt;
-        s.vy+=dy/d*22*dt;
-      }
+      const pos=chooseNormalSpawnPoint(false);
+      s.x=pos.x;
+      s.y=pos.y;
+      s.vx=0;
+      s.vy=0;
+      s.centralCluster=false;
+      s.spawnAge=0;
     }
   }
 
   if(!host)return;
 
-  let normalCount=0,centralCount=0;
-  for(const s of shapes){
-    if(s.centralCluster)centralCount++;
-    else normalCount++;
-  }
+  const normalCount=shapes.length;
 
   normalSpawnTimer-=dt;
-  centralSpawnTimer-=dt;
   localRebalanceTimer-=dt;
 
   if(normalCount<NORMAL_SHAPE_TARGET&&normalSpawnTimer<=0){
@@ -2299,13 +2266,8 @@ function updateShapes(dt){
     normalSpawnTimer=NORMAL_SPAWN_INTERVAL;
   }
 
-  if(centralCount<CENTRAL_PENTAGON_TARGET&&centralSpawnTimer<=0){
-    const amount=Math.min(CENTRAL_SPAWN_BATCH,CENTRAL_PENTAGON_TARGET-centralCount);
-    for(let i=0;i<amount;i++)spawnCentralPentagon();
-    centralSpawnTimer=CENTRAL_SPAWN_INTERVAL;
-  }
-
-  // 총 목표가 이미 가득 차도 플레이어가 외곽/구석으로 이동하면 주변 적 밀도를 다시 채운다.
+  // 중앙도 다른 지역과 동일하다.
+  // 플레이어 위치 주변 밀도 보정 외에는 특정 좌표에 별도 스폰을 하지 않는다.
   if(localRebalanceTimer<=0){
     ensureLocalShapeDensity();
     localRebalanceTimer=LOCAL_REBALANCE_INTERVAL;
