@@ -660,3 +660,11 @@
 #lobbyAdminBtn.hidden,
 #lobbyAdminBtn[hidden]{display:none!important}
 #adminScreen[hidden]{display:none!important}
+
+.rarity.divine{background:linear-gradient(135deg,#efffdc,#baff62 45%,#56f1c0);color:#102617;border:1px solid #efffa4}
+.rarity-card-divine{background:linear-gradient(145deg,rgba(20,61,39,.94),rgba(8,27,24,.96));box-shadow:inset 0 0 0 1px rgba(197,255,99,.34)}
+.gacha-rates .divine,.gacha-message.rarity-divine{color:#d7ff78;text-shadow:0 0 10px #75ff9f}
+.cannon-skill-line.fourth{color:#e9ff98;background:rgba(190,255,70,.07)}
+.skill4-button.hidden{display:none}.skill4-button{border-color:rgba(211,255,90,.34);background:rgba(17,33,9,.93)}
+.skill4-button .skill-fill{background:linear-gradient(90deg,#b9ff59,#f2ff7b,#60f2c2)}
+.mini-cannon.cannon-deku{background:#1f7a51;border-color:#a7ff6b}

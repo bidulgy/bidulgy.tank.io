@@ -96,19 +96,19 @@ const CANNONS=Object.freeze({
 
   // 일반 61.5% / 3캐릭터
   rapid:{
-    id:'rapid',name:'기관포',rarity:'common',rarityLabel:'일반',chance:20.5,
+    id:'rapid',name:'기관포',rarity:'common',rarityLabel:'일반',chance:20.499966,
     desc:'작은 탄환을 매우 빠르게 연속 발사합니다.',
     passive:'평타 · 가속 탄띠: 8번째 사격마다 3발 동시 가속탄',
     skill:'Q 오버드라이브 · 2.8초간 자동 초고속 난사'
   },
   dual:{
-    id:'dual',name:'듀얼 캐논',rarity:'common',rarityLabel:'일반',chance:20.5,
+    id:'dual',name:'듀얼 캐논',rarity:'common',rarityLabel:'일반',chance:20.499967,
     desc:'양쪽 포신에서 두 발을 동시에 발사합니다.',
     passive:'평타 · 트윈 링크: 기본 2발, 7번째 사격은 4발',
     skill:'Q 트윈 드론 · 6초간 회전 드론 2기가 자동 사격'
   },
   needle:{
-    id:'needle',name:'니들러',rarity:'common',rarityLabel:'일반',chance:20.5,
+    id:'needle',name:'니들러',rarity:'common',rarityLabel:'일반',chance:20.499967,
     desc:'작고 매우 빠른 침형 탄환을 사용합니다.',
     passive:'평타 · 니들 코어: 6번째 탄이 강화되어 4회 관통',
     skill:'Q 하푼 스파이크 · 820거리 초장침으로 적을 꿰고 자신 쪽으로 강하게 끌어당김'
@@ -265,6 +265,15 @@ const CANNONS=Object.freeze({
     passive:'평타 · ZERO CORE: 강한 관통탄, 4번째 사격은 3중 NULL 탄',
     skill:'Q ZERO LINE · 초장거리 즉발 삭제 광선 + 적 탄환 제거',
     skill2:'R ABSOLUTE ZERO · 4초간 대영역 적/탄환을 거의 정지'
+  },
+  deku:{
+    id:'deku',name:'데쿠',rarity:'divine',rarityLabel:'디바인',chance:.0001,
+    desc:'원 포 올의 여러 능력을 사용하는 초희귀 디바인 탱크입니다.',
+    passive:'평타 · AIR FORCE: 공압탄 · 5번째 평타는 DETROIT AIR SMASH 강화탄',
+    skill:'Q 연막 · 5초 동안 대형 연막 전개 · 상대 화면/미니맵에서 몸체 은폐',
+    skill2:'R 검은 채찍 · 760거리 직선 공격 · 적 플레이어 1.7초 스턴',
+    skill3:'T 발경 · 7초 동안 이동속도 대폭 증가',
+    skill4:'Y 변속 · 7초 동안 공격력/탄속/연사/이동속도 강화'
   }
 });
 window.IronCellCannons=CANNONS;
@@ -481,7 +490,7 @@ function renderCannonGarage(){
       return `<button type="button" class="cannon-card rarity-card-${c.rarity} ${own?'':'locked'} ${eq?'equipped':''}" data-cannon="${c.id}" ${own?'':'disabled'}>
         <div class="cannon-card-head"><strong>${c.name}</strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span></div>
         <small class="cannon-chance">${chance}</small>
-        <p>${own?c.desc:'아직 획득하지 않은 대포입니다.'}</p>${own&&c.passive?`<div class="cannon-passive-line">● ${c.passive}</div>`:''}${own&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}${own&&c.skill2?`<div class="cannon-skill-line second">◆ ${c.skill2}</div>`:''}${own&&c.skill3?`<div class="cannon-skill-line third">✦ ${c.skill3}</div>`:''}
+        <p>${own?c.desc:'아직 획득하지 않은 대포입니다.'}</p>${own&&c.passive?`<div class="cannon-passive-line">● ${c.passive}</div>`:''}${own&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}${own&&c.skill2?`<div class="cannon-skill-line second">◆ ${c.skill2}</div>`:''}${own&&c.skill3?`<div class="cannon-skill-line third">✦ ${c.skill3}</div>`:''}${own&&c.skill4?`<div class="cannon-skill-line fourth">◆ ${c.skill4}</div>`:''}
         <div class="equip-label">${eq?'장착 중':own?'눌러서 장착':'미보유'}</div>
       </button>`;
     }).join('');
@@ -1107,7 +1116,7 @@ function showMenu(){showLobby()}
 
 function pullResultSummary(data){
   const counts=data?.counts||{};
-  const order=['error','nova','ring','rocket','plasma','piercer','spread','rapid'];
+  const order=['deku','error','nova','ring','rocket','plasma','piercer','spread','rapid'];
   const parts=[];
   for(const id of order){
     const n=Number(counts[id]||0);
