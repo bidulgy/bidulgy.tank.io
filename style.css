@@ -668,3 +668,6 @@
 .skill4-button.hidden{display:none}.skill4-button{border-color:rgba(211,255,90,.34);background:rgba(17,33,9,.93)}
 .skill4-button .skill-fill{background:linear-gradient(90deg,#b9ff59,#f2ff7b,#60f2c2)}
 .mini-cannon.cannon-deku{background:#1f7a51;border-color:#a7ff6b}
+
+/* V5.47: DEKU Y SKILL HARD GUARD */
+#skill4Btn[hidden],#skill4Btn.hidden{display:none!important}

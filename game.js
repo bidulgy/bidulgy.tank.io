@@ -974,8 +974,17 @@ function playerParams(){
   if(now<(player.fortressUntil||0)){move*=.70}
   if(now<(player.overclockUntil||0)){move*=1.85}
   if(now<(player.siegeUntil||0)){damage*=1.55;reload*=.48;bulletSpeed*=1.12;move*=.34}
-  if(now<(player.dekuFaJinUntil||0))move*=1.95;
-  if(now<(player.dekuGearshiftUntil||0)){damage*=1.25;bulletSpeed*=1.62;reload*=.44;move*=1.35}
+  if(cannon==='deku'){
+    if(now<(player.dekuFaJinUntil||0))move*=1.95;
+    if(now<(player.dekuGearshiftUntil||0)){damage*=1.25;bulletSpeed*=1.62;reload*=.44;move*=1.35}
+  }else{
+    // V5.47: 캐릭터 변경/상태 잔존으로 스카우트 등에 데쿠 버프가 넘어가는 것을 차단.
+    player.dekuFaJinUntil=0;
+    player.dekuGearshiftUntil=0;
+    player.dekuSmokeUntil=0;
+    player.skill4Cd=0;
+    player.skill4ReadyAt=0;
+  }
   if(now<(player.stunUntil||0))move=0;
 
   return{damage,bulletSpeed,reload:Math.max(.05,reload),move};
@@ -1020,10 +1029,8 @@ function spawnAttackFx(cannon,x,y,angle,remote=false){
   const f=types[cannonFamily(cannon)]||types.standard;
   let fxAngle=normalizeFxAngle(angle);
 
-  // 모든 공격 이펙트는 +X 방향을 실제 발사 방향으로 통일한다.
-  // 로켓만 '후방 배기' 효과라 실제 발사 방향의 반대로 돌려 그린다.
-  if(f[0]==='rocketMuzzle')fxAngle=normalizeFxAngle(fxAngle+Math.PI);
-
+  // V5.47: 예외 없이 +X 방향 = 실제 공격 진행 방향.
+  // 로켓도 사용자가 보는 공격 이펙트 방향을 탄환 방향과 동일하게 맞춘다.
   spawnCombatFx(f[0],x,y,{angle:fxAngle,color:f[1],life:f[2],radius:f[3],cannon});
 }
 function receiveRemoteSkill(payload){
@@ -1032,6 +1039,9 @@ function receiveRemoteSkill(payload){
   const x=safeRemoteNumber(payload.x),y=safeRemoteNumber(payload.y);
   const angle=safeRemoteNumber(payload.angle);
   const slot=Math.floor(safeRemoteNumber(payload.slot,1));
+  const packetTargetX=safeRemoteNumber(payload.targetX,x);
+  const packetTargetY=safeRemoteNumber(payload.targetY,y);
+  const travelAngle=fxAngleToTarget(x,y,packetTargetX,packetTargetY,angle);
 
   const skillType=String(payload.skillType||'');
   if(skillType){
@@ -1057,9 +1067,9 @@ function receiveRemoteSkill(payload){
     }
     const zoneTypes=new Set(['artillery','barrier','rapidOverdrive','twinDrones','burstBomb','crystalPrism','laserSweep','plasmaCage','thunderStorm','flameWall','missileRain','earthFissure','ringGate','timeField','gravity','supernovaCore','cometTrail','constellation','secondStar','starOrbit','absoluteZero','ironDome','siegeAura','ringParry','rewindEcho','antiMatter','cometShower','glitchDriveAura','glitchWarpTrail']);
     if(zoneTypes.has(skillType)){
-      skillZones.push({type:skillType,x:tx,y:ty,radius,life,maxLife:life,damage:0,tick:0,angle:safeRemoteNumber(payload.zoneAngle,angle),length:safeRemoteNumber(payload.length,0),width:safeRemoteNumber(payload.width,0),ownerId:String(payload.ownerId||''),networkRemote:true,pulses:0,interval:.4,data:{}});
+      skillZones.push({type:skillType,x:tx,y:ty,radius,life,maxLife:life,damage:0,tick:0,angle:fxAngleToTarget(x,y,tx,ty,safeRemoteNumber(payload.zoneAngle,angle)),length:safeRemoteNumber(payload.length,0),width:safeRemoteNumber(payload.width,0),ownerId:String(payload.ownerId||''),networkRemote:true,pulses:0,interval:.4,data:{}});
     }else{
-      spawnCombatFx('uniqueSkill',tx,ty,{angle,color:CANNON_SKILLS[cannon]?.color||'#fff',life:.85,radius:Math.max(90,radius),cannon});
+      spawnCombatFx('uniqueSkill',tx,ty,{angle:travelAngle,color:CANNON_SKILLS[cannon]?.color||'#fff',life:.85,radius:Math.max(90,radius),cannon});
     }
     return;
   }
@@ -1071,11 +1081,12 @@ function receiveRemoteSkill(payload){
     const swingDir=safeRemoteNumber(payload.swingDir,0);
 
     if(mode==='basicSwing'){
-      spawnCombatFx('errorSwordSwing',x,y,{angle,color:'#72ff43',life:.38,radius:182,cannon:'error'});
+      spawnCombatFx('errorSwordSwing',x,y,{angle:remote?.targetAngle??remote?.angle??angle,color:'#72ff43',life:.38,radius:182,cannon:'error'});
       if(remote)triggerErrorSwordSwing(remote,1,.34,swingDir);
     }else{
-      spawnCombatFx('errorSwordDash',x,y,{angle,color:'#72ff43',life:.55,radius:Math.hypot(tx-x,ty-y)||360,cannon:'error'});
-      spawnCombatFx('errorSwordSwing',tx,ty,{angle,color:'#72ff43',life:.50,radius:242,cannon:'error'});
+      const dashAngle=fxAngleToTarget(x,y,tx,ty,angle);
+      spawnCombatFx('errorSwordDash',x,y,{angle:dashAngle,color:'#72ff43',life:.55,radius:Math.hypot(tx-x,ty-y)||360,cannon:'error'});
+      spawnCombatFx('errorSwordSwing',tx,ty,{angle:dashAngle,color:'#72ff43',life:.50,radius:242,cannon:'error'});
       if(remote)triggerErrorSwordSwing(remote,1.35,.46,swingDir);
     }
     if(remote)remote.swordMode=payload.swordMode===true;
@@ -1104,11 +1115,12 @@ function receiveRemoteSkill(payload){
     }else if(cannon==='error'){
       if(String(payload.mode||'')==='dash'){
         const tx=safeRemoteNumber(payload.targetX,x),ty=safeRemoteNumber(payload.targetY,y);
-        spawnCombatFx('skill2-error',x,y,{angle,color:def.color,life:.60,radius:92,cannon});
-        spawnCombatFx('skill2-error',tx,ty,{angle,color:def.color,life:.72,radius:108,cannon});
+        const dashAngle=fxAngleToTarget(x,y,tx,ty,angle);
+        spawnCombatFx('skill2-error',x,y,{angle:dashAngle,color:def.color,life:.60,radius:92,cannon});
+        spawnCombatFx('skill2-error',tx,ty,{angle:dashAngle,color:def.color,life:.72,radius:108,cannon});
         for(let i=1;i<=5;i++){
           const k=i/6;
-          spawnCombatFx('errorDashTrace',x+(tx-x)*k,y+(ty-y)*k,{angle,color:def.color,life:.34+i*.025,radius:48,cannon});
+          spawnCombatFx('errorDashTrace',x+(tx-x)*k,y+(ty-y)*k,{angle:dashAngle,color:def.color,life:.34+i*.025,radius:48,cannon});
         }
       }else{
         spawnCombatFx('skill2-error',x,y,{angle,color:def.color,life:1.0,radius:135,cannon});
@@ -1123,7 +1135,7 @@ function receiveRemoteSkill(payload){
   const errorMode=String(payload.mode||'');
   spawnCombatFx(
     cannon==='error'?(errorMode==='sword'?'errorSwordCast':'skill-error'):`skill-${cannon}`,
-    x,y,{angle,color,life:1.15,radius:cannon==='nova'?390:190,cannon}
+    x,y,{angle:travelAngle,color,life:1.15,radius:cannon==='nova'?390:190,cannon}
   );
 }
 function skillProjectile(cannon,angle,opts={}){
@@ -1205,6 +1217,15 @@ function refreshRealTimeSkillCooldowns(){
   }else{player.skill4Cd=0}
 }
 
+function setFourthSkillVisible(visible){
+  if(!ui.skill4Btn)return;
+  const show=visible===true;
+  ui.skill4Btn.hidden=!show;
+  ui.skill4Btn.disabled=!show;
+  ui.skill4Btn.classList.toggle('hidden',!show);
+  if(show)ui.skill4Btn.style.removeProperty('display');
+  else ui.skill4Btn.style.display='none';
+}
 function updateSkillHud(){
   refreshRealTimeSkillCooldowns();
   const cannon=player?.cannonType||'';
@@ -1280,8 +1301,20 @@ function updateSkillHud(){
 
   const showThird=cannon==='error'||cannon==='deku';ui.skill3Btn?.classList.toggle('hidden',!showThird);
   if(showThird){const cd3=Math.max(0,player.skill3Cd||0),ready3=cd3<=.001,def3=cannon==='deku'?DEKU_T_SKILL:ERROR_T_SKILL;if(ui.skill3Name)ui.skill3Name.textContent=cannon==='deku'?'발경':(player.errorSwordMode?'검 모드 ON':'GLITCH BLADE');if(ui.skill3Cooldown)ui.skill3Cooldown.textContent=ready3?(cannon==='deku'?'T · READY':(player.errorSwordMode?'T · 검 모드 해제':'T · 검 모드 전환')):`${cd3.toFixed(1)}s`;if(ui.skill3Fill)ui.skill3Fill.style.width=`${clamp((1-cd3/def3.cooldown)*100,0,100)}%`;if(ui.skill3Btn){ui.skill3Btn.disabled=!ready3;ui.skill3Btn.className=`skill-button skill3-button cannon-${cannon} ${cannon==='error'&&player.errorSwordMode?'sword-on ':''}${ready3?'ready':'cooling'}`}}
-  const showFourth=cannon==='deku';ui.skill4Btn?.classList.toggle('hidden',!showFourth);
-  if(showFourth){const cd4=Math.max(0,player.skill4Cd||0),ready4=cd4<=.001;if(ui.skill4Name)ui.skill4Name.textContent='변속';if(ui.skill4Cooldown)ui.skill4Cooldown.textContent=ready4?'Y · READY':`${cd4.toFixed(1)}s`;if(ui.skill4Fill)ui.skill4Fill.style.width=`${clamp((1-cd4/DEKU_Y_SKILL.cooldown)*100,0,100)}%`;if(ui.skill4Btn){ui.skill4Btn.disabled=!ready4;ui.skill4Btn.className=`skill-button skill4-button cannon-deku ${ready4?'ready':'cooling'}`}}
+  const showFourth=cannon==='deku';setFourthSkillVisible(showFourth);
+  if(showFourth){
+    const cd4=Math.max(0,player.skill4Cd||0),ready4=cd4<=.001;
+    if(ui.skill4Name)ui.skill4Name.textContent='변속';
+    if(ui.skill4Cooldown)ui.skill4Cooldown.textContent=ready4?'Y · READY':`${cd4.toFixed(1)}s`;
+    if(ui.skill4Fill)ui.skill4Fill.style.width=`${clamp((1-cd4/DEKU_Y_SKILL.cooldown)*100,0,100)}%`;
+    if(ui.skill4Btn){ui.skill4Btn.disabled=!ready4;ui.skill4Btn.className=`skill-button skill4-button cannon-deku ${ready4?'ready':'cooling'}`;ui.skill4Btn.hidden=false;ui.skill4Btn.style.removeProperty('display')}
+  }else{
+    player.dekuGearshiftUntil=0;player.skill4Cd=0;player.skill4ReadyAt=0;
+    if(ui.skill4Name)ui.skill4Name.textContent='';
+    if(ui.skill4Cooldown)ui.skill4Cooldown.textContent='';
+    if(ui.skill4Fill)ui.skill4Fill.style.width='0%';
+    setFourthSkillVisible(false);
+  }
 }
 
 function angleDifference(a,b){
@@ -1391,10 +1424,10 @@ function activateSkill3(){
   const ty=clamp(oy+Math.sin(a)*distance,player.r+10,WORLD-player.r-10);
   player.phaseUntil=now+420;
 
-  spawnCombatFx('errorSwordDash',ox,oy,{angle:a,color:'#72ff43',life:.55,radius:distance,cannon:'error'});
+  spawnCombatFx('errorSwordDash',ox,oy,{angle:fxAngleToTarget(ox,oy,tx,ty,a),color:'#72ff43',life:.55,radius:Math.hypot(tx-ox,ty-oy),cannon:'error'});
   for(let k=1;k<=5;k++){
     const t=k/6;
-    spawnCombatFx('errorDashTrace',ox+(tx-ox)*t,oy+(ty-oy)*t,{angle:a,color:'#72ff43',life:.30+k*.025,radius:45,cannon:'error'});
+    spawnCombatFx('errorDashTrace',ox+(tx-ox)*t,oy+(ty-oy)*t,{angle:fxAngleToTarget(ox,oy,tx,ty,a),color:'#72ff43',life:.30+k*.025,radius:45,cannon:'error'});
   }
 
   player.x=tx;player.y=ty;player.vx=Math.cos(a)*150;player.vy=Math.sin(a)*150;
@@ -1429,6 +1462,7 @@ function skillSlotReady(slot){
   if(!running||paused||!player?.alive)return false;
   refreshRealTimeSkillCooldowns();
   const cannon=player.cannonType||'standard';
+  if(slot===4&&cannon!=='deku')return false;
   if(slot===1){if(cannon==='phantom'&&phantomMarkCanReturn())return true;return !!CANNON_SKILLS[cannon]&&(player.skillCd||0)<=.001;}
   if(slot===2){
     if(!CANNON_SKILLS_2[cannon])return false;
@@ -1828,7 +1862,7 @@ function activateSkill2(){
   refreshRealTimeSkillCooldowns();const now=performance.now(),wallNow=Date.now(),a=player.angle,p=playerParams();
 
   if(cannon==='error'&&now<(player.overclockUntil||0)){
-    if(wallNow<(player.errorDashReadyAt||0))return;const ox=player.x,oy=player.y,[tx,ty]=skillAimPoint(460);player.errorDashReadyAt=wallNow+3000;player.phaseUntil=now+380;player.x=tx;player.y=ty;spawnCombatFx('errorDashTrace',ox,oy,{angle:a,color:def.color,life:.5,radius:460,cannon});sendOnline('skill',{slot:2,mode:'dash',ownerId:onlineSelfId,cannon,x:ox,y:oy,targetX:tx,targetY:ty,angle:a});broadcastLocalState(true);updateSkillHud();return;
+    if(wallNow<(player.errorDashReadyAt||0))return;const ox=player.x,oy=player.y,[tx,ty]=skillAimPoint(460);player.errorDashReadyAt=wallNow+3000;player.phaseUntil=now+380;player.x=tx;player.y=ty;spawnCombatFx('errorDashTrace',ox,oy,{angle:fxAngleToTarget(ox,oy,tx,ty,a),color:def.color,life:.5,radius:Math.hypot(tx-ox,ty-oy),cannon});sendOnline('skill',{slot:2,mode:'dash',ownerId:onlineSelfId,cannon,x:ox,y:oy,targetX:tx,targetY:ty,angle:a});broadcastLocalState(true);updateSkillHud();return;
   }
   if(player.skill2Cd>0)return;player.skill2Cd=def.cooldown;player.skill2Max=def.cooldown;player.skill2ReadyAt=wallNow+def.cooldown*1000;
 
@@ -1901,7 +1935,7 @@ function activateSkill2(){
     player.x=tx;player.y=ty;player.phaseUntil=now+520;player.vx=0;player.vy=0;
     addSkillZone('glitchWarpTrail',{x:ox,y:oy,angle:aa,length,width:96,radius:length/2,life:1.8,damage:p.damage*1.75,pulses:6,interval:.17,data:{next:.18,index:0}});
     sendOnline('skill',{ownerId:onlineSelfId,cannon,x:ox,y:oy,angle:aa,skillType:'glitchWarpTrail',targetX:ox,targetY:oy,zoneAngle:aa,length,width:96,radius:length/2,life:1.8});
-    spawnCombatFx('dataWarp',ox,oy,{angle:aa,color:def.color,life:.72,radius:length,cannon});
+    spawnCombatFx('dataWarp',ox,oy,{angle:fxAngleToTarget(ox,oy,tx,ty,aa),color:def.color,life:.72,radius:Math.hypot(tx-ox,ty-oy),cannon});
     broadcastLocalState(true);
 
   }else if(cannon==='zero'){
@@ -1910,7 +1944,7 @@ function activateSkill2(){
     const length=760,width=34,x2=player.x+Math.cos(a)*length,y2=player.y+Math.sin(a)*length;damageSkillLine(player.x,player.y,a,length,width,p.damage*2.25,'#9dff73',55);
     for(const s of shapes){const h=pointToLineInfo(s.x,s.y,player.x,player.y,x2,y2);if(h.d2<=(width+s.r)*(width+s.r)){s.stunUntil=now+1700;s.vx=0;s.vy=0}}
     for(const enemy of remotePlayers.values()){if(!enemy.alive)continue;const h=pointToLineInfo(enemy.x,enemy.y,player.x,player.y,x2,y2);if(h.d2<=(width+enemy.r)*(width+enemy.r))sendStatus(enemy.id,'stun',1700)}
-    spawnCombatFx('dekuBlackwhip',player.x,player.y,{angle:a,color:'#9dff73',life:.75,radius:length,cannon:'deku'});sendUniqueSkill(cannon,'dekuBlackwhip',{targetX:x2,targetY:y2,zoneAngle:a,length,width,radius:width,life:.75});
+    spawnCombatFx('dekuBlackwhip',player.x,player.y,{angle:fxAngleToTarget(player.x,player.y,x2,y2,a),color:'#9dff73',life:.75,radius:Math.hypot(x2-player.x,y2-player.y),cannon:'deku'});sendUniqueSkill(cannon,'dekuBlackwhip',{targetX:x2,targetY:y2,zoneAngle:a,length,width,radius:width,life:.75});
   }
   updateSkillHud();
 }
@@ -3990,6 +4024,7 @@ function drawSkillAimGuide(){
 }
 function drawAimGuides(){drawBasicAimGuide();drawSkillAimGuide();}
 function update(dt){
+  if(heldSkillAim.active&&heldSkillAim.slot===4&&player?.cannonType!=='deku')cancelHeldSkillAim();
   updatePlayer(dt);
   updateRemotePlayers(dt);
   updateShapes(dt);
