@@ -156,7 +156,7 @@ const TANK_THEMES=Object.freeze({
 });
 
 const statsDef=[['maxHealth','최대 체력'],['regen','체력 회복'],['bulletDamage','탄환 피해'],['bulletSpeed','탄환 속도'],['reload','연사 속도'],['moveSpeed','이동 속도']];
-function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,skill4Cd:0,skill4Max:0,skill4ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,siegeUntil:0,stellarReviveUntil:0,stellarReviveReady:false,phantomMarkActive:false,phantomMarkUntil:0,phantomMarkOriginX:0,phantomMarkOriginY:0,phantomMarkDestX:0,phantomMarkDestY:0,cloakUntil:0,dekuSmokeUntil:0,dekuFaJinUntil:0,dekuGearshiftUntil:0,stunUntil:0,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
+function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,skill4Cd:0,skill4Max:0,skill4ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,siegeUntil:0,stellarReviveUntil:0,stellarReviveReady:false,phantomMarkActive:false,phantomMarkUntil:0,phantomMarkOriginX:0,phantomMarkOriginY:0,phantomMarkDestX:0,phantomMarkDestY:0,cloakUntil:0,dekuSmokeUntil:0,dekuFaJinUntil:0,dekuGearshiftUntil:0,dekuWhipChainRemaining:0,dekuWhipChainUntil:0,stunUntil:0,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
 function resize(){
   const mobileLike=innerWidth<900||matchMedia('(pointer:coarse)').matches;
   const dpr=Math.min(mobileLike?1.25:1.5,devicePixelRatio||1);
@@ -645,7 +645,11 @@ function addRemoteShot(payload){
   const age=clamp((Date.now()-sentAt)/1000,0,.45);
   const startX=safeRemoteNumber(payload.x),startY=safeRemoteNumber(payload.y);
   const shotAngle=fxAngleFromVector(vx,vy,safeRemoteNumber(payload.angle,0));
-  spawnAttackFx(String(payload.cannon||'standard'),startX,startY,shotAngle,true);
+  const remoteCannon=String(payload.cannon||'standard');
+  spawnAttackFx(remoteCannon,startX,startY,shotAngle,true);
+  if(remoteCannon==='deku'&&String(payload.special||'').startsWith('faJin')){
+    spawnCombatFx('dekuFaJinAttack',startX,startY,{angle:shotAngle,color:'#69f5ee',life:.38,radius:String(payload.special||'').includes('Detroit')?105:76,cannon:'deku',variant:'faJin'});
+  }
   if(bullets.length>=MAX_BULLETS){
     const drop=bullets.findIndex(v=>v.networkRemote===true);
     if(drop>=0)bullets.splice(drop,1);
@@ -982,6 +986,8 @@ function playerParams(){
     player.dekuFaJinUntil=0;
     player.dekuGearshiftUntil=0;
     player.dekuSmokeUntil=0;
+    player.dekuWhipChainRemaining=0;
+    player.dekuWhipChainUntil=0;
     player.skill4Cd=0;
     player.skill4ReadyAt=0;
   }
@@ -1011,7 +1017,7 @@ function spawnCombatFx(type,x,y,opts={}){
     type,x,y,angle:normalizeFxAngle(opts.angle),color:opts.color||'#fff',
     life:opts.life||.35,maxLife:opts.life||.35,
     radius:opts.radius||38,size:opts.size||1,
-    ownerId:opts.ownerId||'',cannon:opts.cannon||''
+    ownerId:opts.ownerId||'',cannon:opts.cannon||'',variant:opts.variant||''
   });
 }
 function spawnAttackFx(cannon,x,y,angle,remote=false){
@@ -1024,7 +1030,8 @@ function spawnAttackFx(cannon,x,y,angle,remote=false){
     rocket:['rocketMuzzle','#ff9b4a',.35,48],
     ring:['ringMuzzle','#c6a3ff',.28,42],
     nova:['novaMuzzle','#75efff',.34,52],
-    error:['errorMuzzle','#76ff43',.32,55]
+    error:['errorMuzzle','#76ff43',.32,55],
+    deku:['dekuMuzzle','#baff70',.24,58]
   };
   const f=types[cannonFamily(cannon)]||types.standard;
   let fxAngle=normalizeFxAngle(angle);
@@ -1050,7 +1057,18 @@ function receiveRemoteSkill(payload){
     const life=Math.max(.2,safeRemoteNumber(payload.life,2));
     if(cannon==='deku'){
       if(skillType==='dekuSmoke'){skillZones.push({type:'dekuSmoke',x:tx,y:ty,radius,life,maxLife:life,damage:0,tick:0,angle:0,length:0,width:0,ownerId:String(payload.ownerId||''),networkRemote:true,pulses:0,interval:.4,data:{}});return}
-      if(skillType==='dekuBlackwhip'){spawnCombatFx('dekuBlackwhip',x,y,{angle:fxAngleToTarget(x,y,tx,ty,safeRemoteNumber(payload.zoneAngle,angle)),color:'#9dff73',life:.75,radius:safeRemoteNumber(payload.length,760),cannon:'deku'});return}
+      if(skillType==='dekuBlackwhip'){
+        const whipAngle=fxAngleToTarget(x,y,tx,ty,safeRemoteNumber(payload.zoneAngle,angle));
+        spawnCombatFx('dekuBlackwhip',x,y,{angle:whipAngle,color:'#52e7ea',life:1.25,radius:safeRemoteNumber(payload.length,760),cannon:'deku',variant:payload.faJinBoost===true?'faJin':''});
+        if(payload.recoilDash===true){
+          const dashX=safeRemoteNumber(payload.dashX,x),dashY=safeRemoteNumber(payload.dashY,y),dashLength=Math.hypot(dashX-x,dashY-y);
+          spawnCombatFx('dekuWhipElasticDash',x,y,{angle:fxAngleToTarget(x,y,dashX,dashY,whipAngle),color:'#5cf6e8',life:.52,radius:dashLength,cannon:'deku',variant:payload.faJinBoost===true?'faJin':''});
+          const remote=remotePlayers.get(String(payload.ownerId||''));if(remote){remote.x=remote.tx=dashX;remote.y=remote.ty=dashY}
+        }
+        return
+      }
+      if(skillType==='dekuFaJin'){spawnCombatFx('dekuFaJin',x,y,{angle,color:'#baff70',life:1.35,radius:185,cannon:'deku'});return}
+      if(skillType==='dekuGearshift'){spawnCombatFx('dekuGearshift',x,y,{angle,color:'#80efff',life:1.55,radius:220,cannon:'deku'});return}
     }
     if(cannon==='phantom'&&skillType==='phantomMarks'){
       const ox=safeRemoteNumber(payload.originX,x),oy=safeRemoteNumber(payload.originY,y),dx=safeRemoteNumber(payload.destX,tx),dy=safeRemoteNumber(payload.destY,ty),ownerId=String(payload.ownerId||'');
@@ -1192,6 +1210,11 @@ function skillAreaDamage(x,y,radius,damage,color){
 function refreshRealTimeSkillCooldowns(){
   if(!player)return;
   const now=Date.now();
+  const perfNow=performance.now();
+  if((player.dekuWhipChainUntil||0)>0&&perfNow>=(player.dekuWhipChainUntil||0)){
+    player.dekuWhipChainRemaining=0;
+    player.dekuWhipChainUntil=0;
+  }
 
   if(player.skillReadyAt){
     player.skillCd=Math.max(0,(player.skillReadyAt-now)/1000);
@@ -1288,10 +1311,15 @@ function updateSkillHud(){
     }else{
       const cd2=Math.max(0,player.skill2Cd||0);
       const max2=Math.max(.01,player.skill2Max||def2.cooldown);
-      const ready2=cd2<=.001;
-      if(ui.skill2Name)ui.skill2Name.textContent=def2.name;
-      if(ui.skill2Cooldown)ui.skill2Cooldown.textContent=ready2?'READY':`${cd2.toFixed(1)}s`;
-      if(ui.skill2Fill)ui.skill2Fill.style.width=`${clamp((1-cd2/max2)*100,0,100)}%`;
+      const whipChainActive=cannon==='deku'&&(player.dekuWhipChainRemaining||0)>0&&nowPerf<(player.dekuWhipChainUntil||0);
+      const ready2=cd2<=.001||whipChainActive;
+      if(ui.skill2Name)ui.skill2Name.textContent=cannon==='deku'?'검은 채찍':def2.name;
+      if(ui.skill2Cooldown){
+        ui.skill2Cooldown.textContent=whipChainActive
+          ? `연속 ${player.dekuWhipChainRemaining}회 · READY`
+          : (ready2?'READY':`${cd2.toFixed(1)}s`);
+      }
+      if(ui.skill2Fill)ui.skill2Fill.style.width=whipChainActive?'100%':`${clamp((1-cd2/max2)*100,0,100)}%`;
       if(ui.skill2Btn){
         ui.skill2Btn.disabled=!ready2;
         ui.skill2Btn.className=`skill-button skill2-button cannon-${cannon} ${ready2?'ready':'cooling'}`;
@@ -1411,7 +1439,7 @@ function spawnErrorSwordWave(angle,damageMul=1,opts={}){
 function activateSkill3(){
   if(!running||paused||!player?.alive)return;const cannon=player.cannonType||'standard';if(cannon!=='error'&&cannon!=='deku')return;
   refreshRealTimeSkillCooldowns();if(player.skill3Cd>0)return;const now=performance.now(),wallNow=Date.now(),a=player.angle,p=playerParams();
-  if(cannon==='deku'){player.skill3Cd=DEKU_T_SKILL.cooldown;player.skill3Max=DEKU_T_SKILL.cooldown;player.skill3ReadyAt=wallNow+DEKU_T_SKILL.cooldown*1000;player.dekuFaJinUntil=now+7000;player.vx+=Math.cos(a)*150;player.vy+=Math.sin(a)*150;spawnCombatFx('dekuFaJin',player.x,player.y,{angle:a,color:'#baff70',life:1,radius:130,cannon:'deku'});burst(player.x,player.y,'#baff70',16);broadcastLocalState(true);updateSkillHud();return}
+  if(cannon==='deku'){player.skill3Cd=DEKU_T_SKILL.cooldown;player.skill3Max=DEKU_T_SKILL.cooldown;player.skill3ReadyAt=wallNow+DEKU_T_SKILL.cooldown*1000;player.dekuFaJinUntil=now+7000;player.vx+=Math.cos(a)*190;player.vy+=Math.sin(a)*190;spawnCombatFx('dekuFaJin',player.x,player.y,{angle:a,color:'#baff70',life:1.35,radius:185,cannon:'deku'});burst(player.x,player.y,'#baff70',28);sendUniqueSkill(cannon,'dekuFaJin',{radius:185,life:1.35});broadcastLocalState(true);updateSkillHud();return}
   if(player.errorQCharging)cancelErrorQCharge();const ox=player.x,oy=player.y;
   player.skill3Cd=ERROR_T_SKILL.cooldown;
   player.skill3Max=ERROR_T_SKILL.cooldown;
@@ -1454,7 +1482,7 @@ function activateSkill3(){
 function activateSkill4(){
   if(!running||paused||!player?.alive||player.cannonType!=='deku')return;refreshRealTimeSkillCooldowns();if(player.skill4Cd>0)return;
   const now=performance.now(),wallNow=Date.now();player.skill4Cd=DEKU_Y_SKILL.cooldown;player.skill4Max=DEKU_Y_SKILL.cooldown;player.skill4ReadyAt=wallNow+DEKU_Y_SKILL.cooldown*1000;player.dekuGearshiftUntil=now+7000;
-  spawnCombatFx('dekuGearshift',player.x,player.y,{angle:player.angle,color:'#e7ff76',life:1.2,radius:165,cannon:'deku'});burst(player.x,player.y,'#e7ff76',20);broadcastLocalState(true);updateSkillHud();
+  spawnCombatFx('dekuGearshift',player.x,player.y,{angle:player.angle,color:'#80efff',life:1.55,radius:220,cannon:'deku'});burst(player.x,player.y,'#bffcff',32);sendUniqueSkill('deku','dekuGearshift',{radius:220,life:1.55});broadcastLocalState(true);updateSkillHud();
 }
 
 
@@ -1467,6 +1495,7 @@ function skillSlotReady(slot){
   if(slot===2){
     if(!CANNON_SKILLS_2[cannon])return false;
     if(cannon==='error'&&performance.now()<(player.overclockUntil||0))return Date.now()>=(player.errorDashReadyAt||0);
+    if(cannon==='deku'&&(player.dekuWhipChainRemaining||0)>0&&performance.now()<(player.dekuWhipChainUntil||0))return true;
     return (player.skill2Cd||0)<=.001;
   }
   if(slot===3)return (cannon==='error'||cannon==='deku')&&(player.skill3Cd||0)<=.001;
@@ -1864,7 +1893,9 @@ function activateSkill2(){
   if(cannon==='error'&&now<(player.overclockUntil||0)){
     if(wallNow<(player.errorDashReadyAt||0))return;const ox=player.x,oy=player.y,[tx,ty]=skillAimPoint(460);player.errorDashReadyAt=wallNow+3000;player.phaseUntil=now+380;player.x=tx;player.y=ty;spawnCombatFx('errorDashTrace',ox,oy,{angle:fxAngleToTarget(ox,oy,tx,ty,a),color:def.color,life:.5,radius:Math.hypot(tx-ox,ty-oy),cannon});sendOnline('skill',{slot:2,mode:'dash',ownerId:onlineSelfId,cannon,x:ox,y:oy,targetX:tx,targetY:ty,angle:a});broadcastLocalState(true);updateSkillHud();return;
   }
-  if(player.skill2Cd>0)return;player.skill2Cd=def.cooldown;player.skill2Max=def.cooldown;player.skill2ReadyAt=wallNow+def.cooldown*1000;
+  const dekuWhipChainCast=cannon==='deku'&&(player.dekuWhipChainRemaining||0)>0&&now<(player.dekuWhipChainUntil||0);
+  if(player.skill2Cd>0&&!dekuWhipChainCast)return;
+  if(!dekuWhipChainCast){player.skill2Cd=def.cooldown;player.skill2Max=def.cooldown;player.skill2ReadyAt=wallNow+def.cooldown*1000}
 
   if(cannon==='rocket'){
     player.fortressUntil=now+6000;
@@ -1941,10 +1972,52 @@ function activateSkill2(){
   }else if(cannon==='zero'){
     addSkillZone('absoluteZero',{x:player.x,y:player.y,radius:560,life:4.3,damage:p.damage*.16,tick:0});sendUniqueSkill(cannon,'absoluteZero',{targetX:player.x,targetY:player.y,radius:560,life:4.3});
   }else if(cannon==='deku'){
-    const length=760,width=34,x2=player.x+Math.cos(a)*length,y2=player.y+Math.sin(a)*length;damageSkillLine(player.x,player.y,a,length,width,p.damage*2.25,'#9dff73',55);
-    for(const s of shapes){const h=pointToLineInfo(s.x,s.y,player.x,player.y,x2,y2);if(h.d2<=(width+s.r)*(width+s.r)){s.stunUntil=now+1700;s.vx=0;s.vy=0}}
-    for(const enemy of remotePlayers.values()){if(!enemy.alive)continue;const h=pointToLineInfo(enemy.x,enemy.y,player.x,player.y,x2,y2);if(h.d2<=(width+enemy.r)*(width+enemy.r))sendStatus(enemy.id,'stun',1700)}
-    spawnCombatFx('dekuBlackwhip',player.x,player.y,{angle:fxAngleToTarget(player.x,player.y,x2,y2,a),color:'#9dff73',life:.75,radius:Math.hypot(x2-player.x,y2-player.y),cannon:'deku'});sendUniqueSkill(cannon,'dekuBlackwhip',{targetX:x2,targetY:y2,zoneAngle:a,length,width,radius:width,life:.75});
+    const faJinBoost=now<(player.dekuFaJinUntil||0);
+    const ox=player.x,oy=player.y;
+    const length=760,width=faJinBoost?46:38,x2=ox+Math.cos(a)*length,y2=oy+Math.sin(a)*length;
+    damageSkillLine(ox,oy,a,length,width,p.damage*2.25,faJinBoost?'#65f4ee':'#52e7ea',55);
+    for(const s of shapes){const h=pointToLineInfo(s.x,s.y,ox,oy,x2,y2);if(h.d2<=(width+s.r)*(width+s.r)){s.stunUntil=now+1700;s.vx=0;s.vy=0}}
+
+    // V5.51: Blackwhip only breaks its combo when it actually catches another player.
+    let hitPlayer=false;
+    for(const enemy of remotePlayers.values()){
+      if(!enemy.alive)continue;
+      const h=pointToLineInfo(enemy.x,enemy.y,ox,oy,x2,y2);
+      if(h.d2>(width+enemy.r)*(width+enemy.r))continue;
+      hitPlayer=true;
+      sendStatus(enemy.id,'stun',1700);
+    }
+
+    spawnCombatFx('dekuBlackwhip',ox,oy,{angle:fxAngleToTarget(ox,oy,x2,y2,a),color:'#52e7ea',life:1.25,radius:Math.hypot(x2-ox,y2-oy),cannon:'deku',variant:faJinBoost?'faJin':''});
+    if(faJinBoost)spawnCombatFx('dekuFaJinAttack',ox,oy,{angle:a,color:'#69f5ee',life:.48,radius:135,cannon:'deku',variant:'blackwhip'});
+
+    let recoilDash=false,dashX=ox,dashY=oy;
+    if(hitPlayer){
+      player.dekuWhipChainRemaining=0;
+      player.dekuWhipChainUntil=0;
+    }else{
+      // First miss opens two extra casts; every later miss consumes one, for 3 casts total.
+      const remainingAfter=dekuWhipChainCast?Math.max(0,(player.dekuWhipChainRemaining||0)-1):2;
+      player.dekuWhipChainRemaining=remainingAfter;
+      player.dekuWhipChainUntil=remainingAfter>0?now+2200:0;
+
+      // The unstuck whip snaps Deku forward like an elastic slingshot rather than a plain teleport.
+      const dashDistance=faJinBoost?330:270;
+      dashX=clamp(ox+Math.cos(a)*dashDistance,player.r+10,WORLD-player.r-10);
+      dashY=clamp(oy+Math.sin(a)*dashDistance,player.r+10,WORLD-player.r-10);
+      const actualDash=Math.hypot(dashX-ox,dashY-oy);
+      if(actualDash>4){
+        recoilDash=true;
+        player.phaseUntil=now+300;
+        player.x=dashX;player.y=dashY;
+        player.vx=Math.cos(a)*p.move*.92;player.vy=Math.sin(a)*p.move*.92;
+        spawnCombatFx('dekuWhipElasticDash',ox,oy,{angle:a,color:'#5cf6e8',life:.52,radius:actualDash,cannon:'deku',variant:faJinBoost?'faJin':''});
+        burst(ox,oy,faJinBoost?'#a5ff72':'#63f5e9',faJinBoost?22:15);
+        broadcastLocalState(true);
+      }
+    }
+
+    sendUniqueSkill(cannon,'dekuBlackwhip',{x:ox,y:oy,targetX:x2,targetY:y2,zoneAngle:a,length,width,radius:width,life:1.25,faJinBoost,hitPlayer,recoilDash,dashX,dashY,chainRemaining:player.dekuWhipChainRemaining||0});
   }
   updateSkillHud();
 }
@@ -2160,7 +2233,9 @@ function fire(e){
     shots=shotNo%4===0
       ?[{angle:a-.055,side:-5,curve:0,damageMul:.62,special:'zeroEcho'},{angle:a,side:0,curve:0,damageMul:1.20,special:'zeroCore'},{angle:a+.055,side:5,curve:0,damageMul:.62,special:'zeroEcho'}]
       :[{angle:a,side:0,curve:0,damageMul:1,special:'zeroStraight'}];  }else if(cannon==='deku'){
-    shots=[{angle:a,side:0,curve:0,damageMul:shotNo%5===0?2.40:1,special:shotNo%5===0?'detroitAirSmash':'airForce'}];
+    const faJinBoost=performance.now()<(e.dekuFaJinUntil||0);
+    const smash=shotNo%5===0;
+    shots=[{angle:a,side:0,curve:0,damageMul:smash?2.40:1,special:faJinBoost?(smash?'faJinDetroitAirSmash':'faJinAirForce'):(smash?'detroitAirSmash':'airForce')}];
   }
 
   for(let shotIndex=0;shotIndex<shots.length;shotIndex++){
@@ -2208,9 +2283,10 @@ function fire(e){
     }
     else if(cannon==='glitch'){b.r=8;b.life=2.15;b.pierce=14}
     else if(cannon==='zero'){b.r=shot.special==='zeroCore'?13:10;b.life=2.5;b.pierce=shot.special==='zeroCore'?26:20;if(shot.special==='zeroCore'){b.vx*=1.12;b.vy*=1.12}}
-    else if(cannon==='deku'){b.r=shot.special==='detroitAirSmash'?12:7;b.life=1.75;b.pierce=shot.special==='detroitAirSmash'?8:3;b.splashRadius=shot.special==='detroitAirSmash'?95:28;if(shot.special==='detroitAirSmash'){b.vx*=1.18;b.vy*=1.18}}
+    else if(cannon==='deku'){const smash=String(shot.special||'').includes('DetroitAirSmash')||shot.special==='detroitAirSmash';b.r=smash?12:7;b.life=1.75;b.pierce=smash?8:3;b.splashRadius=smash?95:28;if(smash){b.vx*=1.18;b.vy*=1.18}}
 
     if(bullets.length>=MAX_BULLETS)bullets.shift();bullets.push(b);broadcastShot(b);spawnAttackFx(cannon,b.x,b.y,fxAngleFromVector(b.vx,b.vy,sa));
+    if(cannon==='deku'&&String(b.special||'').startsWith('faJin'))spawnCombatFx('dekuFaJinAttack',b.x,b.y,{angle:fxAngleFromVector(b.vx,b.vy,sa),color:'#69f5ee',life:.38,radius:String(b.special||'').includes('Detroit')?105:76,cannon:'deku',variant:'faJin'});
   }
 
   const recoil={
@@ -3285,6 +3361,18 @@ function drawTank(e){
     ctx.strokeRect(-r-6+Math.cos(t*17)*4,-r-11,(r+8)*2,(r+10)*2);
   }
 
+  const dekuFaJinActive=cannon==='deku'&&(isP?performance.now()<(e.dekuFaJinUntil||0):e.dekuFaJin===true);
+  const dekuGearshiftActive=cannon==='deku'&&(isP?performance.now()<(e.dekuGearshiftUntil||0):e.dekuGearshift===true);
+  if(dekuFaJinActive){
+    ctx.save();ctx.rotate(-e.angle);ctx.shadowColor='#8cff68';ctx.shadowBlur=24;ctx.strokeStyle='rgba(171,255,119,.98)';ctx.lineWidth=3.8;ctx.globalAlpha=.96;
+    for(let k=0;k<7;k++){const aa=k*TAU/7+t*2.5,rr1=r+7+(k%2)*4,rr2=r+23+7*Math.sin(t*7+k);ctx.beginPath();ctx.moveTo(Math.cos(aa)*rr1,Math.sin(aa)*rr1);ctx.lineTo(Math.cos(aa+.16)*((rr1+rr2)*.55),Math.sin(aa+.16)*((rr1+rr2)*.55));ctx.lineTo(Math.cos(aa-.04)*rr2,Math.sin(aa-.04)*rr2);ctx.stroke()}ctx.shadowBlur=0;ctx.restore();
+  }
+  if(dekuGearshiftActive){
+    ctx.save();ctx.shadowColor='#77edff';ctx.shadowBlur=22;ctx.strokeStyle='rgba(174,250,255,.96)';ctx.lineWidth=3.4;ctx.globalAlpha=.96;
+    for(let k=-3;k<=3;k++){const yy=k*9+Math.sin(t*13+k)*3;ctx.beginPath();ctx.moveTo(-r-50-Math.abs(k)*8,yy);ctx.lineTo(-r-9,yy*.55);ctx.stroke()}
+    ctx.strokeStyle='rgba(205,255,255,.74)';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,0,r+15+Math.sin(t*10)*3,(r+15)*.45,t*1.8,0,TAU);ctx.stroke();ctx.shadowBlur=0;ctx.restore();
+  }
+
   // ERROR 검 모드에서는 포신 대신 ERROR 검을 든다.
   if(swordModeActive)drawErrorSword(e,r,t);else drawPlayerCannon(cannon,r);
 
@@ -3403,7 +3491,24 @@ function drawSkillZones(){
     }else if(z.type==='glitchWarpTrail'){
       ctx.rotate(z.angle);ctx.strokeStyle='#ff42df';ctx.lineWidth=5;ctx.setLineDash([18,8]);ctx.beginPath();ctx.moveTo(0,-7);ctx.lineTo(z.length,7);ctx.stroke();ctx.strokeStyle='#42eaff';ctx.beginPath();ctx.moveTo(0,7);ctx.lineTo(z.length,-7);ctx.stroke();ctx.setLineDash([]);
     }else if(z.type==='dekuSmoke'){
-      ctx.fillStyle='rgba(150,170,158,.16)';ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.fill();ctx.strokeStyle='rgba(205,220,210,.28)';ctx.lineWidth=2;ctx.setLineDash([12,10]);ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.stroke();ctx.setLineDash([]);
+      // Deku Smokescreen: layered, rolling grey-white smoke instead of a flat circle.
+      const smokeCount=renderPressure>=2?7:renderPressure>=1?10:15;
+      const breathe=.94+.06*Math.sin(t*1.7+z.x*.002);
+      ctx.globalAlpha*=.94;
+      ctx.fillStyle='rgba(75,88,82,.30)';ctx.beginPath();ctx.arc(0,0,z.radius*breathe,0,TAU);ctx.fill();
+      for(let k=0;k<smokeCount;k++){
+        const seed=k*2.399+z.x*.0007+z.y*.0011;
+        const aa=seed+t*(k%2?-.075:.065);
+        const rr=z.radius*(.12+.72*((k*37)%smokeCount)/Math.max(1,smokeCount-1));
+        const drift=Math.sin(t*.8+seed)*z.radius*.055;
+        const bx=Math.cos(aa)*rr+Math.cos(seed*1.7)*drift;
+        const by=Math.sin(aa)*rr*.78+Math.sin(seed*1.3)*drift;
+        const br=z.radius*(.16+.08*(.5+.5*Math.sin(seed*3.1)))*(1+.10*Math.sin(t*1.4+seed));
+        const g=ctx.createRadialGradient(bx-br*.22,by-br*.20,br*.08,bx,by,br);
+        g.addColorStop(0,'rgba(242,248,243,.48)');g.addColorStop(.46,'rgba(184,198,189,.38)');g.addColorStop(1,'rgba(92,106,98,0)');
+        ctx.fillStyle=g;ctx.beginPath();ctx.arc(bx,by,br,0,TAU);ctx.fill();
+      }
+      ctx.strokeStyle='rgba(221,232,225,.34)';ctx.lineWidth=2.2;ctx.setLineDash([18,13]);ctx.beginPath();ctx.arc(0,0,z.radius*(.96+.025*Math.sin(t*2)),0,TAU);ctx.stroke();ctx.setLineDash([]);
     }else if(z.type==='artillery'){
       ctx.strokeStyle='#8ed6ff';ctx.lineWidth=3;ctx.setLineDash([10,8]);ctx.beginPath();ctx.arc(0,0,z.radius*(.82+.18*q),0,TAU);ctx.stroke();ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(-25,0);ctx.lineTo(25,0);ctx.moveTo(0,-25);ctx.lineTo(0,25);ctx.stroke();
     }else if(z.type==='barrier'){
@@ -3450,9 +3555,12 @@ function drawSkillZones(){
     ctx.restore();
   }
 }
-function drawCombatEffects(){
+function drawCombatEffects(layer='base'){
   const t=performance.now()*.001;
   for(const f of combatFx){
+    const isDekuFx=f.cannon==='deku'||String(f.type||'').startsWith('deku');
+    if(layer==='base'&&isDekuFx)continue;
+    if(layer==='deku'&&!isDekuFx)continue;
     if(f.type==='chainArc'){
       if(!segmentMayTouchScreen(f.x,f.y,f.x2,f.y2,150))continue;
     }else{
@@ -3515,6 +3623,99 @@ function drawCombatEffects(){
       for(let i=0;i<8;i++){const a=i*TAU/8;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*f.radius*q,Math.sin(a)*f.radius*q);ctx.stroke()}ctx.shadowBlur=0;
     }else if(f.type==='errorMuzzle'){
       ctx.fillStyle='#76ff43';ctx.fillRect(f.radius*q-18,-10,18,5);ctx.fillStyle='#ff3fe2';ctx.fillRect(f.radius*q*.65-25,2,25,5);ctx.fillStyle='#42eaff';ctx.fillRect(f.radius*q*.85-13,10,13,4);
+    }else if(f.type==='dekuMuzzle'){
+      // AIR FORCE finger-flick shock: compressed wind rings with OFA green sparks.
+      const push=f.radius*(.38+q*.78);
+      ctx.globalAlpha*=.86;
+      ctx.strokeStyle='rgba(239,255,250,.94)';ctx.shadowColor='#9fffc1';ctx.shadowBlur=14;ctx.lineWidth=4*p+1;
+      ctx.beginPath();ctx.ellipse(push,0,12+q*18,7+q*9,0,0,TAU);ctx.stroke();
+      ctx.strokeStyle='rgba(145,255,189,.72)';ctx.lineWidth=2.4;
+      for(let k=-1;k<=1;k++){ctx.beginPath();ctx.moveTo(2,k*7);ctx.quadraticCurveTo(push*.55,k*12,push+20,k*5);ctx.stroke()}
+      ctx.shadowBlur=0;
+    }else if(f.type==='dekuBlackwhip'){
+      // Blackwhip V5.49: anime-like broad black ribbons with cyan/teal electric rims.
+      // Fa Jin version is thicker, faster-looking and wrapped in green kinetic fractures.
+      const len=Math.max(50,f.radius),boost=f.variant==='faJin',grow=.82+.18*Math.sin(q*Math.PI);
+      ctx.lineJoin='round';ctx.lineCap='round';
+      const strands=boost?7:5;
+      for(let strand=0;strand<strands;strand++){
+        const centered=strand-(strands-1)/2;
+        const baseY=centered*(boost?10:13);
+        const endY=centered*(boost?22:27)+Math.sin(f.x*.004+strand*2.2)*13;
+        const reach=len*(1-Math.abs(centered)*.035)*grow;
+        const half=(boost?25:20)+(strand%2?6:2);
+        ctx.beginPath();
+        ctx.moveTo(-4,baseY*.15-half*.18);
+        ctx.quadraticCurveTo(reach*.28,baseY-half*1.15,reach*.70,endY-half*.62);
+        ctx.lineTo(reach+18,endY);
+        ctx.quadraticCurveTo(reach*.68,endY+half*.62,reach*.26,baseY+half*1.05);
+        ctx.closePath();
+        ctx.shadowColor=boost?'#6affef':'#45eef2';ctx.shadowBlur=boost?34:27;
+        ctx.fillStyle=boost?'rgba(2,10,16,.98)':'rgba(3,12,18,.97)';ctx.fill();
+        ctx.strokeStyle=boost?'rgba(115,255,244,1)':'rgba(69,238,242,.98)';ctx.lineWidth=boost?6.2:4.8;ctx.stroke();
+        ctx.shadowBlur=0;
+        ctx.strokeStyle='rgba(108,255,244,.36)';ctx.lineWidth=1.3;
+        ctx.beginPath();ctx.moveTo(10,baseY*.2);ctx.quadraticCurveTo(reach*.44,baseY-half*.62,reach*.90,endY-2);ctx.stroke();
+      }
+      // Dark connective web between the major ribbons, like the anime frame.
+      ctx.globalAlpha*=.72;ctx.strokeStyle='rgba(0,4,8,.98)';ctx.lineWidth=boost?10:8;
+      for(let k=1;k<=3;k++){const xx=len*(.20+k*.18);ctx.beginPath();ctx.moveTo(xx,-34-k*2);ctx.lineTo(xx+46,28+k*3);ctx.stroke()}
+      ctx.globalAlpha/=.72;
+      // OFA / Fa Jin electrical fractures.
+      ctx.shadowColor=boost?'#a5ff72':'#5af1e8';ctx.shadowBlur=boost?17:11;ctx.strokeStyle=boost?'rgba(166,255,111,.96)':'rgba(91,244,237,.78)';ctx.lineWidth=boost?3:2;
+      const bolts=boost?12:7;
+      for(let k=1;k<=bolts;k++){
+        const u=k/(bolts+1),xx=len*u,yy=Math.sin(u*18+f.y*.003)*20;
+        ctx.beginPath();ctx.moveTo(xx-16,yy);ctx.lineTo(xx-6,yy-(k%2?11:-11));ctx.lineTo(xx+5,yy+5);ctx.lineTo(xx+15,yy-(k%3?4:-7));ctx.stroke();
+      }
+      ctx.shadowBlur=0;ctx.lineCap='butt';ctx.lineJoin='miter';
+    }else if(f.type==='dekuWhipElasticDash'){
+      // V5.51: elastic snap-back dash after Blackwhip misses every player.
+      const len=Math.max(20,f.radius),boost=f.variant==='faJin',head=len*(.30+.70*q);
+      ctx.lineCap='round';ctx.shadowColor=boost?'#a8ff72':'#5ef5eb';ctx.shadowBlur=boost?28:21;
+      ctx.strokeStyle=boost?'rgba(171,255,113,.96)':'rgba(92,246,235,.94)';ctx.lineWidth=boost?7:5.5;
+      ctx.beginPath();ctx.moveTo(-10,0);ctx.quadraticCurveTo(head*.28,Math.sin(q*Math.PI)*24,head,0);ctx.stroke();
+      ctx.strokeStyle='rgba(228,255,253,.94)';ctx.lineWidth=2.6;
+      for(let k=-2;k<=2;k++){const yy=k*9;ctx.beginPath();ctx.moveTo(-35-Math.abs(k)*10,yy);ctx.lineTo(head*.42,yy*.38);ctx.stroke()}
+      ctx.strokeStyle='rgba(5,16,22,.92)';ctx.lineWidth=boost?10:8;
+      ctx.beginPath();ctx.moveTo(-4,-5);ctx.quadraticCurveTo(head*.45,-22,head*.78,-4);ctx.stroke();
+      ctx.shadowBlur=0;ctx.lineCap='butt';
+    }else if(f.type==='dekuFaJinAttack'){
+      // Any Deku attack released while Fa Jin is active gets a distinct kinetic-discharge flash.
+      const rr=f.radius*(.28+.72*q);
+      ctx.shadowColor='#62f5e8';ctx.shadowBlur=22;ctx.strokeStyle='rgba(215,255,252,.96)';ctx.lineWidth=4*p+1;
+      ctx.beginPath();ctx.ellipse(rr*.20,0,rr*.60,rr*.23,0,0,TAU);ctx.stroke();
+      ctx.strokeStyle='rgba(91,241,229,.90)';ctx.lineWidth=3;
+      for(let k=-2;k<=2;k++){const yy=k*8;ctx.beginPath();ctx.moveTo(-18,yy);ctx.lineTo(rr*.38,yy+(k%2?8:-8));ctx.lineTo(rr*.90,yy*.22);ctx.stroke()}
+      ctx.strokeStyle='rgba(166,255,110,.92)';ctx.lineWidth=2.3;
+      for(let k=0;k<5;k++){const aa=-.55+k*.27;ctx.beginPath();ctx.moveTo(8,Math.sin(k)*7);ctx.lineTo(rr*.48,Math.sin(aa)*rr*.32);ctx.lineTo(rr*.90,Math.sin(aa+.16)*rr*.42);ctx.stroke()}
+      ctx.shadowBlur=0;
+    }else if(f.type==='dekuFaJin'){
+      // Fa Jin release: stored kinetic energy bursts outward in green lightning and impact rings.
+      ctx.rotate(-f.angle); // keep the circular discharge stable on screen
+      const rr=f.radius*(.30+.70*q);
+      ctx.shadowColor='#8cff67';ctx.shadowBlur=22;ctx.strokeStyle='rgba(210,255,186,.95)';ctx.lineWidth=5*p+1;
+      for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(0,0,rr*(.50+k*.23),0,TAU);ctx.stroke()}
+      ctx.strokeStyle='#83ff63';ctx.lineWidth=3.2;
+      for(let k=0;k<9;k++){
+        const aa=k*TAU/9+t*.9,inner=22+6*Math.sin(t*6+k),outer=rr*(.80+.18*Math.sin(k*3.1));
+        const mx=Math.cos(aa+.14)*((inner+outer)*.55),my=Math.sin(aa+.14)*((inner+outer)*.55);
+        ctx.beginPath();ctx.moveTo(Math.cos(aa)*inner,Math.sin(aa)*inner);ctx.lineTo(mx,my);ctx.lineTo(Math.cos(aa-.06)*outer,Math.sin(aa-.06)*outer);ctx.stroke();
+      }
+      ctx.globalAlpha*=.35;ctx.fillStyle='#baff70';ctx.beginPath();ctx.arc(0,0,rr*.56,0,TAU);ctx.fill();ctx.shadowBlur=0;
+    }else if(f.type==='dekuGearshift'){
+      // Gearshift: blue-white acceleration rings + green OFA electricity and long speed cuts.
+      const rr=f.radius*(.38+.62*q);ctx.shadowColor='#6feeff';ctx.shadowBlur=24;
+      ctx.strokeStyle='rgba(205,252,255,.95)';ctx.lineWidth=5*p+1;
+      for(let k=0;k<3;k++){ctx.beginPath();ctx.ellipse(0,0,rr*(.55+k*.20),rr*(.22+k*.07),k*.45+q*1.6,0,TAU);ctx.stroke()}
+      ctx.strokeStyle='#70e8ff';ctx.lineWidth=3;
+      for(let k=-3;k<=3;k++){const yy=k*12;ctx.beginPath();ctx.moveTo(-rr*(.9+.08*Math.abs(k)),yy);ctx.lineTo(rr*.78,yy*.40);ctx.stroke()}
+      ctx.strokeStyle='#9dff70';ctx.lineWidth=2.4;
+      for(let k=0;k<6;k++){const aa=k*TAU/6+t*1.8;ctx.beginPath();ctx.moveTo(Math.cos(aa)*24,Math.sin(aa)*24);ctx.lineTo(Math.cos(aa+.12)*rr*.70,Math.sin(aa+.12)*rr*.70);ctx.lineTo(Math.cos(aa-.05)*rr*.92,Math.sin(aa-.05)*rr*.92);ctx.stroke()}
+      ctx.shadowBlur=0;
+    }else if(f.type==='dekuStun'){
+      ctx.rotate(-f.angle);ctx.strokeStyle='#a7ff70';ctx.shadowColor='#8aff5f';ctx.shadowBlur=16;ctx.lineWidth=3;
+      for(let k=0;k<6;k++){const aa=k*TAU/6+t*2.4;ctx.beginPath();ctx.moveTo(Math.cos(aa)*26,Math.sin(aa)*26);ctx.lineTo(Math.cos(aa+.18)*f.radius*.72,Math.sin(aa+.18)*f.radius*.72);ctx.lineTo(Math.cos(aa-.08)*f.radius,Math.sin(aa-.08)*f.radius);ctx.stroke()}ctx.shadowBlur=0;
     }else if(f.type==='skill2-rocket'){
       ctx.strokeStyle='#ffc16c';ctx.lineWidth=7*p+1;ctx.shadowColor='#ffc16c';ctx.shadowBlur=16;
       for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(0,0,f.radius*q*(.55+i*.18),0,TAU);ctx.stroke()}
@@ -3727,7 +3928,22 @@ function drawUniqueProjectile(b,time,phase){
   if(shape==='stellarStar'){
     ctx.rotate(time*4+(b.motionSeed||0));ctx.shadowColor='#f0ffff';ctx.shadowBlur=21;ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(15,0);ctx.lineTo(4,4);ctx.lineTo(0,15);ctx.lineTo(-4,4);ctx.lineTo(-15,0);ctx.lineTo(-4,-4);ctx.lineTo(0,-15);ctx.lineTo(4,-4);ctx.closePath();ctx.fill();ctx.strokeStyle='#9edfff';ctx.lineWidth=2;ctx.stroke();ctx.shadowBlur=0;return true;
   }
-  if(shape==='dekuAirForce'){const smash=b.special==='detroitAirSmash';ctx.shadowColor=smash?'#e8ff70':'#83ffb0';ctx.shadowBlur=smash?22:12;ctx.strokeStyle=smash?'#f1ff9a':'#a7ffca';ctx.lineWidth=smash?5:3;ctx.beginPath();ctx.arc(0,0,smash?13:8,-1.1,1.1);ctx.stroke();ctx.shadowBlur=0;return true}
+  if(shape==='dekuAirForce'){
+    const special=String(b.special||''),faJin=special.startsWith('faJin');
+    const smash=special.includes('DetroitAirSmash')||special==='detroitAirSmash',size=smash?1.55:1;
+    // AIR FORCE: compressed wind. During Fa Jin it becomes a denser cyan/green kinetic shock.
+    ctx.globalAlpha=.90;ctx.shadowColor=faJin?'#63f5e9':(smash?'#d8ffb0':'#c8fff0');ctx.shadowBlur=faJin?(smash?28:20):(smash?20:10);
+    ctx.strokeStyle=faJin?'rgba(220,255,255,.98)':'rgba(244,255,251,.95)';ctx.lineWidth=smash?4.5:2.8;
+    ctx.beginPath();ctx.arc(2,0,(smash?15:9)*pulse,-1.18,1.18);ctx.stroke();
+    ctx.strokeStyle=faJin?'rgba(80,239,230,.88)':(smash?'rgba(174,255,111,.78)':'rgba(151,255,210,.65)');ctx.lineWidth=faJin?(smash?4:2.6):(smash?3:1.8);
+    for(let k=-1;k<=1;k++){const yy=k*(smash?8:5);ctx.beginPath();ctx.moveTo(-34*size,yy);ctx.quadraticCurveTo(-9*size,yy*1.4,10*size,yy*.45);ctx.stroke()}
+    if(faJin){
+      ctx.strokeStyle='rgba(160,255,113,.92)';ctx.lineWidth=2.2;
+      for(let k=-2;k<=2;k++){const yy=k*5;ctx.beginPath();ctx.moveTo(-28*size,yy);ctx.lineTo(-14*size,yy+(k%2?7:-7));ctx.lineTo(4*size,yy*.3);ctx.stroke()}
+    }
+    if(smash){ctx.globalAlpha=.34;ctx.fillStyle=faJin?'#64f1e8':'#baff70';ctx.beginPath();ctx.moveTo(-8,-15);ctx.lineTo(30,0);ctx.lineTo(-8,15);ctx.closePath();ctx.fill()}
+    ctx.globalAlpha=1;ctx.shadowBlur=0;return true
+  }
   if(shape==='errorBlock'){
     const gl=Math.sin(phase*4)>0?2:-2;ctx.shadowColor='#72ff45';ctx.shadowBlur=13;ctx.fillStyle='#070808';ctx.fillRect(-11,-9,22,18);ctx.lineWidth=2.5;ctx.strokeStyle='#72ff45';ctx.strokeRect(-11+gl,-9,22,18);ctx.strokeStyle='#ff3bea';ctx.strokeRect(-11-gl,-8,22,17);ctx.strokeStyle='#42eaff';ctx.strokeRect(-10,-9+gl,21,18);ctx.shadowBlur=0;return true;
   }
@@ -4051,8 +4267,10 @@ function render(){
   updateRenderPressure();
   ctx.save();
   if(shake>0){ctx.translate(rand(-shake,shake),rand(-shake,shake));shake*=.86}
-  drawGrid();drawBoundary();shapes.forEach(drawShape);drawPlasmaTethers();drawSkillZones();drawCombatEffects();drawBullets();
+  drawGrid();drawBoundary();shapes.forEach(drawShape);drawPlasmaTethers();drawSkillZones();drawCombatEffects('base');drawBullets();
   remotePlayers.forEach(drawTank);drawTank(player);drawParticles();
+  // V5.50: Deku VFX is deliberately rendered last so Blackwhip/Fa Jin/Gearshift cannot be hidden by tanks or bullets.
+  drawCombatEffects('deku');
   ctx.restore();
   drawAimGuides();
   drawMinimap();
