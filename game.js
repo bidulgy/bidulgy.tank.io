@@ -8,7 +8,7 @@ const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
 const CENTRAL_PENTAGON_TARGET=180;
 const CENTRAL_PENTAGON_RADIUS=1400;
-const WORLD_SNAPSHOT_INTERVAL=300;
+const WORLD_SNAPSHOT_INTERVAL=480;
 
 const INITIAL_NORMAL_SHAPES=90;
 const INITIAL_CENTRAL_PENTAGONS=24;
@@ -29,6 +29,14 @@ const LOCAL_REBALANCE_BATCH=3;
 let running=false,paused=false,last=performance.now(),camera={x:0,y:0},shapes=[],bullets=[],particles=[],combatFx=[],skillZones=[],shake=0,classUpgradeShown=false,player,playerHistory=[];
 const remotePlayers=new Map();
 let onlineChannel=null,onlineReady=false,onlineSelfId='',lastStateSend=0,networkSerial=0,lastRunAutosave=0,runSaveBusy=false,normalSpawnTimer=0,centralSpawnTimer=0;
+let onlineReconnectTimer=0,onlineReconnectBusy=false,lastNetworkStateReceive=0;
+const REMOTE_STATE_INTERVAL=120;
+const REMOTE_PLAYER_STALE_MS=15000;
+const REMOTE_PLAYER_ABSENT_GRACE_MS=5500;
+const MAX_PARTICLES=520;
+const MAX_COMBAT_FX=260;
+const MAX_BULLETS=900;
+const MAX_SKILL_ZONES=180;
 let localRebalanceTimer=0,normalSpawnAnchorCursor=0;
 let worldHostId='',worldSnapshotSeq=0,lastWorldSnapshotSend=0,lastWorldSnapshotReceive=0,shapeSerial=0;
 const processedDamageIds=new Set();
@@ -518,7 +526,7 @@ function upsertRemotePlayer(payload){
       tx:safeRemoteNumber(payload.x,WORLD/2),ty:safeRemoteNumber(payload.y,WORLD/2),
       angle:safeRemoteNumber(payload.angle,0),targetAngle:safeRemoteNumber(payload.angle,0),
       vx:0,vy:0,r:27,hp:120,maxHp:120,level:1,score:0,kills:0,
-      name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',fortress:false,overclock:false,swordMode:false,cloaked:false,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,lastSeen:performance.now()
+      name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',fortress:false,overclock:false,swordMode:false,cloaked:false,cloakUntilWall:0,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,lastSeen:performance.now(),presenceMissingSince:0
     };
     remotePlayers.set(id,r);
   }
@@ -536,9 +544,13 @@ function upsertRemotePlayer(payload){
   r.fortress=payload.fortress===true;
   r.overclock=payload.overclock===true;
   r.swordMode=payload.swordMode===true;
-  r.cloaked=payload.cloaked===true;
+  const incomingCloakUntil=Math.max(0,safeRemoteNumber(payload.cloakUntilWall,0));
+  r.cloakUntilWall=incomingCloakUntil||(payload.cloaked===true?Date.now()+5500:0);
+  r.cloaked=payload.cloaked===true&&Date.now()<r.cloakUntilWall;
   r.alive=payload.alive!==false;
   r.lastSeen=performance.now();
+  r.presenceMissingSince=0;
+  lastNetworkStateReceive=performance.now();
 }
 function angleLerp(a,b,t){
   let d=((b-a+Math.PI)%(TAU))-Math.PI;
@@ -547,12 +559,30 @@ function angleLerp(a,b,t){
 }
 function updateRemotePlayers(dt){
   const now=performance.now();
+  const present=new Set(getPresencePlayerIds());
   for(const [id,r] of remotePlayers){
-    if(now-r.lastSeen>4500){remotePlayers.delete(id);continue}
-    const t=Math.min(1,dt*11);
+    const age=now-(r.lastSeen||0);
+    const isPresent=present.has(id);
+
+    if(isPresent)r.presenceMissingSince=0;
+    else if(!r.presenceMissingSince)r.presenceMissingSince=now;
+
+    const absentFor=r.presenceMissingSince?now-r.presenceMissingSince:0;
+    if(age>REMOTE_PLAYER_STALE_MS&&!isPresent&&absentFor>REMOTE_PLAYER_ABSENT_GRACE_MS){
+      remotePlayers.delete(id);
+      continue;
+    }
+
+    if(r.cloaked&&r.cloakUntilWall&&Date.now()>=r.cloakUntilWall){
+      r.cloaked=false;
+      r.cloakUntilWall=0;
+    }
+
+    const smooth=age>2500?4.5:11;
+    const t=Math.min(1,dt*smooth);
     r.x+=(r.tx-r.x)*t;
     r.y+=(r.ty-r.y)*t;
-    r.angle=angleLerp(r.angle,r.targetAngle,Math.min(1,dt*14));
+    r.angle=angleLerp(r.angle,r.targetAngle,Math.min(1,dt*(age>2500?6:14)));
   }
 }
 function localNetworkState(){
@@ -564,7 +594,13 @@ function localNetworkState(){
     level:player.level,score:player.score,kills:player.kills,
     name:player.name,cannonType:player.cannonType||'standard',
     classType:player.classType||'basic',alive:!!player.alive,
-    fortress:performance.now()<(player.fortressUntil||0),overclock:performance.now()<(player.overclockUntil||0),cloaked:performance.now()<(player.cloakUntil||0),swordMode:player.cannonType==='error'&&player.errorSwordMode===true
+    fortress:performance.now()<(player.fortressUntil||0),
+    overclock:performance.now()<(player.overclockUntil||0),
+    cloaked:performance.now()<(player.cloakUntil||0),
+    cloakUntilWall:performance.now()<(player.cloakUntil||0)
+      ?Date.now()+Math.max(0,(player.cloakUntil||0)-performance.now())
+      :0,
+    swordMode:player.cannonType==='error'&&player.errorSwordMode===true
   };
 }
 function sendOnline(event,payload){
@@ -580,7 +616,7 @@ function sendOnline(event,payload){
 function broadcastLocalState(force=false){
   if(!onlineReady||!player)return;
   const now=performance.now();
-  if(!force&&now-lastStateSend<80)return;
+  if(!force&&now-lastStateSend<REMOTE_STATE_INTERVAL)return;
   lastStateSend=now;
   const state=localNetworkState();
   if(state)sendOnline('state',state);
@@ -621,6 +657,11 @@ function addRemoteShot(payload){
   const startX=safeRemoteNumber(payload.x),startY=safeRemoteNumber(payload.y);
   const shotAngle=Math.atan2(vy,vx);
   spawnAttackFx(String(payload.cannon||'standard'),startX,startY,shotAngle,true);
+  if(bullets.length>=MAX_BULLETS){
+    const drop=bullets.findIndex(v=>v.networkRemote===true);
+    if(drop>=0)bullets.splice(drop,1);
+    else bullets.shift();
+  }
   bullets.push({
     netId:String(payload.netId||payload.id||''),
     x:startX+vx*age,y:startY+vy*age,
@@ -678,29 +719,46 @@ function sendDamage(targetId,amount){
     amount:damage,sourceLevel:player?.level||1
   });
 }
-function receiveDamage(payload){
-  if(!running||!player?.alive)return;
-  if(String(payload?.targetId||'')!==onlineSelfId)return;
-  const eventId=String(payload?.id||'');
-  if(eventId&&processedDamageIds.has(eventId))return;
+function applyIncomingPlayerDamage(amount,sourceId='',eventId=''){
+  if(!running||!player?.alive)return false;
+
+  eventId=String(eventId||'');
+  if(eventId&&processedDamageIds.has(eventId))return false;
   if(eventId){
     processedDamageIds.add(eventId);
-    if(processedDamageIds.size>240){
+    if(processedDamageIds.size>320){
       const first=processedDamageIds.values().next().value;
       processedDamageIds.delete(first);
     }
   }
-  let amount=Math.max(0,Math.min(5000,Number(payload?.amount)||0));
-  if(!amount)return;
+
+  amount=Math.max(0,Math.min(5000,Number(amount)||0));
+  if(amount<=0)return false;
+
   const now=performance.now();
-  if(now<(player.phaseUntil||0))return;
+
+  // 영구 무적 방지: 정상 phase는 최대 4초 수준이므로 비정상 미래값은 해제.
+  if((player.phaseUntil||0)>now+5000)player.phaseUntil=0;
+  if(now<(player.phaseUntil||0))return false;
+
   if(now<(player.fortressUntil||0))amount*=.30;
-  player.hp-=amount;
+
+  const before=Math.max(0,Math.min(player.maxHp,Number(player.hp)||0));
+  player.hp=Math.max(0,before-amount);
   player.regenTimer=0;
-  burst(player.x,player.y,'#ff8a8a',5);
-  shake=Math.max(shake,5);
-  if(player.hp<=0&&!tryStellarRevive())killPlayer(String(payload?.sourceId||''));
+
+  if(player.hp<before){
+    burst(player.x,player.y,'#ff8a8a',4);
+    shake=Math.max(shake,4);
+  }
+
+  if(player.hp<=0&&!tryStellarRevive())killPlayer(String(sourceId||''));
   broadcastLocalState(true);
+  return player.hp<before;
+}
+function receiveDamage(payload){
+  if(String(payload?.targetId||'')!==onlineSelfId)return;
+  applyIncomingPlayerDamage(payload?.amount,String(payload?.sourceId||''),String(payload?.id||''));
 }
 function tankKillXp(victimLevel){
   // 상대 탱크 레벨이 높을수록 EXP가 가파르게 증가한다.
@@ -717,7 +775,44 @@ function receiveKill(payload){
   const earnedXp=tankKillXp(victimLevel);
   gainXp(earnedXp);
 }
+function clearOnlineReconnectTimer(){
+  if(onlineReconnectTimer){
+    clearTimeout(onlineReconnectTimer);
+    onlineReconnectTimer=0;
+  }
+}
+function scheduleOnlineReconnect(reason='connection_lost'){
+  if(!running||onlineReconnectBusy||onlineReconnectTimer)return;
+  if(!window.IronCellAuth?.user)return;
+
+  onlineReady=false;
+  setNetworkStatus('connecting','온라인 연결 복구 중...');
+
+  onlineReconnectTimer=setTimeout(async()=>{
+    onlineReconnectTimer=0;
+    if(!running||onlineReconnectBusy)return;
+
+    onlineReconnectBusy=true;
+    try{
+      await disconnectOnlineArena();
+      const ok=await connectOnlineArena();
+      if(ok){
+        broadcastLocalState(true);
+        setNetworkStatus('online','온라인 서버 재연결됨');
+      }else{
+        setNetworkStatus('error','온라인 재연결 실패 · 다시 시도 중');
+      }
+    }catch(error){
+      console.warn('Online reconnect failed:',reason,error);
+    }finally{
+      onlineReconnectBusy=false;
+      if(running&&!onlineReady)scheduleOnlineReconnect('retry');
+    }
+  },1200);
+}
+
 async function disconnectOnlineArena(){
+  if(!onlineReconnectBusy)clearOnlineReconnectTimer();
   onlineReady=false;
   updateOnlineCount();
   remotePlayers.clear();
@@ -766,7 +861,10 @@ async function connectOnlineArena(){
   ch.on('presence',{event:'sync'},()=>{updateOnlineCount();electWorldHost()});
   ch.on('presence',{event:'join'},()=>{updateOnlineCount();setTimeout(()=>electWorldHost(),0)});
   ch.on('presence',{event:'leave'},({key})=>{
-    if(key)remotePlayers.delete(String(key));
+    if(key){
+      const r=remotePlayers.get(String(key));
+      if(r&&!r.presenceMissingSince)r.presenceMissingSince=performance.now();
+    }
     updateOnlineCount();
     setTimeout(()=>electWorldHost(true),0);
   });
@@ -781,11 +879,10 @@ async function connectOnlineArena(){
     },7000);
 
     ch.subscribe(async status=>{
-      if(settled)return;
       if(status==='SUBSCRIBED'){
-        settled=true;
         clearTimeout(timer);
         onlineReady=true;
+        clearOnlineReconnectTimer();
         try{
           await ch.track({
             user_id:onlineSelfId,
@@ -797,13 +894,24 @@ async function connectOnlineArena(){
         electWorldHost(true);
         setNetworkStatus('online','온라인 서버 연결됨');
         broadcastLocalState(true);
-        resolve(true);
-      }else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
-        settled=true;
-        clearTimeout(timer);
+        if(!settled){
+          settled=true;
+          resolve(true);
+        }
+        return;
+      }
+
+      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
         onlineReady=false;
-        setNetworkStatus('error','온라인 서버 연결 실패');
-        resolve(false);
+        updateOnlineCount();
+        if(!settled){
+          settled=true;
+          clearTimeout(timer);
+          setNetworkStatus('error','온라인 서버 연결 실패');
+          resolve(false);
+        }else if(running){
+          scheduleOnlineReconnect(status);
+        }
       }
     });
   });
@@ -874,6 +982,9 @@ function playerParams(){
 }
 
 function spawnCombatFx(type,x,y,opts={}){
+  if(combatFx.length>=MAX_COMBAT_FX){
+    combatFx.splice(0,Math.max(1,combatFx.length-MAX_COMBAT_FX+1));
+  }
   combatFx.push({
     type,x,y,angle:opts.angle||0,color:opts.color||'#fff',
     life:opts.life||.35,maxLife:opts.life||.35,
@@ -1440,7 +1551,7 @@ function addSkillZone(type,opts={}){
   const z={type,x:opts.x??player.x,y:opts.y??player.y,radius:opts.radius||120,life,maxLife:life,damage:opts.damage||0,tick:opts.tick??0,
     angle:opts.angle||0,length:opts.length||0,width:opts.width||0,ownerId:onlineSelfId,networkRemote:opts.networkRemote===true,
     pulses:opts.pulses||0,interval:opts.interval||.4,triggered:false,data:opts.data||{},originX:opts.originX,originY:opts.originY};
-  skillZones.push(z);return z;
+  if(skillZones.length>=MAX_SKILL_ZONES)skillZones.splice(0,Math.max(1,skillZones.length-MAX_SKILL_ZONES+1));skillZones.push(z);return z;
 }
 
 function pointInTriangle(px,py,ax,ay,bx,by,cx,cy){
@@ -2033,7 +2144,7 @@ function fire(e){
     else if(cannon==='glitch'){b.r=8;b.life=2.15;b.pierce=14}
     else if(cannon==='zero'){b.r=shot.special==='zeroCore'?13:10;b.life=2.5;b.pierce=shot.special==='zeroCore'?26:20;if(shot.special==='zeroCore'){b.vx*=1.12;b.vy*=1.12}}
 
-    bullets.push(b);broadcastShot(b);spawnAttackFx(cannon,b.x,b.y,sa);
+    if(bullets.length>=MAX_BULLETS)bullets.shift();bullets.push(b);broadcastShot(b);spawnAttackFx(cannon,b.x,b.y,sa);
   }
 
   const recoil={
@@ -2045,7 +2156,15 @@ function fire(e){
   }[cannon]||12;
   e.vx-=Math.cos(a)*recoil;e.vy-=Math.sin(a)*recoil;
 }
-function burst(x,y,color,count=8){for(let i=0;i<count;i++){const a=rand(0,TAU),sp=rand(45,180);particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:rand(.28,.7),color,r:rand(2,5)})}}
+function burst(x,y,color,count=8){
+  if(particles.length>=MAX_PARTICLES)return;
+  const budget=MAX_PARTICLES-particles.length;
+  count=Math.min(count,budget,particles.length>380?Math.ceil(count*.45):count);
+  for(let i=0;i<count;i++){
+    const a=rand(0,TAU),sp=rand(45,180);
+    particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:rand(.28,.7),color,r:rand(2,5)});
+  }
+}
 function applySplashDamage(b,x,y){
   if(!b.splashRadius||b.team!=='player')return;
   if(b.basicAttack&&['rocket','inferno'].includes(b.cannon))createRocketBurnZone(b,x,y);
@@ -2114,7 +2233,7 @@ function handleShapeContact(){
   let damage=hitDamage;
   if(now<(player.fortressUntil||0))damage*=.30;
 
-  player.hp-=damage;
+  player.hp=Math.max(0,Math.max(0,Number(player.hp)||0)-damage);
   player.regenTimer=0;
   player.shapeContactCd=.34;
   burst(player.x,player.y,hitShape.centralCluster?'#8ca6ff':colorForShape(hitShape.type),7);
@@ -3056,7 +3175,10 @@ function drawUniqueTankBody(cannon,r,t,theme){
 }
 function drawTank(e){
   if(!e.alive)return;
-  const isP=e===player,cloakActive=isP?performance.now()<(e.cloakUntil||0):e.cloaked===true;
+  const isP=e===player;
+  const cloakActive=isP
+    ?performance.now()<(e.cloakUntil||0)
+    :(e.cloaked===true&&(!e.cloakUntilWall||Date.now()<e.cloakUntilWall));
   if(!isP&&cloakActive)return;
   const[x,y]=worldToScreen(e.x,e.y);
   if(x<-165||y<-165||x>innerWidth+165||y>innerHeight+165)return;
@@ -3847,6 +3969,11 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+setInterval(()=>{
+  if(running&&player?.alive&&onlineReady)broadcastLocalState(true);
+},850);
+
 async function startGame(){
   if(!window.IronCellAuth?.user){window.IronCellAuth?.logout?.();return}
   const originalText=ui.startBtn.textContent;
