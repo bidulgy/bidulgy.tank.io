@@ -1024,8 +1024,7 @@ function spawnAttackFx(cannon,x,y,angle,remote=false){
     rocket:['rocketMuzzle','#ff9b4a',.35,48],
     ring:['ringMuzzle','#c6a3ff',.28,42],
     nova:['novaMuzzle','#75efff',.34,52],
-    error:['errorMuzzle','#76ff43',.32,55],
-    deku:['dekuMuzzle','#baff70',.24,58]
+    error:['errorMuzzle','#76ff43',.32,55]
   };
   const f=types[cannonFamily(cannon)]||types.standard;
   let fxAngle=normalizeFxAngle(angle);
@@ -1051,9 +1050,7 @@ function receiveRemoteSkill(payload){
     const life=Math.max(.2,safeRemoteNumber(payload.life,2));
     if(cannon==='deku'){
       if(skillType==='dekuSmoke'){skillZones.push({type:'dekuSmoke',x:tx,y:ty,radius,life,maxLife:life,damage:0,tick:0,angle:0,length:0,width:0,ownerId:String(payload.ownerId||''),networkRemote:true,pulses:0,interval:.4,data:{}});return}
-      if(skillType==='dekuBlackwhip'){spawnCombatFx('dekuBlackwhip',x,y,{angle:fxAngleToTarget(x,y,tx,ty,safeRemoteNumber(payload.zoneAngle,angle)),color:'#9dff73',life:.85,radius:safeRemoteNumber(payload.length,760),cannon:'deku'});return}
-      if(skillType==='dekuFaJin'){spawnCombatFx('dekuFaJin',x,y,{angle,color:'#baff70',life:1.05,radius:145,cannon:'deku'});return}
-      if(skillType==='dekuGearshift'){spawnCombatFx('dekuGearshift',x,y,{angle,color:'#80efff',life:1.25,radius:180,cannon:'deku'});return}
+      if(skillType==='dekuBlackwhip'){spawnCombatFx('dekuBlackwhip',x,y,{angle:fxAngleToTarget(x,y,tx,ty,safeRemoteNumber(payload.zoneAngle,angle)),color:'#9dff73',life:.75,radius:safeRemoteNumber(payload.length,760),cannon:'deku'});return}
     }
     if(cannon==='phantom'&&skillType==='phantomMarks'){
       const ox=safeRemoteNumber(payload.originX,x),oy=safeRemoteNumber(payload.originY,y),dx=safeRemoteNumber(payload.destX,tx),dy=safeRemoteNumber(payload.destY,ty),ownerId=String(payload.ownerId||'');
@@ -1414,7 +1411,7 @@ function spawnErrorSwordWave(angle,damageMul=1,opts={}){
 function activateSkill3(){
   if(!running||paused||!player?.alive)return;const cannon=player.cannonType||'standard';if(cannon!=='error'&&cannon!=='deku')return;
   refreshRealTimeSkillCooldowns();if(player.skill3Cd>0)return;const now=performance.now(),wallNow=Date.now(),a=player.angle,p=playerParams();
-  if(cannon==='deku'){player.skill3Cd=DEKU_T_SKILL.cooldown;player.skill3Max=DEKU_T_SKILL.cooldown;player.skill3ReadyAt=wallNow+DEKU_T_SKILL.cooldown*1000;player.dekuFaJinUntil=now+7000;player.vx+=Math.cos(a)*190;player.vy+=Math.sin(a)*190;spawnCombatFx('dekuFaJin',player.x,player.y,{angle:a,color:'#baff70',life:1.05,radius:145,cannon:'deku'});burst(player.x,player.y,'#baff70',20);sendUniqueSkill(cannon,'dekuFaJin',{radius:145,life:1.05});broadcastLocalState(true);updateSkillHud();return}
+  if(cannon==='deku'){player.skill3Cd=DEKU_T_SKILL.cooldown;player.skill3Max=DEKU_T_SKILL.cooldown;player.skill3ReadyAt=wallNow+DEKU_T_SKILL.cooldown*1000;player.dekuFaJinUntil=now+7000;player.vx+=Math.cos(a)*150;player.vy+=Math.sin(a)*150;spawnCombatFx('dekuFaJin',player.x,player.y,{angle:a,color:'#baff70',life:1,radius:130,cannon:'deku'});burst(player.x,player.y,'#baff70',16);broadcastLocalState(true);updateSkillHud();return}
   if(player.errorQCharging)cancelErrorQCharge();const ox=player.x,oy=player.y;
   player.skill3Cd=ERROR_T_SKILL.cooldown;
   player.skill3Max=ERROR_T_SKILL.cooldown;
@@ -1457,7 +1454,7 @@ function activateSkill3(){
 function activateSkill4(){
   if(!running||paused||!player?.alive||player.cannonType!=='deku')return;refreshRealTimeSkillCooldowns();if(player.skill4Cd>0)return;
   const now=performance.now(),wallNow=Date.now();player.skill4Cd=DEKU_Y_SKILL.cooldown;player.skill4Max=DEKU_Y_SKILL.cooldown;player.skill4ReadyAt=wallNow+DEKU_Y_SKILL.cooldown*1000;player.dekuGearshiftUntil=now+7000;
-  spawnCombatFx('dekuGearshift',player.x,player.y,{angle:player.angle,color:'#80efff',life:1.25,radius:180,cannon:'deku'});burst(player.x,player.y,'#bffcff',24);sendUniqueSkill('deku','dekuGearshift',{radius:180,life:1.25});broadcastLocalState(true);updateSkillHud();
+  spawnCombatFx('dekuGearshift',player.x,player.y,{angle:player.angle,color:'#e7ff76',life:1.2,radius:165,cannon:'deku'});burst(player.x,player.y,'#e7ff76',20);broadcastLocalState(true);updateSkillHud();
 }
 
 
@@ -3288,18 +3285,6 @@ function drawTank(e){
     ctx.strokeRect(-r-6+Math.cos(t*17)*4,-r-11,(r+8)*2,(r+10)*2);
   }
 
-  const dekuFaJinActive=cannon==='deku'&&(isP?performance.now()<(e.dekuFaJinUntil||0):e.dekuFaJin===true);
-  const dekuGearshiftActive=cannon==='deku'&&(isP?performance.now()<(e.dekuGearshiftUntil||0):e.dekuGearshift===true);
-  if(dekuFaJinActive){
-    ctx.save();ctx.rotate(-e.angle);ctx.shadowColor='#8cff68';ctx.shadowBlur=15;ctx.strokeStyle='rgba(151,255,102,.88)';ctx.lineWidth=2.6;
-    for(let k=0;k<7;k++){const aa=k*TAU/7+t*2.5,rr1=r+7+(k%2)*4,rr2=r+23+7*Math.sin(t*7+k);ctx.beginPath();ctx.moveTo(Math.cos(aa)*rr1,Math.sin(aa)*rr1);ctx.lineTo(Math.cos(aa+.16)*((rr1+rr2)*.55),Math.sin(aa+.16)*((rr1+rr2)*.55));ctx.lineTo(Math.cos(aa-.04)*rr2,Math.sin(aa-.04)*rr2);ctx.stroke()}ctx.shadowBlur=0;ctx.restore();
-  }
-  if(dekuGearshiftActive){
-    ctx.save();ctx.shadowColor='#77edff';ctx.shadowBlur=13;ctx.strokeStyle='rgba(142,242,255,.78)';ctx.lineWidth=2.4;
-    for(let k=-3;k<=3;k++){const yy=k*9+Math.sin(t*13+k)*3;ctx.beginPath();ctx.moveTo(-r-50-Math.abs(k)*8,yy);ctx.lineTo(-r-9,yy*.55);ctx.stroke()}
-    ctx.strokeStyle='rgba(205,255,255,.74)';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,0,r+15+Math.sin(t*10)*3,(r+15)*.45,t*1.8,0,TAU);ctx.stroke();ctx.shadowBlur=0;ctx.restore();
-  }
-
   // ERROR 검 모드에서는 포신 대신 ERROR 검을 든다.
   if(swordModeActive)drawErrorSword(e,r,t);else drawPlayerCannon(cannon,r);
 
@@ -3418,24 +3403,7 @@ function drawSkillZones(){
     }else if(z.type==='glitchWarpTrail'){
       ctx.rotate(z.angle);ctx.strokeStyle='#ff42df';ctx.lineWidth=5;ctx.setLineDash([18,8]);ctx.beginPath();ctx.moveTo(0,-7);ctx.lineTo(z.length,7);ctx.stroke();ctx.strokeStyle='#42eaff';ctx.beginPath();ctx.moveTo(0,7);ctx.lineTo(z.length,-7);ctx.stroke();ctx.setLineDash([]);
     }else if(z.type==='dekuSmoke'){
-      // Deku Smokescreen: layered, rolling grey-white smoke instead of a flat circle.
-      const smokeCount=renderPressure>=2?7:renderPressure>=1?10:15;
-      const breathe=.94+.06*Math.sin(t*1.7+z.x*.002);
-      ctx.globalAlpha*=.94;
-      ctx.fillStyle='rgba(75,88,82,.18)';ctx.beginPath();ctx.arc(0,0,z.radius*breathe,0,TAU);ctx.fill();
-      for(let k=0;k<smokeCount;k++){
-        const seed=k*2.399+z.x*.0007+z.y*.0011;
-        const aa=seed+t*(k%2?-.075:.065);
-        const rr=z.radius*(.12+.72*((k*37)%smokeCount)/Math.max(1,smokeCount-1));
-        const drift=Math.sin(t*.8+seed)*z.radius*.055;
-        const bx=Math.cos(aa)*rr+Math.cos(seed*1.7)*drift;
-        const by=Math.sin(aa)*rr*.78+Math.sin(seed*1.3)*drift;
-        const br=z.radius*(.16+.08*(.5+.5*Math.sin(seed*3.1)))*(1+.10*Math.sin(t*1.4+seed));
-        const g=ctx.createRadialGradient(bx-br*.22,by-br*.20,br*.08,bx,by,br);
-        g.addColorStop(0,'rgba(232,238,233,.31)');g.addColorStop(.46,'rgba(174,187,179,.24)');g.addColorStop(1,'rgba(92,106,98,0)');
-        ctx.fillStyle=g;ctx.beginPath();ctx.arc(bx,by,br,0,TAU);ctx.fill();
-      }
-      ctx.strokeStyle='rgba(221,232,225,.34)';ctx.lineWidth=2.2;ctx.setLineDash([18,13]);ctx.beginPath();ctx.arc(0,0,z.radius*(.96+.025*Math.sin(t*2)),0,TAU);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle='rgba(150,170,158,.16)';ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.fill();ctx.strokeStyle='rgba(205,220,210,.28)';ctx.lineWidth=2;ctx.setLineDash([12,10]);ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.stroke();ctx.setLineDash([]);
     }else if(z.type==='artillery'){
       ctx.strokeStyle='#8ed6ff';ctx.lineWidth=3;ctx.setLineDash([10,8]);ctx.beginPath();ctx.arc(0,0,z.radius*(.82+.18*q),0,TAU);ctx.stroke();ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(-25,0);ctx.lineTo(25,0);ctx.moveTo(0,-25);ctx.lineTo(0,25);ctx.stroke();
     }else if(z.type==='barrier'){
@@ -3547,62 +3515,6 @@ function drawCombatEffects(){
       for(let i=0;i<8;i++){const a=i*TAU/8;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*f.radius*q,Math.sin(a)*f.radius*q);ctx.stroke()}ctx.shadowBlur=0;
     }else if(f.type==='errorMuzzle'){
       ctx.fillStyle='#76ff43';ctx.fillRect(f.radius*q-18,-10,18,5);ctx.fillStyle='#ff3fe2';ctx.fillRect(f.radius*q*.65-25,2,25,5);ctx.fillStyle='#42eaff';ctx.fillRect(f.radius*q*.85-13,10,13,4);
-    }else if(f.type==='dekuMuzzle'){
-      // AIR FORCE finger-flick shock: compressed wind rings with OFA green sparks.
-      const push=f.radius*(.38+q*.78);
-      ctx.globalAlpha*=.86;
-      ctx.strokeStyle='rgba(239,255,250,.94)';ctx.shadowColor='#9fffc1';ctx.shadowBlur=14;ctx.lineWidth=4*p+1;
-      ctx.beginPath();ctx.ellipse(push,0,12+q*18,7+q*9,0,0,TAU);ctx.stroke();
-      ctx.strokeStyle='rgba(145,255,189,.72)';ctx.lineWidth=2.4;
-      for(let k=-1;k<=1;k++){ctx.beginPath();ctx.moveTo(2,k*7);ctx.quadraticCurveTo(push*.55,k*12,push+20,k*5);ctx.stroke()}
-      ctx.shadowBlur=0;
-    }else if(f.type==='dekuBlackwhip'){
-      // Blackwhip: multiple living black tendrils with violet rims and OFA-green electric fractures.
-      const len=Math.max(40,f.radius);ctx.lineCap='round';
-      for(let strand=0;strand<3;strand++){
-        const off=(strand-1)*9;
-        ctx.beginPath();ctx.moveTo(0,off*.35);
-        const steps=12;
-        for(let k=1;k<=steps;k++){
-          const u=k/steps;
-          const bend=Math.sin(u*14+strand*2.1+f.x*.004)*((1-u)*18+5)*p + off*(1-u);
-          ctx.lineTo(len*u,bend);
-        }
-        ctx.shadowColor='#6d3d9f';ctx.shadowBlur=16;ctx.strokeStyle='rgba(38,20,49,.96)';ctx.lineWidth=(strand===1?13:8)*p+3;ctx.stroke();
-        ctx.shadowBlur=5;ctx.strokeStyle='rgba(119,67,148,.78)';ctx.lineWidth=(strand===1?4.2:2.5);ctx.stroke();
-      }
-      ctx.shadowColor='#a8ff79';ctx.shadowBlur=10;ctx.strokeStyle='rgba(170,255,112,.82)';ctx.lineWidth=2;
-      for(let k=1;k<=8;k++){
-        const u=k/9,xx=len*u,yy=Math.sin(u*14+1.2)*12*p;
-        ctx.beginPath();ctx.moveTo(xx-11,yy);ctx.lineTo(xx-2,yy-8*(k%2?1:-1));ctx.lineTo(xx+9,yy+3);ctx.stroke();
-      }
-      ctx.fillStyle='rgba(28,15,37,.96)';ctx.beginPath();ctx.moveTo(len+13,0);ctx.lineTo(len-10,-14*p);ctx.lineTo(len-4,0);ctx.lineTo(len-10,14*p);ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.lineCap='butt';
-    }else if(f.type==='dekuFaJin'){
-      // Fa Jin release: stored kinetic energy bursts outward in green lightning and impact rings.
-      ctx.rotate(-f.angle); // keep the circular discharge stable on screen
-      const rr=f.radius*(.30+.70*q);
-      ctx.shadowColor='#8cff67';ctx.shadowBlur=22;ctx.strokeStyle='rgba(210,255,186,.95)';ctx.lineWidth=5*p+1;
-      for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(0,0,rr*(.50+k*.23),0,TAU);ctx.stroke()}
-      ctx.strokeStyle='#83ff63';ctx.lineWidth=3.2;
-      for(let k=0;k<9;k++){
-        const aa=k*TAU/9+t*.9,inner=22+6*Math.sin(t*6+k),outer=rr*(.80+.18*Math.sin(k*3.1));
-        const mx=Math.cos(aa+.14)*((inner+outer)*.55),my=Math.sin(aa+.14)*((inner+outer)*.55);
-        ctx.beginPath();ctx.moveTo(Math.cos(aa)*inner,Math.sin(aa)*inner);ctx.lineTo(mx,my);ctx.lineTo(Math.cos(aa-.06)*outer,Math.sin(aa-.06)*outer);ctx.stroke();
-      }
-      ctx.globalAlpha*=.35;ctx.fillStyle='#baff70';ctx.beginPath();ctx.arc(0,0,rr*.56,0,TAU);ctx.fill();ctx.shadowBlur=0;
-    }else if(f.type==='dekuGearshift'){
-      // Gearshift: blue-white acceleration rings + green OFA electricity and long speed cuts.
-      const rr=f.radius*(.38+.62*q);ctx.shadowColor='#6feeff';ctx.shadowBlur=24;
-      ctx.strokeStyle='rgba(205,252,255,.95)';ctx.lineWidth=5*p+1;
-      for(let k=0;k<3;k++){ctx.beginPath();ctx.ellipse(0,0,rr*(.55+k*.20),rr*(.22+k*.07),k*.45+q*1.6,0,TAU);ctx.stroke()}
-      ctx.strokeStyle='#70e8ff';ctx.lineWidth=3;
-      for(let k=-3;k<=3;k++){const yy=k*12;ctx.beginPath();ctx.moveTo(-rr*(.9+.08*Math.abs(k)),yy);ctx.lineTo(rr*.78,yy*.40);ctx.stroke()}
-      ctx.strokeStyle='#9dff70';ctx.lineWidth=2.4;
-      for(let k=0;k<6;k++){const aa=k*TAU/6+t*1.8;ctx.beginPath();ctx.moveTo(Math.cos(aa)*24,Math.sin(aa)*24);ctx.lineTo(Math.cos(aa+.12)*rr*.70,Math.sin(aa+.12)*rr*.70);ctx.lineTo(Math.cos(aa-.05)*rr*.92,Math.sin(aa-.05)*rr*.92);ctx.stroke()}
-      ctx.shadowBlur=0;
-    }else if(f.type==='dekuStun'){
-      ctx.rotate(-f.angle);ctx.strokeStyle='#a7ff70';ctx.shadowColor='#8aff5f';ctx.shadowBlur=16;ctx.lineWidth=3;
-      for(let k=0;k<6;k++){const aa=k*TAU/6+t*2.4;ctx.beginPath();ctx.moveTo(Math.cos(aa)*26,Math.sin(aa)*26);ctx.lineTo(Math.cos(aa+.18)*f.radius*.72,Math.sin(aa+.18)*f.radius*.72);ctx.lineTo(Math.cos(aa-.08)*f.radius,Math.sin(aa-.08)*f.radius);ctx.stroke()}ctx.shadowBlur=0;
     }else if(f.type==='skill2-rocket'){
       ctx.strokeStyle='#ffc16c';ctx.lineWidth=7*p+1;ctx.shadowColor='#ffc16c';ctx.shadowBlur=16;
       for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(0,0,f.radius*q*(.55+i*.18),0,TAU);ctx.stroke()}
@@ -3815,17 +3727,7 @@ function drawUniqueProjectile(b,time,phase){
   if(shape==='stellarStar'){
     ctx.rotate(time*4+(b.motionSeed||0));ctx.shadowColor='#f0ffff';ctx.shadowBlur=21;ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(15,0);ctx.lineTo(4,4);ctx.lineTo(0,15);ctx.lineTo(-4,4);ctx.lineTo(-15,0);ctx.lineTo(-4,-4);ctx.lineTo(0,-15);ctx.lineTo(4,-4);ctx.closePath();ctx.fill();ctx.strokeStyle='#9edfff';ctx.lineWidth=2;ctx.stroke();ctx.shadowBlur=0;return true;
   }
-  if(shape==='dekuAirForce'){
-    const smash=b.special==='detroitAirSmash',size=smash?1.55:1;
-    // AIR FORCE is drawn as compressed air/shock pressure, not a solid energy bullet.
-    ctx.globalAlpha=.88;ctx.shadowColor=smash?'#d8ffb0':'#c8fff0';ctx.shadowBlur=smash?20:10;
-    ctx.strokeStyle='rgba(244,255,251,.95)';ctx.lineWidth=smash?4.5:2.8;
-    ctx.beginPath();ctx.arc(2,0,(smash?15:9)*pulse,-1.18,1.18);ctx.stroke();
-    ctx.strokeStyle=smash?'rgba(174,255,111,.78)':'rgba(151,255,210,.65)';ctx.lineWidth=smash?3:1.8;
-    for(let k=-1;k<=1;k++){const yy=k*(smash?8:5);ctx.beginPath();ctx.moveTo(-34*size,yy);ctx.quadraticCurveTo(-9*size,yy*1.4,10*size,yy*.45);ctx.stroke()}
-    if(smash){ctx.globalAlpha=.34;ctx.fillStyle='#baff70';ctx.beginPath();ctx.moveTo(-8,-15);ctx.lineTo(30,0);ctx.lineTo(-8,15);ctx.closePath();ctx.fill()}
-    ctx.globalAlpha=1;ctx.shadowBlur=0;return true
-  }
+  if(shape==='dekuAirForce'){const smash=b.special==='detroitAirSmash';ctx.shadowColor=smash?'#e8ff70':'#83ffb0';ctx.shadowBlur=smash?22:12;ctx.strokeStyle=smash?'#f1ff9a':'#a7ffca';ctx.lineWidth=smash?5:3;ctx.beginPath();ctx.arc(0,0,smash?13:8,-1.1,1.1);ctx.stroke();ctx.shadowBlur=0;return true}
   if(shape==='errorBlock'){
     const gl=Math.sin(phase*4)>0?2:-2;ctx.shadowColor='#72ff45';ctx.shadowBlur=13;ctx.fillStyle='#070808';ctx.fillRect(-11,-9,22,18);ctx.lineWidth=2.5;ctx.strokeStyle='#72ff45';ctx.strokeRect(-11+gl,-9,22,18);ctx.strokeStyle='#ff3bea';ctx.strokeRect(-11-gl,-8,22,17);ctx.strokeStyle='#42eaff';ctx.strokeRect(-10,-9+gl,21,18);ctx.shadowBlur=0;return true;
   }
