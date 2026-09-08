@@ -3633,52 +3633,96 @@ function drawCombatEffects(layer='base'){
       for(let k=-1;k<=1;k++){ctx.beginPath();ctx.moveTo(2,k*7);ctx.quadraticCurveTo(push*.55,k*12,push+20,k*5);ctx.stroke()}
       ctx.shadowBlur=0;
     }else if(f.type==='dekuBlackwhip'){
-      // Blackwhip V5.49: anime-like broad black ribbons with cyan/teal electric rims.
-      // Fa Jin version is thicker, faster-looking and wrapped in green kinetic fractures.
-      const len=Math.max(50,f.radius),boost=f.variant==='faJin',grow=.82+.18*Math.sin(q*Math.PI);
+      // V5.52: high-detail Blackwhip. Normal mode keeps a dark organic ribbon with teal energy.
+      // Fa Jin mode becomes a separate black chain form with a red luminous rim and red kinetic sparks.
+      const len=Math.max(70,f.radius),boost=f.variant==='faJin',grow=.84+.16*Math.sin(q*Math.PI);
       ctx.lineJoin='round';ctx.lineCap='round';
-      const strands=boost?7:5;
-      for(let strand=0;strand<strands;strand++){
-        const centered=strand-(strands-1)/2;
-        const baseY=centered*(boost?10:13);
-        const endY=centered*(boost?22:27)+Math.sin(f.x*.004+strand*2.2)*13;
-        const reach=len*(1-Math.abs(centered)*.035)*grow;
-        const half=(boost?25:20)+(strand%2?6:2);
-        ctx.beginPath();
-        ctx.moveTo(-4,baseY*.15-half*.18);
-        ctx.quadraticCurveTo(reach*.28,baseY-half*1.15,reach*.70,endY-half*.62);
-        ctx.lineTo(reach+18,endY);
-        ctx.quadraticCurveTo(reach*.68,endY+half*.62,reach*.26,baseY+half*1.05);
-        ctx.closePath();
-        ctx.shadowColor=boost?'#6affef':'#45eef2';ctx.shadowBlur=boost?34:27;
-        ctx.fillStyle=boost?'rgba(2,10,16,.98)':'rgba(3,12,18,.97)';ctx.fill();
-        ctx.strokeStyle=boost?'rgba(115,255,244,1)':'rgba(69,238,242,.98)';ctx.lineWidth=boost?6.2:4.8;ctx.stroke();
+      if(boost){
+        const reach=len*grow;
+        const linkCount=renderPressure>=2?12:renderPressure>=1?16:22;
+        const chains=renderPressure>=2?2:3;
+        // Broad blood-red aura under the chains.
+        ctx.shadowColor='#ff2738';ctx.shadowBlur=32;ctx.strokeStyle='rgba(255,36,55,.22)';ctx.lineWidth=26;
+        for(let strand=0;strand<chains;strand++){
+          const centered=strand-(chains-1)/2,sy=centered*20,ey=centered*34+Math.sin(t*4.2+strand*2.1)*15;
+          const cy=centered*8+Math.sin(t*3.1+strand*1.7)*38;
+          ctx.beginPath();ctx.moveTo(0,sy);ctx.quadraticCurveTo(reach*.48,cy,reach,ey);ctx.stroke();
+        }
         ctx.shadowBlur=0;
-        ctx.strokeStyle='rgba(108,255,244,.36)';ctx.lineWidth=1.3;
-        ctx.beginPath();ctx.moveTo(10,baseY*.2);ctx.quadraticCurveTo(reach*.44,baseY-half*.62,reach*.90,endY-2);ctx.stroke();
+
+        for(let strand=0;strand<chains;strand++){
+          const centered=strand-(chains-1)/2,sy=centered*20,ey=centered*34+Math.sin(t*4.2+strand*2.1)*15;
+          const cx=reach*.48,cy=centered*8+Math.sin(t*3.1+strand*1.7)*38;
+          // Black core cable keeps the links visually connected.
+          ctx.strokeStyle='rgba(2,2,4,.98)';ctx.lineWidth=strand===1||chains===2?15:12;ctx.shadowColor='#b70019';ctx.shadowBlur=14;
+          ctx.beginPath();ctx.moveTo(0,sy);ctx.quadraticCurveTo(cx,cy,reach,ey);ctx.stroke();ctx.shadowBlur=0;
+
+          for(let i=0;i<linkCount;i++){
+            const u=(i+.36)/(linkCount+.15),v=1-u;
+            const x=2*v*u*cx+u*u*reach;
+            const y=v*v*sy+2*v*u*cy+u*u*ey;
+            const dx=2*v*cx+2*u*(reach-cx);
+            const dy=2*v*(cy-sy)+2*u*(ey-cy);
+            const tangent=Math.atan2(dy,dx);
+            const big=(strand===Math.floor(chains/2));
+            const lw=(big?19:15)*(1+.07*Math.sin(i*2.7+t*7));
+            const lh=(big?9.3:7.4);
+            ctx.save();ctx.translate(x,y);ctx.rotate(tangent+(i%2?Math.PI*.50:-Math.PI*.50));
+            // Outer red glow/rim.
+            ctx.shadowColor='#ff1d35';ctx.shadowBlur=20;ctx.strokeStyle='rgba(255,31,49,.99)';ctx.lineWidth=5.2;
+            ctx.fillStyle='rgba(1,1,3,.99)';ctx.beginPath();ctx.ellipse(0,0,lw,lh,0,0,TAU);ctx.fill();ctx.stroke();
+            // Inner hole makes every element read as an actual chain link.
+            ctx.shadowBlur=8;ctx.strokeStyle='rgba(118,0,17,.92)';ctx.lineWidth=2.2;ctx.beginPath();ctx.ellipse(0,0,lw*.56,lh*.44,0,0,TAU);ctx.stroke();
+            // Razor-red specular edge.
+            ctx.shadowBlur=0;ctx.strokeStyle='rgba(255,116,125,.82)';ctx.lineWidth=1.25;ctx.beginPath();ctx.arc(0,0,lw*.80,-2.70,-.42);ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        // Red fracture sparks around the Fa Jin chain.
+        ctx.shadowColor='#ff263d';ctx.shadowBlur=19;ctx.strokeStyle='rgba(255,42,59,.98)';ctx.lineWidth=2.7;
+        const sparks=renderPressure>=2?7:12;
+        for(let k=0;k<sparks;k++){
+          const u=(k+1)/(sparks+1),xx=reach*u,yy=Math.sin(u*21+t*5+k)*28;
+          ctx.beginPath();ctx.moveTo(xx-17,yy);ctx.lineTo(xx-7,yy+(k%2?-13:13));ctx.lineTo(xx+2,yy-4);ctx.lineTo(xx+15,yy+(k%3?8:-10));ctx.stroke();
+        }
+        // Heavy hooked chain head.
+        ctx.save();ctx.translate(reach+5,Math.sin(t*4.2)*10);ctx.rotate(.10*Math.sin(t*5));
+        ctx.shadowColor='#ff1d35';ctx.shadowBlur=26;ctx.fillStyle='rgba(2,2,4,.99)';ctx.strokeStyle='#ff263b';ctx.lineWidth=5;
+        ctx.beginPath();ctx.moveTo(28,0);ctx.lineTo(2,-18);ctx.lineTo(-12,-8);ctx.lineTo(3,0);ctx.lineTo(-12,9);ctx.lineTo(2,19);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
+        ctx.shadowBlur=0;
+      }else{
+        // Normal Blackwhip: layered organic black tendrils with a bright teal rim and inner highlights.
+        const strands=5;
+        for(let strand=0;strand<strands;strand++){
+          const centered=strand-(strands-1)/2;
+          const baseY=centered*12,endY=centered*24+Math.sin(t*3.2+strand*2.15+f.x*.003)*15;
+          const reach=len*(1-Math.abs(centered)*.034)*grow;
+          const half=18+(strand%2?6:2);
+          ctx.beginPath();ctx.moveTo(-5,baseY*.12-half*.22);ctx.quadraticCurveTo(reach*.30,baseY-half*1.18,reach*.70,endY-half*.58);ctx.lineTo(reach+19,endY);ctx.quadraticCurveTo(reach*.69,endY+half*.60,reach*.25,baseY+half*1.10);ctx.closePath();
+          ctx.shadowColor='#39ecf0';ctx.shadowBlur=28;ctx.fillStyle='rgba(2,7,11,.99)';ctx.fill();ctx.strokeStyle='rgba(66,237,241,.99)';ctx.lineWidth=5;ctx.stroke();ctx.shadowBlur=0;
+          ctx.strokeStyle='rgba(181,255,253,.52)';ctx.lineWidth=1.45;ctx.beginPath();ctx.moveTo(12,baseY*.20);ctx.quadraticCurveTo(reach*.47,baseY-half*.58,reach*.91,endY-2);ctx.stroke();
+        }
+        // Small cyan electrical fractures on the organic whip.
+        ctx.shadowColor='#51f7f1';ctx.shadowBlur=13;ctx.strokeStyle='rgba(89,247,241,.88)';ctx.lineWidth=2.1;
+        for(let k=1;k<=8;k++){
+          const u=k/9,xx=len*u,yy=Math.sin(u*19+t*4.5)*19;
+          ctx.beginPath();ctx.moveTo(xx-13,yy);ctx.lineTo(xx-4,yy-(k%2?10:-10));ctx.lineTo(xx+6,yy+4);ctx.lineTo(xx+14,yy-(k%3?3:-6));ctx.stroke();
+        }
+        ctx.shadowBlur=0;
       }
-      // Dark connective web between the major ribbons, like the anime frame.
-      ctx.globalAlpha*=.72;ctx.strokeStyle='rgba(0,4,8,.98)';ctx.lineWidth=boost?10:8;
-      for(let k=1;k<=3;k++){const xx=len*(.20+k*.18);ctx.beginPath();ctx.moveTo(xx,-34-k*2);ctx.lineTo(xx+46,28+k*3);ctx.stroke()}
-      ctx.globalAlpha/=.72;
-      // OFA / Fa Jin electrical fractures.
-      ctx.shadowColor=boost?'#a5ff72':'#5af1e8';ctx.shadowBlur=boost?17:11;ctx.strokeStyle=boost?'rgba(166,255,111,.96)':'rgba(91,244,237,.78)';ctx.lineWidth=boost?3:2;
-      const bolts=boost?12:7;
-      for(let k=1;k<=bolts;k++){
-        const u=k/(bolts+1),xx=len*u,yy=Math.sin(u*18+f.y*.003)*20;
-        ctx.beginPath();ctx.moveTo(xx-16,yy);ctx.lineTo(xx-6,yy-(k%2?11:-11));ctx.lineTo(xx+5,yy+5);ctx.lineTo(xx+15,yy-(k%3?4:-7));ctx.stroke();
-      }
-      ctx.shadowBlur=0;ctx.lineCap='butt';ctx.lineJoin='miter';
+      ctx.lineCap='butt';ctx.lineJoin='miter';
     }else if(f.type==='dekuWhipElasticDash'){
       // V5.51: elastic snap-back dash after Blackwhip misses every player.
       const len=Math.max(20,f.radius),boost=f.variant==='faJin',head=len*(.30+.70*q);
-      ctx.lineCap='round';ctx.shadowColor=boost?'#a8ff72':'#5ef5eb';ctx.shadowBlur=boost?28:21;
-      ctx.strokeStyle=boost?'rgba(171,255,113,.96)':'rgba(92,246,235,.94)';ctx.lineWidth=boost?7:5.5;
+      ctx.lineCap='round';ctx.shadowColor=boost?'#ff233b':'#5ef5eb';ctx.shadowBlur=boost?30:21;
+      ctx.strokeStyle=boost?'rgba(255,42,59,.98)':'rgba(92,246,235,.94)';ctx.lineWidth=boost?8:5.5;
       ctx.beginPath();ctx.moveTo(-10,0);ctx.quadraticCurveTo(head*.28,Math.sin(q*Math.PI)*24,head,0);ctx.stroke();
       ctx.strokeStyle='rgba(228,255,253,.94)';ctx.lineWidth=2.6;
       for(let k=-2;k<=2;k++){const yy=k*9;ctx.beginPath();ctx.moveTo(-35-Math.abs(k)*10,yy);ctx.lineTo(head*.42,yy*.38);ctx.stroke()}
-      ctx.strokeStyle='rgba(5,16,22,.92)';ctx.lineWidth=boost?10:8;
+      ctx.strokeStyle=boost?'rgba(3,2,4,.98)':'rgba(5,16,22,.92)';ctx.lineWidth=boost?12:8;
       ctx.beginPath();ctx.moveTo(-4,-5);ctx.quadraticCurveTo(head*.45,-22,head*.78,-4);ctx.stroke();
+      if(boost){ctx.strokeStyle='rgba(255,45,61,.95)';ctx.lineWidth=2.4;for(let k=1;k<=6;k++){const xx=head*k/7,yy=Math.sin(k*2.4+t*5)*10;ctx.beginPath();ctx.moveTo(xx-8,yy);ctx.lineTo(xx,yy+(k%2?-8:8));ctx.lineTo(xx+8,yy-2);ctx.stroke()}}
       ctx.shadowBlur=0;ctx.lineCap='butt';
     }else if(f.type==='dekuFaJinAttack'){
       // Any Deku attack released while Fa Jin is active gets a distinct kinetic-discharge flash.
