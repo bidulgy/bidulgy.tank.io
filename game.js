@@ -3633,59 +3633,140 @@ function drawCombatEffects(layer='base'){
       for(let k=-1;k<=1;k++){ctx.beginPath();ctx.moveTo(2,k*7);ctx.quadraticCurveTo(push*.55,k*12,push+20,k*5);ctx.stroke()}
       ctx.shadowBlur=0;
     }else if(f.type==='dekuBlackwhip'){
-      // V5.53: both Blackwhip forms are ONE huge, heavy line instead of several separate tendrils.
-      // Fa Jin keeps the black/red chain identity, but every link rides inside one massive cable silhouette.
-      const len=Math.max(70,f.radius),boost=f.variant==='faJin',grow=.86+.14*Math.sin(q*Math.PI),reach=len*grow;
-      const bend=Math.sin(t*3.5+f.x*.0027)*18*(1-q*.35);
-      const endY=Math.sin(t*4.4+f.y*.0021)*8;
-      const coreWidth=boost?86:68;
+      // V5.55: cel-anime Blackwhip reconstruction.
+      // A single huge solid black whip body: sharp asymmetric silhouette, hard cyan/red rim,
+      // dark internal facets and animated energy seams. Fa Jin uses the same ONE body with red chain plates.
+      const len=Math.max(90,f.radius),boost=f.variant==='faJin';
+      const extend=Math.min(1,1.18*q+.16),snap=Math.sin(Math.min(1,q)*Math.PI);
+      const reach=len*(.10+.90*extend);
+      const baseWidth=boost?116:102;
+      const bend=(Math.sin(t*3.1+f.x*.0031)*18+Math.sin(t*5.7+f.y*.0017)*6)*(.45+.55*extend);
+      const tipWobble=Math.sin(t*5.2+f.x*.0019)*8;
+      const samples=renderPressure>=2?20:renderPressure>=1?28:38;
       ctx.lineJoin='round';ctx.lineCap='round';
-      const whipPath=()=>{ctx.beginPath();ctx.moveTo(-6,0);ctx.bezierCurveTo(reach*.28,-bend,reach*.64,bend*.72,reach,endY)};
 
-      // One broad outer energy silhouette.
-      ctx.shadowColor=boost?'#ff2039':'#38f1ef';ctx.shadowBlur=boost?44:34;
-      ctx.strokeStyle=boost?'rgba(255,28,48,.30)':'rgba(48,240,238,.28)';ctx.lineWidth=coreWidth+30;whipPath();ctx.stroke();
+      const centerAt=(u)=>{
+        const v=1-u;
+        const c1x=reach*.30,c2x=reach*.70;
+        const c1y=-bend*.92,c2y=bend*.66;
+        const x=3*v*v*u*c1x+3*v*u*u*c2x+u*u*u*reach;
+        const y=3*v*v*u*c1y+3*v*u*u*c2y+u*u*u*tipWobble;
+        const dx=3*v*v*c1x+6*v*u*(c2x-c1x)+3*u*u*(reach-c2x);
+        const dy=3*v*v*c1y+6*v*u*(c2y-c1y)+3*u*u*(tipWobble-c2y);
+        const d=Math.hypot(dx,dy)||1;
+        return{x,y,nx:-dy/d,ny:dx/d,ang:Math.atan2(dy,dx)};
+      };
+      const widthAt=(u)=>{
+        // Narrow at Deku's arm, huge through the middle, slightly tapered at the gripping tip.
+        const body=.33+.74*Math.sin(Math.PI*Math.min(.98,u*.94));
+        const tipTaper=1-.24*Math.max(0,(u-.80)/.20);
+        return baseWidth*body*tipTaper;
+      };
 
-      // Thick black body: this is the single visible Blackwhip line.
-      ctx.shadowColor=boost?'#b6001c':'#0ddde0';ctx.shadowBlur=boost?24:18;
-      ctx.strokeStyle=boost?'rgba(2,1,4,.995)':'rgba(2,7,11,.995)';ctx.lineWidth=coreWidth;whipPath();ctx.stroke();
+      const left=[],right=[];
+      for(let i=0;i<=samples;i++){
+        const u=i/samples,c=centerAt(u);
+        const edgeNoise=(Math.sin(i*2.43+t*7.7+f.x*.0047)*4.2+Math.sin(i*.91-t*4.2)*2.1)*(1-.35*u);
+        const tooth=(i%6===2?5.5:(i%7===4?-3.2:0))*(.95-.45*u);
+        const half=Math.max(12,widthAt(u)*.5+edgeNoise+tooth);
+        left.push([c.x+c.nx*half,c.y+c.ny*half]);
+        right.push([c.x-c.nx*half,c.y-c.ny*half]);
+      }
+      const bodyPath=()=>{
+        ctx.beginPath();ctx.moveTo(left[0][0],left[0][1]);
+        for(let i=1;i<left.length;i++)ctx.lineTo(left[i][0],left[i][1]);
+        for(let i=right.length-1;i>=0;i--)ctx.lineTo(right[i][0],right[i][1]);
+        ctx.closePath();
+      };
 
-      // Bright rim follows the exact same single body instead of splitting into multiple whips.
-      ctx.shadowColor=boost?'#ff243d':'#53fbf5';ctx.shadowBlur=boost?25:18;
-      ctx.strokeStyle=boost?'rgba(255,38,58,.98)':'rgba(67,241,240,.97)';ctx.lineWidth=boost?9:7;whipPath();ctx.stroke();
-      ctx.shadowBlur=0;
+      // Flat anime aura: broad but controlled so the body remains truly black, not a neon tube.
+      ctx.shadowColor=boost?'#f30e29':'#00dfe3';ctx.shadowBlur=boost?30:26;
+      ctx.strokeStyle=boost?'rgba(255,20,43,.30)':'rgba(0,230,234,.30)';ctx.lineWidth=baseWidth+24;
+      ctx.beginPath();for(let i=0;i<=samples;i++){const c=centerAt(i/samples);i?ctx.lineTo(c.x,c.y):ctx.moveTo(c.x,c.y)}ctx.stroke();
 
-      if(boost){
-        // Fa Jin: repeated black chain impressions with hot-red rims, embedded inside the one thick cable.
-        const links=renderPressure>=2?10:renderPressure>=1?14:18;
-        for(let i=1;i<links;i++){
-          const u=i/links,v=1-u;
-          const cx=reach*.28,cy=-bend,cx2=reach*.64,cy2=bend*.72;
-          const x=v*v*v*(-6)+3*v*v*u*cx+3*v*u*u*cx2+u*u*u*reach;
-          const y=3*v*v*u*cy+3*v*u*u*cy2+u*u*u*endY;
-          const dx=3*v*v*(cx+6)+6*v*u*(cx2-cx)+3*u*u*(reach-cx2);
-          const dy=3*v*v*cy+6*v*u*(cy2-cy)+3*u*u*(endY-cy2);
-          ctx.save();ctx.translate(x,y);ctx.rotate(Math.atan2(dy,dx)+(i%2?Math.PI*.5:0));
-          ctx.shadowColor='#ff1733';ctx.shadowBlur=15;ctx.fillStyle='rgba(1,1,3,.98)';ctx.strokeStyle='rgba(255,44,63,.98)';ctx.lineWidth=4;
-          ctx.beginPath();ctx.ellipse(0,0,24,11,0,0,TAU);ctx.fill();ctx.stroke();
-          ctx.shadowBlur=0;ctx.strokeStyle='rgba(122,0,19,.95)';ctx.lineWidth=2.3;ctx.beginPath();ctx.ellipse(0,0,13,5.4,0,0,TAU);ctx.stroke();ctx.restore();
+      // Main cel-shaded solid body.
+      const bodyGrad=ctx.createLinearGradient(0,-baseWidth*.45,0,baseWidth*.45);
+      if(boost){bodyGrad.addColorStop(0,'#050507');bodyGrad.addColorStop(.46,'#000001');bodyGrad.addColorStop(.72,'#090205');bodyGrad.addColorStop(1,'#010102')}
+      else{bodyGrad.addColorStop(0,'#061216');bodyGrad.addColorStop(.42,'#010507');bodyGrad.addColorStop(.72,'#07191d');bodyGrad.addColorStop(1,'#000304')}
+      ctx.fillStyle=bodyGrad;bodyPath();ctx.fill();
+
+      // Hard luminous edge matching cel animation.
+      ctx.shadowColor=boost?'#ff1736':'#20edf0';ctx.shadowBlur=boost?23:20;
+      ctx.strokeStyle=boost?'#ff263f':'#35e9ed';ctx.lineWidth=boost?7.5:7;bodyPath();ctx.stroke();ctx.shadowBlur=0;
+      ctx.strokeStyle=boost?'rgba(255,125,137,.72)':'rgba(158,255,255,.68)';ctx.lineWidth=1.6;
+      ctx.beginPath();for(let i=2;i<left.length-2;i++){const p0=left[i];i===2?ctx.moveTo(p0[0],p0[1]):ctx.lineTo(p0[0],p0[1])}ctx.stroke();
+
+      // All details stay inside ONE thick whip silhouette.
+      ctx.save();bodyPath();ctx.clip();
+
+      // Deep angular facets give the black mass the same hand-drawn dimensional read as the reference.
+      for(let lane=-1;lane<=1;lane++){
+        const off=lane*(boost?22:20);
+        ctx.strokeStyle=boost?(lane===0?'rgba(75,0,9,.74)':'rgba(20,2,6,.92)'):(lane===0?'rgba(0,73,78,.78)':'rgba(0,29,34,.92)');
+        ctx.lineWidth=lane===0?10:7;
+        ctx.beginPath();
+        for(let j=2;j<=samples-2;j++){
+          const u=j/samples,c=centerAt(u),w=widthAt(u),osc=Math.sin(u*15+t*2.4+lane)*w*.08;
+          const x=c.x+c.nx*(off+osc),y=c.y+c.ny*(off+osc);
+          j===2?ctx.moveTo(x,y):ctx.lineTo(x,y);
         }
-        ctx.shadowColor='#ff2038';ctx.shadowBlur=20;ctx.strokeStyle='rgba(255,46,64,.97)';ctx.lineWidth=3.1;
-        const sparks=renderPressure>=2?6:10;
-        for(let k=1;k<=sparks;k++){const u=k/(sparks+1),xx=reach*u,yy=Math.sin(u*22+t*5.2)*34;ctx.beginPath();ctx.moveTo(xx-15,yy);ctx.lineTo(xx-5,yy+(k%2?-14:14));ctx.lineTo(xx+5,yy-5);ctx.lineTo(xx+17,yy+(k%3?7:-10));ctx.stroke()}
-        ctx.shadowBlur=0;
-      }else{
-        // Normal form: teal fractures and a subtle inner highlight, still one single huge black line.
-        ctx.strokeStyle='rgba(196,255,253,.42)';ctx.lineWidth=2.2;ctx.beginPath();ctx.moveTo(16,-coreWidth*.20);ctx.bezierCurveTo(reach*.30,-bend-coreWidth*.13,reach*.66,bend*.70-coreWidth*.11,reach*.94,endY-coreWidth*.09);ctx.stroke();
-        ctx.shadowColor='#53faf4';ctx.shadowBlur=14;ctx.strokeStyle='rgba(83,248,242,.90)';ctx.lineWidth=2.5;
-        for(let k=1;k<=8;k++){const u=k/9,xx=reach*u,yy=Math.sin(u*19+t*4.6)*29;ctx.beginPath();ctx.moveTo(xx-14,yy);ctx.lineTo(xx-5,yy-(k%2?12:-12));ctx.lineTo(xx+5,yy+4);ctx.lineTo(xx+15,yy-(k%3?4:-7));ctx.stroke()}
-        ctx.shadowBlur=0;
+        ctx.stroke();
       }
 
-      // Heavy arrow-like end cap emphasizes the single-line direction.
-      ctx.save();ctx.translate(reach+4,endY);ctx.rotate(.04*Math.sin(t*5));ctx.shadowColor=boost?'#ff2038':'#48f4ef';ctx.shadowBlur=24;
-      ctx.fillStyle='rgba(2,3,5,.99)';ctx.strokeStyle=boost?'#ff2d45':'#55f4ef';ctx.lineWidth=boost?6:5;
-      ctx.beginPath();ctx.moveTo(34,0);ctx.lineTo(-5,-22);ctx.lineTo(5,0);ctx.lineTo(-5,22);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();ctx.shadowBlur=0;
+      if(boost){
+        // Fa Jin + Blackwhip: large red-rimmed chain links embedded in the same single black body.
+        const links=renderPressure>=2?10:renderPressure>=1?14:18;
+        for(let i=1;i<links;i++){
+          const u=.04+i/(links+1)*.92,c=centerAt(u),w=widthAt(u);
+          const flip=i%2?Math.PI*.5:0,scale=Math.min(1.18,Math.max(.70,w/baseWidth));
+          ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.ang+flip);
+          ctx.shadowColor='#ff1534';ctx.shadowBlur=16;
+          ctx.strokeStyle='rgba(255,30,54,.98)';ctx.lineWidth=5.2;
+          ctx.fillStyle='rgba(0,0,1,.98)';ctx.beginPath();ctx.ellipse(0,0,31*scale,13.5*scale,0,0,TAU);ctx.fill();ctx.stroke();
+          ctx.shadowBlur=4;ctx.strokeStyle='rgba(115,0,17,.98)';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,0,17.5*scale,6.4*scale,0,0,TAU);ctx.stroke();
+          ctx.shadowBlur=0;ctx.strokeStyle='rgba(255,142,151,.72)';ctx.lineWidth=1.25;ctx.beginPath();ctx.arc(0,0,25*scale,-2.7,-.45);ctx.stroke();
+          ctx.restore();
+        }
+        // Thin red lightning cracks between links.
+        ctx.shadowColor='#ff1737';ctx.shadowBlur=13;ctx.strokeStyle='rgba(255,38,60,.95)';ctx.lineWidth=2.7;
+        const crackCount=renderPressure>=2?6:10;
+        for(let k=1;k<=crackCount;k++){
+          const u=k/(crackCount+1),c=centerAt(u),side=k%2?-1:1,w=widthAt(u);
+          const n=side*w*.24,x=c.x+c.nx*n,y=c.y+c.ny*n;
+          ctx.beginPath();ctx.moveTo(x-15,y);ctx.lineTo(x-6,y+side*12);ctx.lineTo(x+3,y-side*6);ctx.lineTo(x+17,y+side*7);ctx.stroke();
+        }
+        ctx.shadowBlur=0;
+      }else{
+        // Normal Blackwhip: long cyan-blue veins like the anime frame, not separate whip strands.
+        const veinOffsets=[-.22,0,.22];
+        for(let v=0;v<veinOffsets.length;v++){
+          ctx.shadowColor=v===1?'#1ae9ed':'#008f99';ctx.shadowBlur=v===1?10:5;
+          ctx.strokeStyle=v===1?'rgba(32,222,226,.78)':'rgba(0,117,126,.72)';ctx.lineWidth=v===1?3.4:2.3;
+          ctx.beginPath();
+          for(let j=2;j<=samples-2;j++){
+            const u=j/samples,c=centerAt(u),w=widthAt(u);
+            const n=w*veinOffsets[v]+Math.sin(u*19+t*2.6+v)*w*.035;
+            const x=c.x+c.nx*n,y=c.y+c.ny*n;
+            j===2?ctx.moveTo(x,y):ctx.lineTo(x,y);
+          }
+          ctx.stroke();
+        }
+        ctx.shadowBlur=0;
+      }
+      ctx.restore();
+
+      // Heavy pointed gripping head. It remains part of the single line instead of branching into extra tendrils.
+      const tip=centerAt(1),tipWidth=Math.max(24,widthAt(1)*.60);
+      ctx.save();ctx.translate(tip.x,tip.y);ctx.rotate(tip.ang);
+      ctx.shadowColor=boost?'#ff1736':'#20eef1';ctx.shadowBlur=22;
+      ctx.fillStyle='#010203';ctx.strokeStyle=boost?'#ff2943':'#3cf0f1';ctx.lineWidth=boost?7:6;
+      ctx.beginPath();ctx.moveTo(46,0);ctx.lineTo(-7,-tipWidth*.56);ctx.lineTo(4,-tipWidth*.20);ctx.lineTo(-18,0);ctx.lineTo(4,tipWidth*.20);ctx.lineTo(-7,tipWidth*.56);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.shadowBlur=0;ctx.restore();
+
+      // Small snap flare at the arm during extension, emphasizing the violent anime-like launch.
+      ctx.globalAlpha*=.72*snap;
+      ctx.strokeStyle=boost?'rgba(255,60,79,.82)':'rgba(72,245,242,.78)';ctx.lineWidth=3;
+      for(let k=-2;k<=2;k++){ctx.beginPath();ctx.moveTo(-12,k*8);ctx.lineTo(28+12*Math.abs(k),k*15);ctx.stroke()}
       ctx.lineCap='butt';ctx.lineJoin='miter';
     }else if(f.type==='dekuWhipElasticDash'){
       // V5.51: elastic snap-back dash after Blackwhip misses every player.
