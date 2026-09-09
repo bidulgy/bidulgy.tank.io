@@ -1,0 +1,39 @@
+# Sworder VS Tank V5.56 - EC2 t3.small
+# /etc/nginx/sites-available/bidulgy-tank
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    root /var/www/bidulgy.tank.io;
+    index index.html;
+
+    # 게임 정적 파일
+    location / {
+        try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache";
+    }
+
+    # EC2 Node.js 실시간 전투 서버
+    location /arena-ws {
+        proxy_pass http://127.0.0.1:3000/arena-ws;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 75s;
+        proxy_send_timeout 75s;
+        proxy_buffering off;
+        tcp_nodelay on;
+    }
+
+    # 서버 상태 확인
+    location = /health {
+        proxy_pass http://127.0.0.1:3000/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_buffering off;
+    }
+}
