@@ -3,6 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
+console.info('[Sworder VS Tank] game V5.57 · anime Blackwhip reconstruction');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -24,10 +25,11 @@ const LOCAL_REBALANCE_BATCH=4;
 let running=false,paused=false,last=performance.now(),camera={x:0,y:0},shapes=[],bullets=[],particles=[],combatFx=[],skillZones=[],shake=0,classUpgradeShown=false,player,playerHistory=[];
 const remotePlayers=new Map();
 let onlineChannel=null,onlineReady=false,onlineSelfId='',lastStateSend=0,networkSerial=0,lastRunAutosave=0,runSaveBusy=false,normalSpawnTimer=0;
+let onlinePresenceIds=new Set(),onlinePingTimer=0,onlineLatencyMs=0;
 let onlineReconnectTimer=0,onlineReconnectBusy=false,lastNetworkStateReceive=0;
 let localStateSeq=0,lastSkillHudFrameUpdate=0;
 const cachedPresenceIds=new Set();
-const REMOTE_STATE_INTERVAL=110;
+const REMOTE_STATE_INTERVAL=66; // V5.56: EC2 t3.small 전용 WS에서 약 15Hz 위치 동기화
 const REMOTE_PLAYER_STALE_MS=45000;
 const REMOTE_PLAYER_ABSENT_GRACE_MS=30000;
 const MAX_PARTICLES=360;
@@ -307,19 +309,8 @@ function setNetworkStatus(state,text){
 }
 function updateOnlineCount(){
   if(!ui.onlineCount)return;
-  let count=onlineReady?1:0;
-  try{
-    const presence=onlineChannel?.presenceState?.()||{};
-    const ids=new Set();
-    for(const entries of Object.values(presence)){
-      for(const p of entries||[]){
-        const id=String(p?.user_id||p?.presence_ref||'');
-        if(id)ids.add(id);
-      }
-    }
-    if(ids.size)count=ids.size;
-  }catch(_){}
-  ui.onlineCount.textContent=String(Math.max(0,count));
+  const count=onlineReady?Math.max(1,onlinePresenceIds.size):0;
+  ui.onlineCount.textContent=String(count);
 }
 function safeRemoteNumber(v,fallback=0){
   v=Number(v);
@@ -331,17 +322,8 @@ function makeShapeId(){
   return `${owner}:${Date.now().toString(36)}:${(++shapeSerial).toString(36)}`;
 }
 function getPresencePlayerIds(){
-  const ids=new Set();
+  const ids=new Set(onlinePresenceIds);
   if(onlineReady&&onlineSelfId)ids.add(onlineSelfId);
-  try{
-    const presence=onlineChannel?.presenceState?.()||{};
-    for(const entries of Object.values(presence)){
-      for(const p of entries||[]){
-        const id=String(p?.user_id||p?.presence_ref||'');
-        if(id)ids.add(id);
-      }
-    }
-  }catch(_){}
   for(const id of remotePlayers.keys())if(id)ids.add(id);
   return [...ids].sort();
 }
@@ -593,13 +575,13 @@ function localNetworkState(){
   };
 }
 function sendOnline(event,payload){
-  if(!onlineReady||!onlineChannel)return;
+  const ws=onlineChannel;
+  if(!onlineReady||!ws||ws.readyState!==WebSocket.OPEN)return;
   try{
-    const result=onlineChannel.send({type:'broadcast',event,payload});
-    if(result&&typeof result.catch==='function')void result.catch(()=>{});
+    // V5.56: 전투 패킷은 Supabase Realtime이 아니라 EC2 t3.small 직결 WebSocket으로 전송.
+    ws.send(JSON.stringify({type:'event',event:String(event||''),payload:payload||{}}));
   }catch(error){
-    // Realtime disconnects or Supabase maintenance must never stop the local battle loop.
-    console.warn('Realtime send skipped:',error);
+    console.warn('EC2 arena send skipped:',error);
   }
 }
 function broadcastLocalState(force=false){
@@ -807,21 +789,86 @@ function scheduleOnlineReconnect(reason='connection_lost'){
   },1200);
 }
 
+function arenaWebSocketUrl(){
+  try{
+    const params=new URLSearchParams(location.search);
+    const query=params.get('arenaWs');
+    if(query){
+      const decoded=decodeURIComponent(query).trim();
+      if(/^wss?:\/\//i.test(decoded))localStorage.setItem('tank_arena_ws_url',decoded);
+    }
+  }catch(_){}
+  const override=String(window.TANK_ARENA_WS_URL||localStorage.getItem('tank_arena_ws_url')||'').trim();
+  if(/^wss?:\/\//i.test(override))return override;
+  const scheme=location.protocol==='https:'?'wss:':'ws:';
+  return `${scheme}//${location.host}/arena-ws`;
+}
+function dispatchArenaEvent(event,payload){
+  if(event==='state')return upsertRemotePlayer(payload);
+  if(event==='shot')return addRemoteShot(payload);
+  if(event==='shotSync')return receiveShotSync(payload);
+  if(event==='shotEnd')return receiveShotEnd(payload);
+  if(event==='damage')return receiveDamage(payload);
+  if(event==='status')return receiveStatus(payload);
+  if(event==='kill')return receiveKill(payload);
+  if(event==='skill')return receiveRemoteSkill(payload);
+  if(event==='worldSnapshot')return applyWorldSnapshot(payload);
+  if(event==='worldRequest'){
+    if(isWorldHost()&&(!payload?.hostId||String(payload.hostId)===onlineSelfId))sendWorldSnapshot(true);
+    return;
+  }
+  if(event==='shapeDamage')return receiveShapeDamage(payload);
+  if(event==='shapeImpulse')return receiveShapeImpulse(payload);
+}
+function applyArenaPresence(players){
+  const previous=new Set(onlinePresenceIds);
+  onlinePresenceIds.clear();
+  for(const p of Array.isArray(players)?players:[]){
+    const id=String(p?.userId||p?.id||'');
+    if(id)onlinePresenceIds.add(id);
+  }
+  if(onlineSelfId)onlinePresenceIds.add(onlineSelfId);
+  for(const id of previous){
+    if(id===onlineSelfId||onlinePresenceIds.has(id))continue;
+    const r=remotePlayers.get(id);
+    if(r&&!r.presenceMissingSince)r.presenceMissingSince=performance.now();
+  }
+  refreshPresenceCache();
+  updateOnlineCount();
+  setTimeout(()=>electWorldHost(true),0);
+}
+function stopArenaPing(){
+  if(onlinePingTimer){clearInterval(onlinePingTimer);onlinePingTimer=0}
+}
+function startArenaPing(ws){
+  stopArenaPing();
+  onlinePingTimer=setInterval(()=>{
+    if(ws!==onlineChannel||ws.readyState!==WebSocket.OPEN)return;
+    try{ws.send(JSON.stringify({type:'client_ping',sentAt:Date.now()}))}catch(_){}
+  },5000);
+}
+
 async function disconnectOnlineArena(clearRemotes=true){
   if(!onlineReconnectBusy)clearOnlineReconnectTimer();
   onlineReady=false;
-  updateOnlineCount();
+  stopArenaPing();
   if(clearRemotes)remotePlayers.clear();
   cachedPresenceIds.clear();
+  onlinePresenceIds.clear();
   worldHostId='';lastWorldSnapshotReceive=0;lastWorldSnapshotSend=0;
-  const ch=onlineChannel;
+  const ws=onlineChannel;
   onlineChannel=null;
-  if(ch){
-    try{await window.IronCellAuth?.client?.removeChannel(ch)}catch(_){}
+  if(ws){
+    ws.__manualClose=true;
+    try{
+      if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:'leave'}));
+    }catch(_){}
+    try{ws.close(1000,'client_leave')}catch(_){}
   }
+  updateOnlineCount();
 }
 async function connectOnlineArena(preserveRemotes=false){
-  if(onlineReady&&onlineChannel)return true;
+  if(onlineReady&&onlineChannel?.readyState===WebSocket.OPEN)return true;
   const client=window.IronCellAuth?.client;
   const user=window.IronCellAuth?.user;
   if(!client||!user){
@@ -831,89 +878,126 @@ async function connectOnlineArena(preserveRemotes=false){
 
   await disconnectOnlineArena(!preserveRemotes);
   onlineSelfId=String(user.id);
-  setNetworkStatus('connecting','온라인 서버 연결 중...');
+  setNetworkStatus('connecting','t3.small 전투 서버 연결 중...');
   if(!preserveRemotes)remotePlayers.clear();
 
-  const ch=client.channel('iron-cell-arena-global-v1',{
-    config:{
-      broadcast:{self:false,ack:false},
-      presence:{key:onlineSelfId}
+  let session=null;
+  try{
+    const first=await client.auth.getSession();
+    session=first?.data?.session||null;
+    if(!session?.access_token){
+      const refreshed=await client.auth.refreshSession();
+      session=refreshed?.data?.session||null;
     }
-  });
-  onlineChannel=ch;
+  }catch(error){
+    console.warn('EC2 arena session read failed:',error);
+  }
+  if(!session?.access_token){
+    setNetworkStatus('error','로그인 세션을 다시 확인해 주세요');
+    return false;
+  }
 
-  ch.on('broadcast',{event:'state'},({payload})=>upsertRemotePlayer(payload));
-  ch.on('broadcast',{event:'shot'},({payload})=>addRemoteShot(payload));
-  ch.on('broadcast',{event:'shotSync'},({payload})=>receiveShotSync(payload));
-  ch.on('broadcast',{event:'shotEnd'},({payload})=>receiveShotEnd(payload));
-  ch.on('broadcast',{event:'damage'},({payload})=>receiveDamage(payload));
-  ch.on('broadcast',{event:'status'},({payload})=>receiveStatus(payload));
-  ch.on('broadcast',{event:'kill'},({payload})=>receiveKill(payload));
-  ch.on('broadcast',{event:'skill'},({payload})=>receiveRemoteSkill(payload));
-  ch.on('broadcast',{event:'worldSnapshot'},({payload})=>applyWorldSnapshot(payload));
-  ch.on('broadcast',{event:'worldRequest'},({payload})=>{
-    if(isWorldHost()&&(!payload?.hostId||String(payload.hostId)===onlineSelfId))sendWorldSnapshot(true);
-  });
-  ch.on('broadcast',{event:'shapeDamage'},({payload})=>receiveShapeDamage(payload));
-  ch.on('broadcast',{event:'shapeImpulse'},({payload})=>receiveShapeImpulse(payload));
-  ch.on('presence',{event:'sync'},()=>{refreshPresenceCache();updateOnlineCount();electWorldHost()});
-  ch.on('presence',{event:'join'},()=>{refreshPresenceCache();updateOnlineCount();setTimeout(()=>electWorldHost(),0)});
-  ch.on('presence',{event:'leave'},({key})=>{
-    if(key){
-      const r=remotePlayers.get(String(key));
-      if(r&&!r.presenceMissingSince)r.presenceMissingSince=performance.now();
-    }
-    refreshPresenceCache();
-    updateOnlineCount();
-    setTimeout(()=>electWorldHost(true),0);
-  });
+  const wsUrl=arenaWebSocketUrl();
+  let ws;
+  try{ws=new WebSocket(wsUrl)}
+  catch(error){
+    console.warn('EC2 arena websocket create failed:',error);
+    setNetworkStatus('error','t3.small 서버 주소 오류');
+    return false;
+  }
+  onlineChannel=ws;
 
   return await new Promise(resolve=>{
     let settled=false;
-    const timer=setTimeout(()=>{
+    const finish=value=>{
       if(settled)return;
       settled=true;
-      setNetworkStatus('error','온라인 서버 연결 실패');
-      resolve(false);
+      clearTimeout(timer);
+      resolve(value);
+    };
+    const timer=setTimeout(()=>{
+      if(ws===onlineChannel){
+        ws.__manualClose=true;
+        try{ws.close()}catch(_){}
+      }
+      setNetworkStatus('error','t3.small 서버 연결 실패');
+      finish(false);
     },7000);
 
-    ch.subscribe(async status=>{
-      if(status==='SUBSCRIBED'){
-        clearTimeout(timer);
+    ws.onopen=()=>{
+      try{
+        ws.send(JSON.stringify({
+          type:'join',
+          arenaId:'iron-cell-arena-global-v1',
+          accessToken:session.access_token,
+          username:String(window.IronCellAuth?.username||player?.name||'PLAYER').slice(0,24),
+          sentAt:Date.now()
+        }));
+      }catch(error){
+        console.warn('EC2 arena join send failed:',error);
+      }
+    };
+
+    ws.onmessage=event=>{
+      let message;
+      try{message=JSON.parse(String(event.data||''))}
+      catch(_){return}
+      const type=String(message?.type||'');
+
+      if(type==='joined'){
+        if(ws!==onlineChannel)return;
         onlineReady=true;
         clearOnlineReconnectTimer();
-        try{
-          await ch.track({
-            user_id:onlineSelfId,
-            username:window.IronCellAuth?.username||'PLAYER',
-            joined_at:new Date().toISOString()
-          });
-        }catch(_){}
-        refreshPresenceCache();
-        updateOnlineCount();
-        electWorldHost(true);
-        setNetworkStatus('online','온라인 서버 연결됨');
+        applyArenaPresence(message.players||[]);
+        startArenaPing(ws);
+        setNetworkStatus('online','t3.small 전투 서버 연결됨');
         broadcastLocalState(true);
-        if(!settled){
-          settled=true;
-          resolve(true);
+        finish(true);
+        return;
+      }
+      if(type==='presence'){
+        applyArenaPresence(message.players||[]);
+        return;
+      }
+      if(type==='event'){
+        dispatchArenaEvent(String(message.event||''),message.payload||{});
+        return;
+      }
+      if(type==='client_pong'){
+        const sentAt=Number(message.sentAt||0);
+        if(sentAt>0){
+          onlineLatencyMs=Math.max(0,Date.now()-sentAt);
+          if(onlineReady)setNetworkStatus('online',`t3.small 연결됨 · ${onlineLatencyMs}ms`);
         }
         return;
       }
-
-      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
-        onlineReady=false;
-        updateOnlineCount();
-        if(!settled){
-          settled=true;
-          clearTimeout(timer);
-          setNetworkStatus('error','온라인 서버 연결 실패');
-          resolve(false);
-        }else if(running){
-          scheduleOnlineReconnect(status);
-        }
+      if(type==='error'){
+        const code=String(message.code||'SERVER_ERROR');
+        console.warn('EC2 arena server:',code,message.message||'');
+        if(code==='AUTH_FAILED')setNetworkStatus('error','t3.small 인증 실패 · 다시 로그인해 주세요');
       }
-    });
+    };
+
+    ws.onerror=()=>{};
+
+    ws.onclose=event=>{
+      const manual=ws.__manualClose===true;
+      if(ws===onlineChannel){
+        onlineChannel=null;
+        onlineReady=false;
+        stopArenaPing();
+        onlinePresenceIds.clear();
+        cachedPresenceIds.clear();
+        updateOnlineCount();
+      }
+      if(!settled){
+        setNetworkStatus('error','t3.small 서버 연결 실패');
+        finish(false);
+      }else if(!manual&&running){
+        setNetworkStatus('connecting','t3.small 연결 복구 중...');
+        scheduleOnlineReconnect(`ws_${event.code||'closed'}`);
+      }
+    };
   });
 }
 
@@ -1059,7 +1143,7 @@ function receiveRemoteSkill(payload){
       if(skillType==='dekuSmoke'){skillZones.push({type:'dekuSmoke',x:tx,y:ty,radius,life,maxLife:life,damage:0,tick:0,angle:0,length:0,width:0,ownerId:String(payload.ownerId||''),networkRemote:true,pulses:0,interval:.4,data:{}});return}
       if(skillType==='dekuBlackwhip'){
         const whipAngle=fxAngleToTarget(x,y,tx,ty,safeRemoteNumber(payload.zoneAngle,angle));
-        spawnCombatFx('dekuBlackwhip',x,y,{angle:whipAngle,color:'#52e7ea',life:1.25,radius:safeRemoteNumber(payload.length,760),cannon:'deku',variant:payload.faJinBoost===true?'faJin':''});
+        spawnCombatFx('dekuBlackwhip',x,y,{angle:whipAngle,color:'#52e7ea',life:.92,radius:safeRemoteNumber(payload.length,800),cannon:'deku',variant:payload.faJinBoost===true?'faJin':''});
         if(payload.recoilDash===true){
           const dashX=safeRemoteNumber(payload.dashX,x),dashY=safeRemoteNumber(payload.dashY,y),dashLength=Math.hypot(dashX-x,dashY-y);
           spawnCombatFx('dekuWhipElasticDash',x,y,{angle:fxAngleToTarget(x,y,dashX,dashY,whipAngle),color:'#5cf6e8',life:.68,radius:dashLength,cannon:'deku',variant:payload.faJinBoost===true?'faJin':''});
@@ -1988,7 +2072,7 @@ function activateSkill2(){
       sendStatus(enemy.id,'stun',1700);
     }
 
-    spawnCombatFx('dekuBlackwhip',ox,oy,{angle:fxAngleToTarget(ox,oy,x2,y2,a),color:'#52e7ea',life:1.25,radius:Math.hypot(x2-ox,y2-oy),cannon:'deku',variant:faJinBoost?'faJin':''});
+    spawnCombatFx('dekuBlackwhip',ox,oy,{angle:fxAngleToTarget(ox,oy,x2,y2,a),color:'#52e7ea',life:.92,radius:Math.hypot(x2-ox,y2-oy),cannon:'deku',variant:faJinBoost?'faJin':''});
     if(faJinBoost)spawnCombatFx('dekuFaJinAttack',ox,oy,{angle:a,color:'#69f5ee',life:.48,radius:135,cannon:'deku',variant:'blackwhip'});
 
     let recoilDash=false,dashX=ox,dashY=oy;
@@ -2017,7 +2101,7 @@ function activateSkill2(){
       }
     }
 
-    sendUniqueSkill(cannon,'dekuBlackwhip',{x:ox,y:oy,targetX:x2,targetY:y2,zoneAngle:a,length,width,radius:width,life:1.25,faJinBoost,hitPlayer,recoilDash,dashX,dashY,chainRemaining:player.dekuWhipChainRemaining||0});
+    sendUniqueSkill(cannon,'dekuBlackwhip',{x:ox,y:oy,targetX:x2,targetY:y2,zoneAngle:a,length,width,radius:width,life:.92,faJinBoost,hitPlayer,recoilDash,dashX,dashY,chainRemaining:player.dekuWhipChainRemaining||0});
   }
   updateSkillHud();
 }
@@ -3633,153 +3717,153 @@ function drawCombatEffects(layer='base'){
       for(let k=-1;k<=1;k++){ctx.beginPath();ctx.moveTo(2,k*7);ctx.quadraticCurveTo(push*.55,k*12,push+20,k*5);ctx.stroke()}
       ctx.shadowBlur=0;
     }else if(f.type==='dekuBlackwhip'){
-      // V5.55: cel-anime Blackwhip reconstruction.
-      // A single huge solid black whip body: sharp asymmetric silhouette, hard cyan/red rim,
-      // dark internal facets and animated energy seams. Fa Jin uses the same ONE body with red chain plates.
-      const len=Math.max(90,f.radius),boost=f.variant==='faJin';
-      const extend=Math.min(1,1.18*q+.16),snap=Math.sin(Math.min(1,q)*Math.PI);
-      const reach=len*(.10+.90*extend);
-      const baseWidth=boost?116:102;
-      const bend=(Math.sin(t*3.1+f.x*.0031)*18+Math.sin(t*5.7+f.y*.0017)*6)*(.45+.55*extend);
-      const tipWobble=Math.sin(t*5.2+f.x*.0019)*8;
-      const samples=renderPressure>=2?20:renderPressure>=1?28:38;
-      ctx.lineJoin='round';ctx.lineCap='round';
+      // V5.57: reference-frame Blackwhip reconstruction.
+      // The anime read is a bundled set of broad, flat, angular black ribbons with a hard luminous rim.
+      // They share one root at Deku's arm, fan only after launch, then tense and retract like elastic straps.
+      const len=Math.max(110,f.radius),boost=f.variant==='faJin',age=q;
+      const easeOutCubic=v=>1-Math.pow(1-clamp(v,0,1),3);
+      const easeInCubic=v=>Math.pow(clamp(v,0,1),3);
+      const launch=clamp(age/.20,0,1);
+      const retract=clamp((age-.72)/.28,0,1);
+      const launchEase=easeOutCubic(launch),retractEase=easeInCubic(retract);
+      const overshoot=1+.055*Math.sin(Math.min(1,launch)*Math.PI)*(1-launch*.55);
+      const reach=len*(.035+.965*launchEase)*overshoot*(1-.16*retractEase);
+      const rim=boost?'#ff2946':'#27e3e8';
+      const rimHot=boost?'#ff8a99':'#a9ffff';
+      const inner=boost?'rgba(99,0,17,.74)':'rgba(0,91,101,.76)';
+      const dark=boost?'#010102':'#01070a';
+      const ribbons=renderPressure>=2?2:3;
+      const laneDefs=ribbons===2
+        ? [{spread:-.34,scale:.90,phase:.7},{spread:.27,scale:1.08,phase:2.1}]
+        : [{spread:-.42,scale:.82,phase:.55},{spread:.02,scale:1.08,phase:1.55},{spread:.43,scale:.88,phase:2.55}];
+      const us=[0,.12,.28,.49,.69,.86,1];
+      const bundleBend=(Math.sin(t*3.15+f.x*.003)*8+Math.sin(t*5.1+f.y*.0017)*3.5)*(1-.42*retract);
+      ctx.lineJoin='miter';ctx.lineCap='butt';
 
-      const centerAt=(u)=>{
-        const v=1-u;
-        const c1x=reach*.30,c2x=reach*.70;
-        const c1y=-bend*.92,c2y=bend*.66;
-        const x=3*v*v*u*c1x+3*v*u*u*c2x+u*u*u*reach;
-        const y=3*v*v*u*c1y+3*v*u*u*c2y+u*u*u*tipWobble;
-        const dx=3*v*v*c1x+6*v*u*(c2x-c1x)+3*u*u*(reach-c2x);
-        const dy=3*v*v*c1y+6*v*u*(c2y-c1y)+3*u*u*(tipWobble-c2y);
-        const d=Math.hypot(dx,dy)||1;
-        return{x,y,nx:-dy/d,ny:dx/d,ang:Math.atan2(dy,dx)};
-      };
-      const widthAt=(u)=>{
-        // Narrow at Deku's arm, huge through the middle, slightly tapered at the gripping tip.
-        const body=.33+.74*Math.sin(Math.PI*Math.min(.98,u*.94));
-        const tipTaper=1-.24*Math.max(0,(u-.80)/.20);
-        return baseWidth*body*tipTaper;
-      };
-
-      const left=[],right=[];
-      for(let i=0;i<=samples;i++){
-        const u=i/samples,c=centerAt(u);
-        const edgeNoise=(Math.sin(i*2.43+t*7.7+f.x*.0047)*4.2+Math.sin(i*.91-t*4.2)*2.1)*(1-.35*u);
-        const tooth=(i%6===2?5.5:(i%7===4?-3.2:0))*(.95-.45*u);
-        const half=Math.max(12,widthAt(u)*.5+edgeNoise+tooth);
-        left.push([c.x+c.nx*half,c.y+c.ny*half]);
-        right.push([c.x-c.nx*half,c.y-c.ny*half]);
-      }
-      const bodyPath=()=>{
-        ctx.beginPath();ctx.moveTo(left[0][0],left[0][1]);
-        for(let i=1;i<left.length;i++)ctx.lineTo(left[i][0],left[i][1]);
-        for(let i=right.length-1;i>=0;i--)ctx.lineTo(right[i][0],right[i][1]);
-        ctx.closePath();
-      };
-
-      // Flat anime aura: broad but controlled so the body remains truly black, not a neon tube.
-      ctx.shadowColor=boost?'#f30e29':'#00dfe3';ctx.shadowBlur=boost?30:26;
-      ctx.strokeStyle=boost?'rgba(255,20,43,.30)':'rgba(0,230,234,.30)';ctx.lineWidth=baseWidth+24;
-      ctx.beginPath();for(let i=0;i<=samples;i++){const c=centerAt(i/samples);i?ctx.lineTo(c.x,c.y):ctx.moveTo(c.x,c.y)}ctx.stroke();
-
-      // Main cel-shaded solid body.
-      const bodyGrad=ctx.createLinearGradient(0,-baseWidth*.45,0,baseWidth*.45);
-      if(boost){bodyGrad.addColorStop(0,'#050507');bodyGrad.addColorStop(.46,'#000001');bodyGrad.addColorStop(.72,'#090205');bodyGrad.addColorStop(1,'#010102')}
-      else{bodyGrad.addColorStop(0,'#061216');bodyGrad.addColorStop(.42,'#010507');bodyGrad.addColorStop(.72,'#07191d');bodyGrad.addColorStop(1,'#000304')}
-      ctx.fillStyle=bodyGrad;bodyPath();ctx.fill();
-
-      // Hard luminous edge matching cel animation.
-      ctx.shadowColor=boost?'#ff1736':'#20edf0';ctx.shadowBlur=boost?23:20;
-      ctx.strokeStyle=boost?'#ff263f':'#35e9ed';ctx.lineWidth=boost?7.5:7;bodyPath();ctx.stroke();ctx.shadowBlur=0;
-      ctx.strokeStyle=boost?'rgba(255,125,137,.72)':'rgba(158,255,255,.68)';ctx.lineWidth=1.6;
-      ctx.beginPath();for(let i=2;i<left.length-2;i++){const p0=left[i];i===2?ctx.moveTo(p0[0],p0[1]):ctx.lineTo(p0[0],p0[1])}ctx.stroke();
-
-      // All details stay inside ONE thick whip silhouette.
-      ctx.save();bodyPath();ctx.clip();
-
-      // Deep angular facets give the black mass the same hand-drawn dimensional read as the reference.
-      for(let lane=-1;lane<=1;lane++){
-        const off=lane*(boost?22:20);
-        ctx.strokeStyle=boost?(lane===0?'rgba(75,0,9,.74)':'rgba(20,2,6,.92)'):(lane===0?'rgba(0,73,78,.78)':'rgba(0,29,34,.92)');
-        ctx.lineWidth=lane===0?10:7;
-        ctx.beginPath();
-        for(let j=2;j<=samples-2;j++){
-          const u=j/samples,c=centerAt(u),w=widthAt(u),osc=Math.sin(u*15+t*2.4+lane)*w*.08;
-          const x=c.x+c.nx*(off+osc),y=c.y+c.ny*(off+osc);
-          j===2?ctx.moveTo(x,y):ctx.lineTo(x,y);
+      function ribbonGeometry(def,index){
+        const centers=[];
+        for(let j=0;j<us.length;j++){
+          const u=us[j];
+          const fan=def.spread*(boost?74:66)*Math.pow(u,.72);
+          const hardKink=(j===2?-1:j===4?1:0)*(boost?9:8)*(index%2?-.75:1);
+          const flex=(Math.sin(u*8.6+t*2.8+def.phase)*5.2+Math.sin(u*4.3-t*3.7+def.phase)*2.8)*u;
+          const tension=retract*def.spread*26*Math.sin(u*Math.PI);
+          centers.push({x:reach*u,y:fan+bundleBend*Math.sin(u*Math.PI)+hardKink+flex+tension});
         }
-        ctx.stroke();
+        const left=[],right=[],widths=[];
+        for(let j=0;j<centers.length;j++){
+          const u=us[j],prev=centers[Math.max(0,j-1)],next=centers[Math.min(centers.length-1,j+1)];
+          const dx=next.x-prev.x,dy=next.y-prev.y,d=Math.hypot(dx,dy)||1,nx=-dy/d,ny=dx/d;
+          const shoulder=Math.sin(Math.PI*Math.pow(u,.72));
+          const base=(boost?70:63)*def.scale;
+          const root=7+(base*shoulder*(1-.17*u));
+          const tipTaper=u>.84?1-.68*((u-.84)/.16):1;
+          const width=Math.max(6,root*tipTaper)*(1-.13*retract);
+          widths.push(width);
+          left.push([centers[j].x+nx*width*.5,centers[j].y+ny*width*.5]);
+          right.push([centers[j].x-nx*width*.5,centers[j].y-ny*width*.5]);
+        }
+        const path=()=>{
+          ctx.beginPath();ctx.moveTo(left[0][0],left[0][1]);
+          for(let j=1;j<left.length;j++)ctx.lineTo(left[j][0],left[j][1]);
+          for(let j=right.length-1;j>=0;j--)ctx.lineTo(right[j][0],right[j][1]);
+          ctx.closePath();
+        };
+        return{centers,left,right,widths,path};
       }
 
-      if(boost){
-        // Fa Jin + Blackwhip: large red-rimmed chain links embedded in the same single black body.
-        const links=renderPressure>=2?10:renderPressure>=1?14:18;
-        for(let i=1;i<links;i++){
-          const u=.04+i/(links+1)*.92,c=centerAt(u),w=widthAt(u);
-          const flip=i%2?Math.PI*.5:0,scale=Math.min(1.18,Math.max(.70,w/baseWidth));
-          ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.ang+flip);
-          ctx.shadowColor='#ff1534';ctx.shadowBlur=16;
-          ctx.strokeStyle='rgba(255,30,54,.98)';ctx.lineWidth=5.2;
-          ctx.fillStyle='rgba(0,0,1,.98)';ctx.beginPath();ctx.ellipse(0,0,31*scale,13.5*scale,0,0,TAU);ctx.fill();ctx.stroke();
-          ctx.shadowBlur=4;ctx.strokeStyle='rgba(115,0,17,.98)';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,0,17.5*scale,6.4*scale,0,0,TAU);ctx.stroke();
-          ctx.shadowBlur=0;ctx.strokeStyle='rgba(255,142,151,.72)';ctx.lineWidth=1.25;ctx.beginPath();ctx.arc(0,0,25*scale,-2.7,-.45);ctx.stroke();
-          ctx.restore();
+      const geos=laneDefs.map(ribbonGeometry);
+
+      // Fast launch smears: the anime whip appears almost frame-snapped out of the arm.
+      if(launch<1){
+        const smearAlpha=(1-launch)*.72;
+        ctx.globalAlpha*=.92;
+        for(let i=0;i<3;i++){
+          const sy=(i-1)*13,sl=reach*(.48+i*.10);
+          ctx.strokeStyle=boost?`rgba(255,48,72,${smearAlpha})`:`rgba(69,238,241,${smearAlpha})`;
+          ctx.lineWidth=5-i*.9;ctx.beginPath();ctx.moveTo(-28-i*15,sy);ctx.lineTo(sl,sy*(.18+i*.10));ctx.stroke();
         }
-        // Thin red lightning cracks between links.
-        ctx.shadowColor='#ff1737';ctx.shadowBlur=13;ctx.strokeStyle='rgba(255,38,60,.95)';ctx.lineWidth=2.7;
-        const crackCount=renderPressure>=2?6:10;
-        for(let k=1;k<=crackCount;k++){
-          const u=k/(crackCount+1),c=centerAt(u),side=k%2?-1:1,w=widthAt(u);
-          const n=side*w*.24,x=c.x+c.nx*n,y=c.y+c.ny*n;
-          ctx.beginPath();ctx.moveTo(x-15,y);ctx.lineTo(x-6,y+side*12);ctx.lineTo(x+3,y-side*6);ctx.lineTo(x+17,y+side*7);ctx.stroke();
+      }
+
+      // Wide under-glow follows the flat bundle, not a circular neon tube.
+      for(const g of geos){
+        ctx.shadowColor=rim;ctx.shadowBlur=boost?26:23;ctx.strokeStyle=boost?'rgba(255,34,60,.19)':'rgba(39,227,232,.18)';ctx.lineWidth=boost?24:21;
+        ctx.beginPath();for(let j=0;j<g.centers.length;j++){const c=g.centers[j];j?ctx.lineTo(c.x,c.y):ctx.moveTo(c.x,c.y)}ctx.stroke();
+      }
+      ctx.shadowBlur=0;
+
+      // Back ribbons first, center/large ribbon last so the bundle reads like the overlapping anime cels.
+      const order=geos.length===3?[0,2,1]:[0,1];
+      for(const gi of order){
+        const g=geos[gi];
+        // Solid black cel body.
+        g.path();ctx.shadowColor=rim;ctx.shadowBlur=boost?18:15;ctx.fillStyle=dark;ctx.fill();
+        ctx.strokeStyle=rim;ctx.lineWidth=boost?6.4:5.8;ctx.stroke();ctx.shadowBlur=0;
+
+        // Bright one-sided rim highlight, like the cyan hand-drawn edge in the supplied frame.
+        ctx.strokeStyle=rimHot;ctx.globalAlpha*=.82;ctx.lineWidth=1.45;
+        ctx.beginPath();for(let j=1;j<g.left.length;j++){const pt=g.left[j];j===1?ctx.moveTo(pt[0],pt[1]):ctx.lineTo(pt[0],pt[1])}ctx.stroke();ctx.globalAlpha=Math.min(1,p*1.35);
+
+        ctx.save();g.path();ctx.clip();
+        // Hard triangular facets inside each ribbon; no rounded tube shading.
+        for(let j=1;j<g.centers.length-1;j++){
+          const c=g.centers[j],n=g.centers[j+1],w=g.widths[j];
+          const side=(j+gi)%2?-1:1;
+          ctx.fillStyle=boost?'rgba(55,0,10,.46)':'rgba(0,52,59,.50)';
+          ctx.beginPath();ctx.moveTo(c.x,c.y);ctx.lineTo(n.x,n.y);ctx.lineTo(c.x,c.y+side*w*.42);ctx.closePath();ctx.fill();
+          ctx.strokeStyle=inner;ctx.lineWidth=2.2;ctx.beginPath();ctx.moveTo(c.x,c.y+side*w*.18);ctx.lineTo(n.x,n.y-side*w*.12);ctx.stroke();
         }
-        ctx.shadowBlur=0;
-      }else{
-        // Normal Blackwhip: long cyan-blue veins like the anime frame, not separate whip strands.
-        const veinOffsets=[-.22,0,.22];
-        for(let v=0;v<veinOffsets.length;v++){
-          ctx.shadowColor=v===1?'#1ae9ed':'#008f99';ctx.shadowBlur=v===1?10:5;
-          ctx.strokeStyle=v===1?'rgba(32,222,226,.78)':'rgba(0,117,126,.72)';ctx.lineWidth=v===1?3.4:2.3;
-          ctx.beginPath();
-          for(let j=2;j<=samples-2;j++){
-            const u=j/samples,c=centerAt(u),w=widthAt(u);
-            const n=w*veinOffsets[v]+Math.sin(u*19+t*2.6+v)*w*.035;
-            const x=c.x+c.nx*n,y=c.y+c.ny*n;
-            j===2?ctx.moveTo(x,y):ctx.lineTo(x,y);
+
+        if(boost){
+          // Fa Jin + Blackwhip keeps the previously requested black/red chain appearance,
+          // but the links are painted onto the same broad anime ribbon bundle.
+          const main=gi===1||geos.length===2&&gi===1;
+          const linkCount=main?(renderPressure>=2?6:9):(renderPressure>=2?3:5);
+          for(let k=1;k<=linkCount;k++){
+            const u=.12+k/(linkCount+1)*.76;
+            let seg=1;while(seg<us.length-1&&us[seg]<u)seg++;
+            const u0=us[seg-1],u1=us[seg],mix=(u-u0)/(u1-u0||1);
+            const a0=g.centers[seg-1],a1=g.centers[seg];
+            const x=a0.x+(a1.x-a0.x)*mix,y=a0.y+(a1.y-a0.y)*mix;
+            const ang=Math.atan2(a1.y-a0.y,a1.x-a0.x)+(k%2?Math.PI*.5:0);
+            const scale=.68+.22*Math.sin(Math.PI*u);
+            ctx.save();ctx.translate(x,y);ctx.rotate(ang);ctx.shadowColor='#ff1736';ctx.shadowBlur=13;
+            ctx.fillStyle='#010102';ctx.strokeStyle='rgba(255,38,64,.98)';ctx.lineWidth=4.2;
+            ctx.beginPath();ctx.ellipse(0,0,25*scale,10.5*scale,0,0,TAU);ctx.fill();ctx.stroke();
+            ctx.shadowBlur=0;ctx.strokeStyle='rgba(105,0,16,.95)';ctx.lineWidth=2.1;ctx.beginPath();ctx.ellipse(0,0,13.5*scale,4.8*scale,0,0,TAU);ctx.stroke();ctx.restore();
           }
-          ctx.stroke();
+        }else{
+          // Cyan seams are sparse and angular, matching the visible folds in the reference frame.
+          ctx.strokeStyle='rgba(32,210,216,.74)';ctx.shadowColor='#1adfe4';ctx.shadowBlur=7;ctx.lineWidth=2.5;
+          ctx.beginPath();for(let j=1;j<g.centers.length-1;j++){const c=g.centers[j],off=(j%2?-.17:.15)*g.widths[j];j===1?ctx.moveTo(c.x,c.y+off):ctx.lineTo(c.x,c.y+off)}ctx.stroke();ctx.shadowBlur=0;
         }
-        ctx.shadowBlur=0;
+        ctx.restore();
       }
-      ctx.restore();
 
-      // Heavy pointed gripping head. It remains part of the single line instead of branching into extra tendrils.
-      const tip=centerAt(1),tipWidth=Math.max(24,widthAt(1)*.60);
-      ctx.save();ctx.translate(tip.x,tip.y);ctx.rotate(tip.ang);
-      ctx.shadowColor=boost?'#ff1736':'#20eef1';ctx.shadowBlur=22;
-      ctx.fillStyle='#010203';ctx.strokeStyle=boost?'#ff2943':'#3cf0f1';ctx.lineWidth=boost?7:6;
-      ctx.beginPath();ctx.moveTo(46,0);ctx.lineTo(-7,-tipWidth*.56);ctx.lineTo(4,-tipWidth*.20);ctx.lineTo(-18,0);ctx.lineTo(4,tipWidth*.20);ctx.lineTo(-7,tipWidth*.56);ctx.closePath();ctx.fill();ctx.stroke();
-      ctx.shadowBlur=0;ctx.restore();
-
-      // Small snap flare at the arm during extension, emphasizing the violent anime-like launch.
-      ctx.globalAlpha*=.72*snap;
-      ctx.strokeStyle=boost?'rgba(255,60,79,.82)':'rgba(72,245,242,.78)';ctx.lineWidth=3;
-      for(let k=-2;k<=2;k++){ctx.beginPath();ctx.moveTo(-12,k*8);ctx.lineTo(28+12*Math.abs(k),k*15);ctx.stroke()}
+      // The tips taper to sharp flat points; there is deliberately no spear/arrow head.
+      // During retraction the whole bundle tightens toward the arm, producing the elastic snap seen in animation.
+      if(retract>0){
+        ctx.globalAlpha*=.68*retract;
+        ctx.strokeStyle=boost?'rgba(255,77,95,.92)':'rgba(123,255,255,.88)';ctx.lineWidth=2.5;
+        for(let i=-2;i<=2;i++){ctx.beginPath();ctx.moveTo(-22,i*8);ctx.lineTo(Math.max(24,reach*.44),i*3);ctx.stroke()}
+      }
       ctx.lineCap='butt';ctx.lineJoin='miter';
     }else if(f.type==='dekuWhipElasticDash'){
-      // V5.51: elastic snap-back dash after Blackwhip misses every player.
-      const len=Math.max(20,f.radius),boost=f.variant==='faJin',head=len*(.30+.70*q);
-      ctx.lineCap='round';ctx.shadowColor=boost?'#ff233b':'#5ef5eb';ctx.shadowBlur=boost?30:21;
-      ctx.strokeStyle=boost?'rgba(255,42,59,.98)':'rgba(92,246,235,.94)';ctx.lineWidth=boost?8:5.5;
-      ctx.beginPath();ctx.moveTo(-10,0);ctx.quadraticCurveTo(head*.28,Math.sin(q*Math.PI)*24,head,0);ctx.stroke();
-      ctx.strokeStyle='rgba(228,255,253,.94)';ctx.lineWidth=2.6;
-      for(let k=-2;k<=2;k++){const yy=k*9;ctx.beginPath();ctx.moveTo(-35-Math.abs(k)*10,yy);ctx.lineTo(head*.42,yy*.38);ctx.stroke()}
-      ctx.strokeStyle=boost?'rgba(3,2,4,.98)':'rgba(5,16,22,.92)';ctx.lineWidth=boost?12:8;
-      ctx.beginPath();ctx.moveTo(-4,-5);ctx.quadraticCurveTo(head*.45,-22,head*.78,-4);ctx.stroke();
-      if(boost){ctx.strokeStyle='rgba(255,45,61,.95)';ctx.lineWidth=2.4;for(let k=1;k<=6;k++){const xx=head*k/7,yy=Math.sin(k*2.4+t*5)*10;ctx.beginPath();ctx.moveTo(xx-8,yy);ctx.lineTo(xx,yy+(k%2?-8:8));ctx.lineTo(xx+8,yy-2);ctx.stroke()}}
-      ctx.shadowBlur=0;ctx.lineCap='butt';
+      // V5.57: cel-animation elastic pull. Broad black/cyan (or black/red) streaks collapse behind Deku
+      // instead of the previous thin curved laser line.
+      const len=Math.max(30,f.radius),boost=f.variant==='faJin',age=q;
+      const drive=1-Math.pow(1-clamp(age/.55,0,1),3),head=len*drive;
+      const rim=boost?'#ff2946':'#2be3e7',hot=boost?'rgba(255,126,140,.92)':'rgba(169,255,255,.90)';
+      ctx.lineJoin='miter';ctx.lineCap='butt';
+      for(let lane=-1;lane<=1;lane++){
+        const spread=lane*15*(1-age),trail=Math.max(45,head*(.52+.08*Math.abs(lane)));
+        ctx.shadowColor=rim;ctx.shadowBlur=boost?21:17;ctx.fillStyle=boost?'rgba(2,1,3,.92)':'rgba(1,8,11,.92)';ctx.strokeStyle=rim;ctx.lineWidth=boost?5.2:4.8;
+        ctx.beginPath();ctx.moveTo(Math.max(0,head-trail)-28,spread);ctx.lineTo(head-5,spread-(lane*3));ctx.lineTo(head+28,spread);ctx.lineTo(head-10,spread+10+Math.abs(lane)*3);ctx.closePath();ctx.fill();ctx.stroke();
+      }
+      ctx.shadowBlur=0;ctx.strokeStyle=hot;ctx.lineWidth=1.7;
+      for(let k=-2;k<=2;k++){const yy=k*10*(1-age*.65);ctx.beginPath();ctx.moveTo(-38-Math.abs(k)*14,yy);ctx.lineTo(head*.72,yy*.18);ctx.stroke()}
+      if(boost){ctx.strokeStyle='rgba(255,42,64,.92)';ctx.lineWidth=2.2;for(let k=1;k<=5;k++){const xx=head*k/6,yy=Math.sin(k*2.3+t*5)*9;ctx.beginPath();ctx.moveTo(xx-9,yy);ctx.lineTo(xx,yy+(k%2?-8:8));ctx.lineTo(xx+9,yy-2);ctx.stroke()}}
+      ctx.lineCap='butt';ctx.lineJoin='miter';
     }else if(f.type==='dekuFaJinAttack'){
       // Any Deku attack released while Fa Jin is active gets a distinct kinetic-discharge flash.
       const rr=f.radius*(.28+.72*q);
