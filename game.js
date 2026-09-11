@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.57 · anime Blackwhip reconstruction');
+console.info('[Sworder VS Tank] game V5.61 · Diep evolution tree');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -29,7 +29,7 @@ let onlinePresenceIds=new Set(),onlinePingTimer=0,onlineLatencyMs=0;
 let onlineReconnectTimer=0,onlineReconnectBusy=false,lastNetworkStateReceive=0;
 let localStateSeq=0,lastSkillHudFrameUpdate=0;
 const cachedPresenceIds=new Set();
-const REMOTE_STATE_INTERVAL=66; // V5.56: EC2 t3.small 전용 WS에서 약 15Hz 위치 동기화
+const REMOTE_STATE_INTERVAL=110; // V5.58: t3.small 준비 전까지 Supabase Realtime 사용
 const REMOTE_PLAYER_STALE_MS=45000;
 const REMOTE_PLAYER_ABSENT_GRACE_MS=30000;
 const MAX_PARTICLES=360;
@@ -51,7 +51,7 @@ const CANNON_FAMILY=Object.freeze({
   rocket:'rocket',titan:'rocket',phantom:'piercer',
   ring:'ring',chrono:'ring',void:'nova',
   nova:'nova',comet:'nova',stellar:'nova',
-  error:'error',glitch:'error',zero:'error',deku:'deku'
+  error:'error',glitch:'error',zero:'error',deku:'deku',sniper:'piercer'
 });
 function cannonFamily(id){return CANNON_FAMILY[id]||'standard'}
 
@@ -64,7 +64,7 @@ const PROJECTILE_SHAPE=Object.freeze({
   rocket:'rocketMissile', titan:'titanShell', phantom:'phantomBolt',
   ring:'dimensionRing', chrono:'chronoRing', void:'voidOrb',
   nova:'novaStar', comet:'cometCore', stellar:'stellarStar',
-  error:'errorBlock', glitch:'glitchPacket', zero:'zeroCore', deku:'dekuAirForce'
+  error:'errorBlock', glitch:'glitchPacket', zero:'zeroCore', deku:'dekuAirForce', sniper:'sniperRound'
 });
 function projectileShapeForCannon(cannon){return PROJECTILE_SHAPE[cannon]||'standardSlug'}
 
@@ -98,7 +98,8 @@ const CANNON_SKILLS=Object.freeze({
   error:{name:'ERROR 검기',cooldown:27,color:'#7dff48'},
   glitch:{name:'MIRROR ERROR',cooldown:24,color:'#ff4be1'},
   zero:{name:'ZERO LINE',cooldown:30,color:'#f0f0f0'},
-  deku:{name:'연막',cooldown:18,color:'#9dff78'}
+  deku:{name:'연막',cooldown:18,color:'#9dff78'},
+  sniper:{name:'3× 전술 조준경',cooldown:22,color:'#8ee8ff'}
 });
 const CANNON_SKILLS_2=Object.freeze({
   rocket:{name:'IRON DOME',cooldown:28,color:'#ffc06a',kind:'fortress'},
@@ -113,7 +114,8 @@ const CANNON_SKILLS_2=Object.freeze({
   error:{name:'GLITCH DRIVE',cooldown:34,color:'#ff46dc',kind:'overclock'},
   glitch:{name:'DATA WARP',cooldown:30,color:'#ff50e7',kind:'dataWarp'},
   zero:{name:'ABSOLUTE ZERO',cooldown:30,color:'#ffffff',kind:'freeze'},
-  deku:{name:'검은 채찍',cooldown:16,color:'#9dff78',kind:'blackwhip'}
+  deku:{name:'검은 채찍',cooldown:16,color:'#9dff78',kind:'blackwhip'},
+  sniper:{name:'스나이퍼 유도탄',cooldown:20,color:'#bdefff',kind:'homing'}
 });
 const ERROR_T_SKILL=Object.freeze({name:'GLITCH BLADE',cooldown:7,color:'#73ff45'});
 const DEKU_T_SKILL=Object.freeze({name:'발경',cooldown:20,color:'#baff70'});
@@ -154,11 +156,87 @@ const TANK_THEMES=Object.freeze({
   error:{body:'#151719',edge:'#70ff3f',glow:'#7cff45'},
   glitch:{body:'#19141e',edge:'#ff3edc',glow:'#ff64e7'},
   zero:{body:'#0b0b0d',edge:'#e8f3ff',glow:'#ffffff'},
-  deku:{body:'#1f8257',edge:'#0c4435',glow:'#baff70'}
+  deku:{body:'#1f8257',edge:'#0c4435',glow:'#baff70'},
+  sniper:{body:'#23313d',edge:'#7fdcff',glow:'#c6f5ff'}
 });
 
+// V5.61: Diep.io-style evolution tree. Drone/summoner branches are intentionally excluded.
+const DIEP_EVOLUTION_INFO=Object.freeze({
+  basic:{name:'탱크',tier:1,desc:'기본 탱크'},
+  twin:{name:'트윈',tier:15,desc:'두 포신 · 빠른 연사',mods:{damage:.94,reload:.84}},
+  sniperClass:{name:'스나이퍼',tier:15,desc:'긴 사거리 · 느린 연사',mods:{damage:1.12,bulletSpeed:1.16,reload:1.12}},
+  machineGun:{name:'머신 건',tier:15,desc:'빠른 연사 · 넓은 탄 분산',mods:{damage:.84,reload:.74}},
+  flankGuard:{name:'플랭크 가드',tier:15,desc:'전후방 포신 · 기동 전투',mods:{damage:.96,reload:.92,move:1.05}},
+
+  tripleShot:{name:'트리플 샷',tier:30,desc:'전방 3포신',mods:{damage:.96,reload:.82}},
+  quadTank:{name:'쿼드 탱크',tier:30,desc:'4방향 포신',mods:{damage:.90,reload:.80}},
+  twinFlank:{name:'트윈 플랭크',tier:30,desc:'전후방 쌍포신',mods:{damage:.88,reload:.76,move:1.03}},
+  assassin:{name:'어쌔신',tier:30,desc:'초장거리 저격',mods:{damage:1.22,bulletSpeed:1.24,reload:1.22}},
+  hunter:{name:'헌터',tier:30,desc:'고속 중저격',mods:{damage:1.12,bulletSpeed:1.18,reload:1.05}},
+  trapper:{name:'트래퍼',tier:30,desc:'방어형 함정 포신',mods:{damage:1.15,bulletSpeed:.86,reload:1.16}},
+  destroyer:{name:'디스트로이어',tier:30,desc:'초대형 고화력 단발',mods:{damage:1.62,bulletSpeed:.78,reload:1.72,move:.96}},
+  gunner:{name:'거너',tier:30,desc:'고속 집탄',mods:{damage:.78,bulletSpeed:1.10,reload:.66}},
+  shotgun:{name:'샷건',tier:30,desc:'근거리 파편 포격',mods:{damage:1.08,bulletSpeed:.90,reload:1.22}},
+  triAngle:{name:'트라이-앵글',tier:30,desc:'후방 반동 가속',mods:{damage:.94,reload:.90,move:1.16}},
+  auto3:{name:'오토 3',tier:30,desc:'3방향 자동 포탑형',mods:{damage:.90,reload:.80}},
+  smasher:{name:'스매셔',tier:30,desc:'충돌 기동 특화',mods:{damage:1.06,reload:1.10,move:1.18}},
+
+  triplet:{name:'트리플렛',tier:45,desc:'3연장 집탄 최종형',mods:{damage:1.02,reload:.67}},
+  pentaShot:{name:'펜타 샷',tier:45,desc:'전방 5방향 탄막',mods:{damage:.90,reload:.70,move:1.04}},
+  spreadShot:{name:'스프레드 샷',tier:45,desc:'초광각 전방 탄막',mods:{damage:.86,reload:.68}},
+  octoTank:{name:'옥토 탱크',tier:45,desc:'8방향 전방위 탄막',mods:{damage:.86,reload:.65}},
+  auto5:{name:'오토 5',tier:45,desc:'5방향 자동 포탑형',mods:{damage:.92,reload:.72}},
+  tripleTwin:{name:'트리플 트윈',tier:45,desc:'3축 쌍포신',mods:{damage:.86,reload:.64}},
+  ranger:{name:'레인저',tier:45,desc:'최장거리 저격',mods:{damage:1.32,bulletSpeed:1.34,reload:1.30}},
+  stalker:{name:'스토커',tier:45,desc:'은밀 저격 특화',mods:{damage:1.28,bulletSpeed:1.24,reload:1.24,move:1.03}},
+  predator:{name:'프레데터',tier:45,desc:'강력한 장거리 포식자',mods:{damage:1.22,bulletSpeed:1.26,reload:1.08}},
+  streamliner:{name:'스트림라이너',tier:45,desc:'초고속 단방향 연사',mods:{damage:.80,bulletSpeed:1.14,reload:.54}},
+  triTrapper:{name:'트라이-트래퍼',tier:45,desc:'3방향 함정 방어',mods:{damage:1.16,bulletSpeed:.84,reload:.92}},
+  gunnerTrapper:{name:'거너 트래퍼',tier:45,desc:'거너 + 트래퍼 혼합',mods:{damage:.94,bulletSpeed:1.02,reload:.70}},
+  megaTrapper:{name:'메가 트래퍼',tier:45,desc:'거대 함정 단발',mods:{damage:1.48,bulletSpeed:.72,reload:1.46}},
+  autoTrapper:{name:'오토 트래퍼',tier:45,desc:'자동포 + 트래퍼',mods:{damage:1.02,bulletSpeed:.90,reload:.82}},
+  annihilator:{name:'어나이얼레이터',tier:45,desc:'최대 구경 파괴포',mods:{damage:1.95,bulletSpeed:.72,reload:1.92,move:.92}},
+  skimmer:{name:'스키머',tier:45,desc:'회전 보조탄 파괴포',mods:{damage:1.54,bulletSpeed:.82,reload:1.48}},
+  glider:{name:'글라이더',tier:45,desc:'기동형 파괴포',mods:{damage:1.48,bulletSpeed:.90,reload:1.42,move:1.08}},
+  rocketeer:{name:'로켓티어',tier:45,desc:'장거리 추진탄 파괴포',mods:{damage:1.56,bulletSpeed:1.00,reload:1.55}},
+  autoGunner:{name:'오토 거너',tier:45,desc:'자동포가 결합된 거너',mods:{damage:.82,bulletSpeed:1.08,reload:.58}},
+  sprayer:{name:'스프레이어',tier:45,desc:'머신 건 직계 최종형',mods:{damage:.90,reload:.55}},
+  palletShot:{name:'팰릿 샷',tier:45,desc:'촘촘한 산탄 파편',mods:{damage:1.00,bulletSpeed:.94,reload:.92}},
+  dualBarrel:{name:'듀얼 배럴',tier:45,desc:'쌍포 샷건 최종형',mods:{damage:1.08,bulletSpeed:.92,reload:.88}},
+  booster:{name:'부스터',tier:45,desc:'최고속 후방 추진',mods:{damage:.92,reload:.86,move:1.28}},
+  fighter:{name:'파이터',tier:45,desc:'기동 + 측면 화력',mods:{damage:1.00,reload:.82,move:1.22}},
+  landmine:{name:'랜드마인',tier:45,desc:'충돌/은신형 스매셔',mods:{damage:1.18,move:1.20}},
+  autoSmasher:{name:'오토 스매셔',tier:45,desc:'스매셔 + 자동포',mods:{damage:1.12,reload:.84,move:1.16}},
+  spike:{name:'스파이크',tier:45,desc:'최강 충돌형 스매셔',mods:{damage:1.24,move:1.23}},
+  autoTank:{name:'오토 탱크',tier:45,desc:'기본 탱크의 자동포 최종형',mods:{damage:1.08,reload:.82}}
+});
+const DIEP_EVOLUTION_CHILDREN=Object.freeze({
+  basic:['twin','sniperClass','machineGun','flankGuard','smasher','autoTank'],
+  twin:['tripleShot','quadTank','twinFlank'],
+  sniperClass:['assassin','hunter','trapper'],
+  machineGun:['destroyer','gunner','shotgun','sprayer'],
+  flankGuard:['triAngle','quadTank','twinFlank','auto3'],
+  tripleShot:['triplet','pentaShot','spreadShot'],
+  quadTank:['octoTank','auto5'],
+  twinFlank:['tripleTwin'],
+  assassin:['ranger','stalker'],
+  hunter:['predator','streamliner'],
+  trapper:['triTrapper','gunnerTrapper','megaTrapper','autoTrapper'],
+  destroyer:['annihilator','skimmer','glider','rocketeer'],
+  gunner:['autoGunner','gunnerTrapper','streamliner'],
+  shotgun:['palletShot','dualBarrel'],
+  triAngle:['booster','fighter'],
+  auto3:['auto5','autoGunner'],
+  smasher:['landmine','autoSmasher','spike']
+});
+const EVOLUTION_MILESTONES=[15,30,45];
+function eligibleEvolutionChildren(type,level){
+  return (DIEP_EVOLUTION_CHILDREN[type]||[]).filter(id=>(DIEP_EVOLUTION_INFO[id]?.tier||99)<=level);
+}
+function evolutionName(type){return DIEP_EVOLUTION_INFO[type]?.name||'탱크'}
+
 const statsDef=[['maxHealth','최대 체력'],['regen','체력 회복'],['bulletDamage','탄환 피해'],['bulletSpeed','탄환 속도'],['reload','연사 속도'],['moveSpeed','이동 속도']];
-function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,skill4Cd:0,skill4Max:0,skill4ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,siegeUntil:0,stellarReviveUntil:0,stellarReviveReady:false,phantomMarkActive:false,phantomMarkUntil:0,phantomMarkOriginX:0,phantomMarkOriginY:0,phantomMarkDestX:0,phantomMarkDestY:0,cloakUntil:0,dekuSmokeUntil:0,dekuFaJinUntil:0,dekuGearshiftUntil:0,dekuWhipChainRemaining:0,dekuWhipChainUntil:0,stunUntil:0,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
+function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',evolutionTier:0,cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,skill4Cd:0,skill4Max:0,skill4ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,siegeUntil:0,stellarReviveUntil:0,stellarReviveReady:false,phantomMarkActive:false,phantomMarkUntil:0,phantomMarkOriginX:0,phantomMarkOriginY:0,phantomMarkDestX:0,phantomMarkDestY:0,cloakUntil:0,dekuSmokeUntil:0,dekuFaJinUntil:0,dekuGearshiftUntil:0,dekuWhipChainRemaining:0,dekuWhipChainUntil:0,sniperScopeUntil:0,stunUntil:0,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
 function resize(){
   const mobileLike=innerWidth<900||matchMedia('(pointer:coarse)').matches;
   const dpr=Math.min(mobileLike?1.25:1.5,devicePixelRatio||1);
@@ -309,8 +387,19 @@ function setNetworkStatus(state,text){
 }
 function updateOnlineCount(){
   if(!ui.onlineCount)return;
-  const count=onlineReady?Math.max(1,onlinePresenceIds.size):0;
-  ui.onlineCount.textContent=String(count);
+  let count=onlineReady?1:0;
+  try{
+    const presence=onlineChannel?.presenceState?.()||{};
+    const ids=new Set();
+    for(const entries of Object.values(presence)){
+      for(const p of entries||[]){
+        const id=String(p?.user_id||p?.presence_ref||'');
+        if(id)ids.add(id);
+      }
+    }
+    if(ids.size)count=ids.size;
+  }catch(_){}
+  ui.onlineCount.textContent=String(Math.max(0,count));
 }
 function safeRemoteNumber(v,fallback=0){
   v=Number(v);
@@ -322,8 +411,17 @@ function makeShapeId(){
   return `${owner}:${Date.now().toString(36)}:${(++shapeSerial).toString(36)}`;
 }
 function getPresencePlayerIds(){
-  const ids=new Set(onlinePresenceIds);
+  const ids=new Set();
   if(onlineReady&&onlineSelfId)ids.add(onlineSelfId);
+  try{
+    const presence=onlineChannel?.presenceState?.()||{};
+    for(const entries of Object.values(presence)){
+      for(const p of entries||[]){
+        const id=String(p?.user_id||p?.presence_ref||'');
+        if(id)ids.add(id);
+      }
+    }
+  }catch(_){}
   for(const id of remotePlayers.keys())if(id)ids.add(id);
   return [...ids].sort();
 }
@@ -494,7 +592,7 @@ function upsertRemotePlayer(payload){
       tx:safeRemoteNumber(payload.x,WORLD/2),ty:safeRemoteNumber(payload.y,WORLD/2),
       angle:safeRemoteNumber(payload.angle,0),targetAngle:safeRemoteNumber(payload.angle,0),
       vx:0,vy:0,r:27,hp:120,maxHp:120,level:1,score:0,kills:0,
-      name:'PLAYER',alive:true,classType:'basic',cannonType:'standard',fortress:false,overclock:false,swordMode:false,cloaked:false,cloakUntilWall:0,dekuSmokeUntilWall:0,dekuFaJin:false,dekuGearshift:false,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,lastSeen:performance.now(),presenceMissingSince:0,lastStateSeq:0,lastStateWall:0
+      name:'PLAYER',alive:true,classType:'basic',evolutionTier:0,cannonType:'standard',fortress:false,overclock:false,swordMode:false,cloaked:false,cloakUntilWall:0,dekuSmokeUntilWall:0,dekuFaJin:false,dekuGearshift:false,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,lastSeen:performance.now(),presenceMissingSince:0,lastStateSeq:0,lastStateWall:0
     };
     remotePlayers.set(id,r);
   }
@@ -517,12 +615,12 @@ function upsertRemotePlayer(payload){
   r.targetAngle=safeRemoteNumber(payload.angle,r.targetAngle);
   r.hp=Math.max(0,safeRemoteNumber(payload.hp,r.hp));
   r.maxHp=Math.max(1,safeRemoteNumber(payload.maxHp,r.maxHp));
-  r.level=Math.max(1,Math.floor(safeRemoteNumber(payload.level,r.level)));
+  r.level=clamp(Math.floor(safeRemoteNumber(payload.level,r.level)),1,45);
   r.score=Math.max(0,Math.floor(safeRemoteNumber(payload.score,r.score)));
   r.kills=Math.max(0,Math.floor(safeRemoteNumber(payload.kills,r.kills)));
   r.name=String(payload.name||r.name||'PLAYER').slice(0,14);
   r.cannonType=String(payload.cannonType||r.cannonType||'standard');
-  r.classType=String(payload.classType||r.classType||'basic');
+  r.classType=String(payload.classType||r.classType||'basic');r.evolutionTier=Math.max(0,Math.floor(safeRemoteNumber(payload.evolutionTier,r.evolutionTier||0)));
   r.fortress=payload.fortress===true;
   r.overclock=payload.overclock===true;
   r.swordMode=payload.swordMode===true;
@@ -564,7 +662,7 @@ function localNetworkState(){
     hp:player.hp,maxHp:player.maxHp,
     level:player.level,score:player.score,kills:player.kills,
     name:player.name,cannonType:player.cannonType||'standard',
-    classType:player.classType||'basic',alive:!!player.alive,
+    classType:player.classType||'basic',evolutionTier:player.evolutionTier||0,alive:!!player.alive,
     fortress:performance.now()<(player.fortressUntil||0),
     overclock:performance.now()<(player.overclockUntil||0),
     cloaked:performance.now()<(player.cloakUntil||0),
@@ -575,13 +673,13 @@ function localNetworkState(){
   };
 }
 function sendOnline(event,payload){
-  const ws=onlineChannel;
-  if(!onlineReady||!ws||ws.readyState!==WebSocket.OPEN)return;
+  if(!onlineReady||!onlineChannel)return;
   try{
-    // V5.56: 전투 패킷은 Supabase Realtime이 아니라 EC2 t3.small 직결 WebSocket으로 전송.
-    ws.send(JSON.stringify({type:'event',event:String(event||''),payload:payload||{}}));
+    const result=onlineChannel.send({type:'broadcast',event,payload});
+    if(result&&typeof result.catch==='function')void result.catch(()=>{});
   }catch(error){
-    console.warn('EC2 arena send skipped:',error);
+    // Realtime disconnects or Supabase maintenance must never stop the local battle loop.
+    console.warn('Realtime send skipped:',error);
   }
 }
 function broadcastLocalState(force=false){
@@ -601,6 +699,7 @@ function broadcastShot(b){
     x:b.x,y:b.y,vx:b.vx,vy:b.vy,r:b.r,life:b.life,damage:b.damage||0,
     cannon:b.cannon,shape:b.shape,pierce:b.pierce||1,splashRadius:b.splashRadius||0,
     basicAttack:b.basicAttack===true,special:b.special||'',fragment:b.fragment===true,returned:b.returned===true,
+    targetId:String(b.targetId||''),targetShapeId:String(b.targetShapeId||''),
     curve:Number(b.curve)||0,motionSeed:Number(b.motionSeed)||0,motionAge:Number(b.motionAge)||0
   });
 }
@@ -651,6 +750,7 @@ function addRemoteShot(payload){
     pierce:Math.max(1,safeRemoteNumber(payload.pierce,1)),
     splashRadius:Math.max(0,safeRemoteNumber(payload.splashRadius,0)),
     basicAttack:payload.basicAttack===true,special:String(payload.special||''),fragment:payload.fragment===true,returned:payload.returned===true,
+    targetId:String(payload.targetId||''),targetShapeId:String(payload.targetShapeId||''),
     curve:safeRemoteNumber(payload.curve,0),motionSeed:safeRemoteNumber(payload.motionSeed,0),motionAge:Math.max(0,safeRemoteNumber(payload.motionAge,0)+age),
     hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()
   });
@@ -851,24 +951,18 @@ function startArenaPing(ws){
 async function disconnectOnlineArena(clearRemotes=true){
   if(!onlineReconnectBusy)clearOnlineReconnectTimer();
   onlineReady=false;
-  stopArenaPing();
+  updateOnlineCount();
   if(clearRemotes)remotePlayers.clear();
   cachedPresenceIds.clear();
-  onlinePresenceIds.clear();
   worldHostId='';lastWorldSnapshotReceive=0;lastWorldSnapshotSend=0;
-  const ws=onlineChannel;
+  const ch=onlineChannel;
   onlineChannel=null;
-  if(ws){
-    ws.__manualClose=true;
-    try{
-      if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:'leave'}));
-    }catch(_){}
-    try{ws.close(1000,'client_leave')}catch(_){}
+  if(ch){
+    try{await window.IronCellAuth?.client?.removeChannel(ch)}catch(_){}
   }
-  updateOnlineCount();
 }
 async function connectOnlineArena(preserveRemotes=false){
-  if(onlineReady&&onlineChannel?.readyState===WebSocket.OPEN)return true;
+  if(onlineReady&&onlineChannel)return true;
   const client=window.IronCellAuth?.client;
   const user=window.IronCellAuth?.user;
   if(!client||!user){
@@ -878,146 +972,167 @@ async function connectOnlineArena(preserveRemotes=false){
 
   await disconnectOnlineArena(!preserveRemotes);
   onlineSelfId=String(user.id);
-  setNetworkStatus('connecting','t3.small 전투 서버 연결 중...');
+  setNetworkStatus('connecting','온라인 서버 연결 중...');
   if(!preserveRemotes)remotePlayers.clear();
 
-  let session=null;
-  try{
-    const first=await client.auth.getSession();
-    session=first?.data?.session||null;
-    if(!session?.access_token){
-      const refreshed=await client.auth.refreshSession();
-      session=refreshed?.data?.session||null;
+  const ch=client.channel('iron-cell-arena-global-v1',{
+    config:{
+      broadcast:{self:false,ack:false},
+      presence:{key:onlineSelfId}
     }
-  }catch(error){
-    console.warn('EC2 arena session read failed:',error);
-  }
-  if(!session?.access_token){
-    setNetworkStatus('error','로그인 세션을 다시 확인해 주세요');
-    return false;
-  }
+  });
+  onlineChannel=ch;
 
-  const wsUrl=arenaWebSocketUrl();
-  let ws;
-  try{ws=new WebSocket(wsUrl)}
-  catch(error){
-    console.warn('EC2 arena websocket create failed:',error);
-    setNetworkStatus('error','t3.small 서버 주소 오류');
-    return false;
-  }
-  onlineChannel=ws;
+  ch.on('broadcast',{event:'state'},({payload})=>upsertRemotePlayer(payload));
+  ch.on('broadcast',{event:'shot'},({payload})=>addRemoteShot(payload));
+  ch.on('broadcast',{event:'shotSync'},({payload})=>receiveShotSync(payload));
+  ch.on('broadcast',{event:'shotEnd'},({payload})=>receiveShotEnd(payload));
+  ch.on('broadcast',{event:'damage'},({payload})=>receiveDamage(payload));
+  ch.on('broadcast',{event:'status'},({payload})=>receiveStatus(payload));
+  ch.on('broadcast',{event:'kill'},({payload})=>receiveKill(payload));
+  ch.on('broadcast',{event:'skill'},({payload})=>receiveRemoteSkill(payload));
+  ch.on('broadcast',{event:'worldSnapshot'},({payload})=>applyWorldSnapshot(payload));
+  ch.on('broadcast',{event:'worldRequest'},({payload})=>{
+    if(isWorldHost()&&(!payload?.hostId||String(payload.hostId)===onlineSelfId))sendWorldSnapshot(true);
+  });
+  ch.on('broadcast',{event:'shapeDamage'},({payload})=>receiveShapeDamage(payload));
+  ch.on('broadcast',{event:'shapeImpulse'},({payload})=>receiveShapeImpulse(payload));
+  ch.on('presence',{event:'sync'},()=>{refreshPresenceCache();updateOnlineCount();electWorldHost()});
+  ch.on('presence',{event:'join'},()=>{refreshPresenceCache();updateOnlineCount();setTimeout(()=>electWorldHost(),0)});
+  ch.on('presence',{event:'leave'},({key})=>{
+    if(key){
+      const r=remotePlayers.get(String(key));
+      if(r&&!r.presenceMissingSince)r.presenceMissingSince=performance.now();
+    }
+    refreshPresenceCache();
+    updateOnlineCount();
+    setTimeout(()=>electWorldHost(true),0);
+  });
 
   return await new Promise(resolve=>{
     let settled=false;
-    const finish=value=>{
+    const timer=setTimeout(()=>{
       if(settled)return;
       settled=true;
-      clearTimeout(timer);
-      resolve(value);
-    };
-    const timer=setTimeout(()=>{
-      if(ws===onlineChannel){
-        ws.__manualClose=true;
-        try{ws.close()}catch(_){}
-      }
-      setNetworkStatus('error','t3.small 서버 연결 실패');
-      finish(false);
+      setNetworkStatus('error','온라인 서버 연결 실패');
+      resolve(false);
     },7000);
 
-    ws.onopen=()=>{
-      try{
-        ws.send(JSON.stringify({
-          type:'join',
-          arenaId:'iron-cell-arena-global-v1',
-          accessToken:session.access_token,
-          username:String(window.IronCellAuth?.username||player?.name||'PLAYER').slice(0,24),
-          sentAt:Date.now()
-        }));
-      }catch(error){
-        console.warn('EC2 arena join send failed:',error);
-      }
-    };
-
-    ws.onmessage=event=>{
-      let message;
-      try{message=JSON.parse(String(event.data||''))}
-      catch(_){return}
-      const type=String(message?.type||'');
-
-      if(type==='joined'){
-        if(ws!==onlineChannel)return;
+    ch.subscribe(async status=>{
+      if(status==='SUBSCRIBED'){
+        clearTimeout(timer);
         onlineReady=true;
         clearOnlineReconnectTimer();
-        applyArenaPresence(message.players||[]);
-        startArenaPing(ws);
-        setNetworkStatus('online','t3.small 전투 서버 연결됨');
+        try{
+          await ch.track({
+            user_id:onlineSelfId,
+            username:window.IronCellAuth?.username||'PLAYER',
+            joined_at:new Date().toISOString()
+          });
+        }catch(_){}
+        refreshPresenceCache();
+        updateOnlineCount();
+        electWorldHost(true);
+        setNetworkStatus('online','온라인 서버 연결됨');
         broadcastLocalState(true);
-        finish(true);
-        return;
-      }
-      if(type==='presence'){
-        applyArenaPresence(message.players||[]);
-        return;
-      }
-      if(type==='event'){
-        dispatchArenaEvent(String(message.event||''),message.payload||{});
-        return;
-      }
-      if(type==='client_pong'){
-        const sentAt=Number(message.sentAt||0);
-        if(sentAt>0){
-          onlineLatencyMs=Math.max(0,Date.now()-sentAt);
-          if(onlineReady)setNetworkStatus('online',`t3.small 연결됨 · ${onlineLatencyMs}ms`);
+        if(!settled){
+          settled=true;
+          resolve(true);
         }
         return;
       }
-      if(type==='error'){
-        const code=String(message.code||'SERVER_ERROR');
-        console.warn('EC2 arena server:',code,message.message||'');
-        if(code==='AUTH_FAILED')setNetworkStatus('error','t3.small 인증 실패 · 다시 로그인해 주세요');
-      }
-    };
 
-    ws.onerror=()=>{};
-
-    ws.onclose=event=>{
-      const manual=ws.__manualClose===true;
-      if(ws===onlineChannel){
-        onlineChannel=null;
+      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
         onlineReady=false;
-        stopArenaPing();
-        onlinePresenceIds.clear();
-        cachedPresenceIds.clear();
         updateOnlineCount();
+        if(!settled){
+          settled=true;
+          clearTimeout(timer);
+          setNetworkStatus('error','온라인 서버 연결 실패');
+          resolve(false);
+        }else if(running){
+          scheduleOnlineReconnect(status);
+        }
       }
-      if(!settled){
-        setNetworkStatus('error','t3.small 서버 연결 실패');
-        finish(false);
-      }else if(!manual&&running){
-        setNetworkStatus('connecting','t3.small 연결 복구 중...');
-        scheduleOnlineReconnect(`ws_${event.code||'closed'}`);
-      }
-    };
+    });
   });
 }
 
 const xpNeed=l=>Math.round(40+l*18+l*l*2.2);
-function gainXp(a){if(!player.alive)return;player.xp+=a;player.score+=Math.round(a*3);while(player.xp>=player.xpNeed){player.xp-=player.xpNeed;player.level++;player.points++;player.xpNeed=xpNeed(player.level);if(player.level===15&&!classUpgradeShown)showClassUpgrade()}updateUI()}
-function updateUI(){ui.level.textContent=player.level;ui.score.textContent=player.score.toLocaleString();ui.xp.style.width=`${clamp(player.xp/player.xpNeed*100,0,100)}%`;ui.points.textContent=player.points;ui.upgradePanel.classList.toggle('has-points',player.points>0);renderUpgrades()}
+function gainXp(a){
+  if(!player.alive)return;
+  const gain=Math.max(0,Number(a)||0);
+  player.score+=Math.round(gain*3);
+  if(player.level>=45){player.level=45;player.xp=0;updateUI();return}
+  player.xp+=gain;
+  while(player.level<45&&player.xp>=player.xpNeed){
+    player.xp-=player.xpNeed;
+    player.level++;
+    player.points++;
+    player.xpNeed=xpNeed(player.level);
+    if(EVOLUTION_MILESTONES.includes(player.level)&&(player.evolutionTier||0)<player.level){
+      showClassUpgrade(player.level);
+      break;
+    }
+  }
+  if(player.level>=45){player.level=45;player.xp=0}
+  updateUI();
+}
+// V5.62: polygon kills grant 50% XP, while score reward stays unchanged.
+function gainPolygonXp(rawXp){
+  const full=Math.max(0,Number(rawXp)||0);
+  if(!player.alive)return;
+  const scoreBefore=player.score;
+  gainXp(full*.5);
+  // gainXp couples score to XP; restore polygon score to its original full value.
+  player.score=scoreBefore+Math.round(full*3);
+  updateUI();
+}
+function updateUI(){ui.level.textContent=player.level;ui.score.textContent=player.score.toLocaleString();ui.xp.style.width=player.level>=45?'100%':`${clamp(player.xp/player.xpNeed*100,0,100)}%`;ui.points.textContent=player.points;ui.upgradePanel.classList.toggle('has-points',player.points>0);renderUpgrades()}
 function renderUpgrades(){ui.upgrades.innerHTML=statsDef.map(([k,l])=>{const n=player.stats[k]||0;return`<div class="stat"><span class="stat-name">${l}</span><span class="stat-bars">${Array.from({length:7},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join('')}</span><button type="button" data-stat="${k}" ${player.points<=0||n>=7?'disabled':''}>+</button></div>`}).join('');ui.upgrades.querySelectorAll('[data-stat]').forEach(b=>b.onclick=()=>upgrade(b.dataset.stat))}
 function upgrade(k){if(player.points<=0||player.stats[k]>=7)return;player.points--;player.stats[k]++;if(k==='maxHealth'){const old=player.maxHp;player.maxHp=120+player.stats.maxHealth*18;player.hp+=player.maxHp-old}updateUI()}
-function showClassUpgrade(){
+function finishEvolutionMilestone(level){
+  player.evolutionTier=Math.max(player.evolutionTier||0,level);
+  classUpgradeShown=false;
+  ui.classPanel.classList.add('hidden');
+  paused=false;
+  broadcastLocalState(true);
+  updateUI();
+  // Large XP rewards can cross more than one level while the selection panel was open.
+  setTimeout(()=>gainXp(0),0);
+}
+function showClassUpgrade(level=player.level){
+  const milestone=EVOLUTION_MILESTONES.includes(level)?level:EVOLUTION_MILESTONES.find(v=>v>=level)||45;
+  const choices=eligibleEvolutionChildren(player.classType||'basic',milestone);
+  if(!choices.length){finishEvolutionMilestone(milestone);return}
   classUpgradeShown=true;paused=true;
-  const cs=[{id:'assault',name:'돌격 튜닝',desc:'피해량과 이동 속도가 조금 증가합니다.'},{id:'precision',name:'정밀 튜닝',desc:'피해량과 탄속이 증가하지만 연사가 조금 느려집니다.'},{id:'overdrive',name:'과급 튜닝',desc:'연사력이 크게 증가하지만 탄환 피해가 조금 감소합니다.'}];
-  ui.classChoices.innerHTML=cs.map(c=>`<button class="class-choice" data-class="${c.id}"><strong>${c.name}</strong><span>${c.desc}</span></button>`).join('');
-  ui.classPanel.classList.remove('hidden');ui.classChoices.querySelectorAll('[data-class]').forEach(b=>b.onclick=()=>{player.classType=b.dataset.class;ui.classPanel.classList.add('hidden');paused=false});
+  const card=ui.classPanel?.querySelector('.panel-card');
+  if(card){const small=card.querySelector('small'),title=card.querySelector('h2');if(small)small.textContent=`LEVEL ${milestone} · DIEP.IO EVOLUTION`;if(title)title.textContent=`${evolutionName(player.classType)} → 진화 선택`}
+  const buttons=choices.map(id=>{const c=DIEP_EVOLUTION_INFO[id];return`<button class="class-choice" data-class="${id}"><strong>${c.name}</strong><span>LV ${c.tier} · ${c.desc}</span></button>`}).join('');
+  ui.classChoices.innerHTML=buttons+`<button class="class-choice" data-class="__skip"><strong>현재 탱크 유지</strong><span>지금 진화하지 않고 다음 단계까지 유지합니다.</span></button>`;
+  ui.classPanel.classList.remove('hidden');
+  ui.classChoices.querySelectorAll('[data-class]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.class;
+    if(id==='__skip'){finishEvolutionMilestone(milestone);return}
+    if(!DIEP_EVOLUTION_INFO[id])return;
+    player.classType=id;
+    broadcastLocalState(true);
+    const next=eligibleEvolutionChildren(id,milestone);
+    // Diep.io allows delayed lower-tier upgrades; when already high enough, immediately expose the next tier too.
+    if(next.length){showClassUpgrade(milestone);return}
+    finishEvolutionMilestone(milestone);
+  });
 }
 function playerParams(){
   const s=player.stats;
   let damage=17+s.bulletDamage*4,bulletSpeed=610+s.bulletSpeed*55,reload=.34-s.reload*.03,move=245+s.moveSpeed*15;
-  if(player.classType==='assault'){damage*=1.15;move*=1.08}
-  if(player.classType==='precision'){damage*=1.25;bulletSpeed*=1.15;reload*=1.10}
-  if(player.classType==='overdrive'){damage*=.90;reload*=.78}
+  const evoMods=DIEP_EVOLUTION_INFO[player.classType||'basic']?.mods||null;
+  if(evoMods){
+    damage*=Number(evoMods.damage)||1;
+    bulletSpeed*=Number(evoMods.bulletSpeed)||1;
+    reload*=Number(evoMods.reload)||1;
+    move*=Number(evoMods.move)||1;
+  }
 
   const cannon=player.cannonType||'standard';
 
@@ -1057,11 +1172,13 @@ function playerParams(){
   else if(cannon==='glitch'){damage*=2.10;bulletSpeed*=1.52;reload*=1.38;move*=1.05}
   else if(cannon==='zero'){damage*=3.05;bulletSpeed*=1.16;reload*=2.05;move*=.93}
   else if(cannon==='deku'){damage*=1.72;bulletSpeed*=1.34;reload*=.88;move*=1.18}
+  else if(cannon==='sniper'){damage*=4.20;bulletSpeed*=2.40;reload*=5.60;move*=.90}
 
   const now=performance.now();
   if(now<(player.fortressUntil||0)){move*=.70}
   if(now<(player.overclockUntil||0)){move*=1.85}
   if(now<(player.siegeUntil||0)){damage*=1.55;reload*=.48;bulletSpeed*=1.12;move*=.34}
+  if(cannon!=='sniper')player.sniperScopeUntil=0;
   if(cannon==='deku'){
     if(now<(player.dekuFaJinUntil||0))move*=1.95;
     if(now<(player.dekuGearshiftUntil||0)){damage*=1.25;bulletSpeed*=1.62;reload*=.44;move*=1.35}
@@ -1267,6 +1384,8 @@ function skillProjectile(cannon,angle,opts={}){
   if(opts.pierce)b.pierce=opts.pierce;
   if(opts.splashRadius!==undefined)b.splashRadius=opts.splashRadius;
   if(opts.special)b.special=opts.special;
+  if(opts.targetId)b.targetId=String(opts.targetId);
+  if(opts.targetShapeId)b.targetShapeId=String(opts.targetShapeId);
 
   bullets.push(b);broadcastShot(b);
   return b;
@@ -1280,7 +1399,7 @@ function skillAreaDamage(x,y,radius,damage,color){
     applyShapeDamage(s,damage*scale);
     burst(s.x,s.y,color,4);
     if(s.hp<=0){
-      gainXp(s.xp);burst(s.x,s.y,colorForShape(s.type),11);shapes.splice(i,1);
+      gainPolygonXp(s.xp);burst(s.x,s.y,colorForShape(s.type),11);shapes.splice(i,1);
     }
   }
   for(const enemy of remotePlayers.values()){
@@ -1495,7 +1614,7 @@ function errorSwordArcDamage(x,y,angle,damage,range=135,halfAngle=.82){
     const d=Math.sqrt(d2)||1,scale=.55+.45*(1-d/range);
     applyShapeDamage(s,damage*scale,Math.cos(angle)*120*scale,Math.sin(angle)*120*scale);
     burst(s.x,s.y,Math.random()<.5?'#72ff43':'#ff42df',4);
-    if(s.hp<=0){gainXp(s.xp);burst(s.x,s.y,colorForShape(s.type),11);shapes.splice(i,1)}
+    if(s.hp<=0){gainPolygonXp(s.xp);burst(s.x,s.y,colorForShape(s.type),11);shapes.splice(i,1)}
   }
   for(const enemy of remotePlayers.values()){
     if(!enemy.alive)continue;
@@ -1663,7 +1782,7 @@ function damageSkillLine(x,y,angle,length,width,damage,color,push=0){
     const scale=.72+.28*hit.t;
     const px=push?Math.cos(angle)*push:0,py=push?Math.sin(angle)*push:0;
     applyShapeDamage(s,damage*scale,px,py);burst(s.x,s.y,color,5);
-    if(s.hp<=0){gainXp(s.xp);burst(s.x,s.y,colorForShape(s.type),10);shapes.splice(i,1)}
+    if(s.hp<=0){gainPolygonXp(s.xp);burst(s.x,s.y,colorForShape(s.type),10);shapes.splice(i,1)}
   }
   for(const enemy of remotePlayers.values()){
     if(!enemy.alive)continue;
@@ -1678,7 +1797,7 @@ function damageSkillCone(x,y,angle,range,halfAngle,damage,color,push=0){
     if(Math.abs(angleDifference(Math.atan2(dy,dx),angle))>halfAngle)continue;
     const scale=.45+.55*(1-d/range),px=Math.cos(angle)*push*scale,py=Math.sin(angle)*push*scale;
     applyShapeDamage(s,damage*scale,px,py);burst(s.x,s.y,color,5);
-    if(s.hp<=0){gainXp(s.xp);burst(s.x,s.y,colorForShape(s.type),10);shapes.splice(i,1)}
+    if(s.hp<=0){gainPolygonXp(s.xp);burst(s.x,s.y,colorForShape(s.type),10);shapes.splice(i,1)}
   }
   for(const enemy of remotePlayers.values()){
     if(!enemy.alive)continue;const dx=enemy.x-x,dy=enemy.y-y,d=Math.hypot(dx,dy)||1;if(d>range)continue;
@@ -1693,6 +1812,7 @@ function spawnSkillProjectileAt(cannon,x,y,angle,opts={}){
     owner:player,ownerId:onlineSelfId,team:'player',cannon,shape:opts.shape||projectileShapeForCannon(cannon),
     pierce:opts.pierce||1,splashRadius:opts.splashRadius||0,basicAttack:false,special:opts.special||'',fragment:false,
     curve:Number(opts.curve)||0,motionSeed:Number(opts.motionSeed)||Math.random()*TAU,motionAge:0,
+    targetId:String(opts.targetId||''),targetShapeId:String(opts.targetShapeId||''),targetShapeRef:opts.targetShapeRef||null,
     hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()
   };
   bullets.push(b);broadcastShot(b);return b;
@@ -1952,6 +2072,11 @@ function activateSkill(errorChargeRatio=0,aimOverride=null){
     burst(tx,ty,'#e8ffff',30);
     sendUniqueSkill(cannon,'constellation',{targetX:tx,targetY:ty,radius:340,life:8});
 
+  }else if(cannon==='sniper'){
+    player.sniperScopeUntil=now+10000;
+    spawnCombatFx('sniperScopePulse',player.x,player.y,{angle:a,color:'#bdefff',life:.72,radius:145,cannon:'sniper'});
+    burst(player.x,player.y,'#bdefff',16);
+    sendUniqueSkill(cannon,'sniperScope',{targetX:player.x,targetY:player.y,radius:145,life:.72});
   }else if(cannon==='deku'){
     player.dekuSmokeUntil=now+5000;addSkillZone('dekuSmoke',{x:player.x,y:player.y,radius:330,life:5,damage:0,tick:0});burst(player.x,player.y,'#cbd8cc',18);sendUniqueSkill(cannon,'dekuSmoke',{targetX:player.x,targetY:player.y,radius:330,life:5});broadcastLocalState(true);
   }else if(cannon==='error'){
@@ -1968,6 +2093,22 @@ function activateSkill(errorChargeRatio=0,aimOverride=null){
     sendUniqueSkill(cannon,'zeroLine',{targetX:player.x+Math.cos(a)*1250,targetY:player.y+Math.sin(a)*1250,radius:72});
   }
   updateSkillHud();
+}
+function sniperAcquireTarget(angle){
+  let best=null,bestScore=Infinity;
+  const scoreTarget=(x,y,kind,target)=>{
+    const dx=x-player.x,dy=y-player.y,dist=Math.hypot(dx,dy);
+    if(dist<20||dist>2800)return;
+    const diff=Math.abs(angleDifference(Math.atan2(dy,dx),angle));
+    const score=diff*760+dist*.32;
+    if(score<bestScore){bestScore=score;best={kind,target,x,y,dist,diff}}
+  };
+  for(const enemy of remotePlayers.values())if(enemy?.alive)scoreTarget(enemy.x,enemy.y,'player',enemy);
+  // Solo play / no visible player: guided round may also lock on to a world shape.
+  if(!best||best.diff>.72){
+    for(const s of shapes)if(s?.hp>0)scoreTarget(s.x,s.y,'shape',s);
+  }
+  return best;
 }
 function activateSkill2(){
   if(!running||paused||!player?.alive)return;
@@ -2055,6 +2196,16 @@ function activateSkill2(){
 
   }else if(cannon==='zero'){
     addSkillZone('absoluteZero',{x:player.x,y:player.y,radius:560,life:4.3,damage:p.damage*.16,tick:0});sendUniqueSkill(cannon,'absoluteZero',{targetX:player.x,targetY:player.y,radius:560,life:4.3});
+  }else if(cannon==='sniper'){
+    const target=sniperAcquireTarget(a);
+    const missile=spawnSkillProjectileAt(cannon,player.x+Math.cos(a)*(player.r+28),player.y+Math.sin(a)*(player.r+28),a,{
+      damageMul:4.8,speedMul:.78,life:5.6,pierce:1,r:11,splashRadius:78,shape:'sniperHomingMissile',special:'sniperHoming',
+      targetId:target?.kind==='player'?target.target.id:'',targetShapeId:target?.kind==='shape'?target.target.id:''
+    });
+    missile.homingTurnRate=5.8;missile.homingAccel=.22;
+    if(target?.kind==='shape')missile.targetShapeRef=target.target;
+    spawnCombatFx('sniperMissileLaunch',player.x,player.y,{angle:a,color:'#c8f6ff',life:.55,radius:120,cannon:'sniper'});
+    shake=Math.max(shake,9);
   }else if(cannon==='deku'){
     const faJinBoost=now<(player.dekuFaJinUntil||0);
     const ox=player.x,oy=player.y;
@@ -2131,7 +2282,7 @@ function chainPlasmaBasicHit(parent,x,y,primaryShape=null,primaryPlayerId=''){
   for(const c of candidates.slice(0,parent.cannon==='thunder'?3:2)){
     const tx=c.target.x,ty=c.target.y,damage=parent.damage*(parent.cannon==='thunder'?.40:.45);
     combatFx.push({type:'chainArc',x,y,x2:tx,y2:ty,angle:0,color:'#84f8ff',life:.28,maxLife:.28,radius:0,size:1,ownerId:onlineSelfId,cannon:'plasma'});
-    if(c.kind==='shape'){applyShapeDamage(c.target,damage);burst(tx,ty,'#89f8ff',5);if(c.target.hp<=0){const idx=shapes.indexOf(c.target);if(idx>=0){gainXp(c.target.xp);burst(tx,ty,colorForShape(c.target.type),10);shapes.splice(idx,1)}}}
+    if(c.kind==='shape'){applyShapeDamage(c.target,damage);burst(tx,ty,'#89f8ff',5);if(c.target.hp<=0){const idx=shapes.indexOf(c.target);if(idx>=0){gainPolygonXp(c.target.xp);burst(tx,ty,colorForShape(c.target.type),10);shapes.splice(idx,1)}}}
     else{sendDamage(c.target.id,damage);burst(tx,ty,'#89f8ff',5)}
   }
 }
@@ -2168,7 +2319,7 @@ function errorGlitchImpact(parent,x,y,primaryShape=null,primaryPlayerId=''){
     applyShapeDamage(s,base*falloff,dx/d*55*falloff,dy/d*55*falloff);
     if(Math.random()<.28)burst(s.x,s.y,Math.random()<.5?'#72ff43':'#ff42df',2);
     if(s.hp<=0){
-      if(parent.owner===player)gainXp(s.xp);
+      if(parent.owner===player)gainPolygonXp(s.xp);
       burst(s.x,s.y,colorForShape(s.type),10);
       shapes.splice(i,1);
     }
@@ -2194,10 +2345,74 @@ function errorGlitchImpact(parent,x,y,primaryShape=null,primaryPlayerId=''){
   if(isCore)burst(x,y,'#42eaff',5);
 }
 
+function configureBasicProjectilePhysics(b,cannon,special=''){
+  b.r=6;b.life=1.65;b.pierce=1;b.splashRadius=0;
+  if(cannon==='standard'){b.r=6;b.life=1.65}
+  else if(cannon==='scout'){b.r=5;b.life=1.55;b.vx*=1.08;b.vy*=1.08}
+  else if(cannon==='bastion'){b.r=10;b.life=2.15;b.pierce=special==='bastionCore'?3:1;b.splashRadius=special==='bastionCore'?52:28}
+  else if(cannon==='rapid'){b.r=3.5;b.life=1.28}
+  else if(cannon==='dual'){b.r=5;b.life=1.42}
+  else if(cannon==='needle'){b.r=3;b.life=1.65;b.pierce=special==='needleCore'?4:2}
+  else if(cannon==='spread'){b.r=4;b.life=.95}
+  else if(cannon==='burst'){b.r=5;b.life=1.18}
+  else if(cannon==='crystal'){b.r=5;b.life=1.20;b.pierce=2}
+  else if(cannon==='piercer'){b.r=5;b.life=1.78;b.pierce=4}
+  else if(cannon==='laser'){b.r=4;b.life=1.50;b.pierce=special==='laserCore'?10:5}
+  else if(cannon==='drill'){b.r=special==='drillCore'?11:8;b.life=special==='drillCore'?2.25:1.95;b.pierce=special==='drillCore'?16:8}
+  else if(cannon==='plasma'){b.r=13;b.life=2.15;b.splashRadius=72}
+  else if(cannon==='thunder'){b.r=10;b.life=2.05;b.splashRadius=62}
+  else if(cannon==='inferno'){b.r=10;b.life=2.12;b.splashRadius=100}
+  else if(cannon==='rocket'){b.r=8;b.life=2.22;b.splashRadius=112}
+  else if(cannon==='titan'){b.r=12;b.life=2.55;b.splashRadius=138}
+  else if(cannon==='phantom'){b.r=6;b.life=1.90;b.pierce=6}
+  else if(cannon==='ring'){b.r=12;b.life=1.85;b.pierce=8}
+  else if(cannon==='chrono'){b.r=10;b.life=2.0;b.pierce=9}
+  else if(cannon==='void'){b.r=12;b.life=2.10;b.pierce=4;b.splashRadius=72}
+  else if(cannon==='nova'){b.r=10;b.life=1.90;b.pierce=3;b.splashRadius=46}
+  else if(cannon==='comet'){b.r=8;b.life=2.08;b.pierce=4;b.splashRadius=52}
+  else if(cannon==='stellar'){b.r=9;b.life=2.02;b.pierce=4;b.splashRadius=58}
+  else if(cannon==='error'){
+    b.r=9;b.life=2.30;b.pierce=16;
+    if(special==='nullCore'){b.r=13;b.life=2.65;b.pierce=24;b.vx*=1.10;b.vy*=1.10}
+    else if(special==='nullEcho'){b.r=8;b.life=2.35;b.pierce=18;b.vx*=1.05;b.vy*=1.05}
+  }
+  else if(cannon==='glitch'){b.r=8;b.life=2.15;b.pierce=14}
+  else if(cannon==='zero'){b.r=special==='zeroCore'?13:10;b.life=2.5;b.pierce=special==='zeroCore'?26:20;if(special==='zeroCore'){b.vx*=1.12;b.vy*=1.12}}
+  else if(cannon==='deku'){const smash=String(special||'').includes('DetroitAirSmash')||special==='detroitAirSmash';b.r=smash?12:7;b.life=1.75;b.pierce=smash?8:3;b.splashRadius=smash?95:28;if(smash){b.vx*=1.18;b.vy*=1.18}}
+  else if(cannon==='sniper'){b.r=5;b.life=3.6;b.pierce=7;b.vx*=1.15;b.vy*=1.15}
+}
+function spawnBasicSplitFragment(parent,spec,x,y,index=0){
+  const baseAngle=Math.atan2(parent.vy,parent.vx),a=baseAngle+(Number(spec.offset)||0);
+  const speed=Math.max(220,Math.hypot(parent.vx,parent.vy)*(Number(spec.speedMul)||.96));
+  const special=String(spec.special||'');
+  const b={
+    x,y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,
+    r:6,damage:Math.max(0,(Number(parent.splitBaseDamage)||Number(parent.damage)||0)*(Number(spec.damageMul)||1)),life:1.65,
+    owner:parent.owner||player,ownerId:onlineSelfId,team:'player',cannon:parent.cannon,shape:projectileShapeForCannon(parent.cannon),
+    pierce:1,splashRadius:0,basicAttack:true,special,fragment:true,
+    curve:Number(spec.curve)||0,motionSeed:((Number(parent.motionSeed)||0)+index*2.317+1.113)%TAU,motionAge:0,
+    hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()
+  };
+  configureBasicProjectilePhysics(b,b.cannon,special);
+  if(bullets.length>=MAX_BULLETS)return null;
+  bullets.push(b);broadcastShot(b);
+  return b;
+}
+function splitBasicCarrier(parent){
+  if(!parent||parent.networkRemote||parent.splitDone||!Array.isArray(parent.splitPattern)||!parent.splitPattern.length)return false;
+  parent.splitDone=true;
+  const x=parent.x,y=parent.y,pattern=parent.splitPattern;
+  for(let k=0;k<pattern.length;k++)spawnBasicSplitFragment(parent,pattern[k],x,y,k);
+  const theme=TANK_THEMES[parent.cannon]||TANK_THEMES.standard;
+  burst(x,y,theme.glow||'#dffcff',Math.min(18,6+pattern.length*2));
+  spawnCombatFx('splitBurst',x,y,{angle:Math.atan2(parent.vy,parent.vx),color:theme.glow||'#dffcff',life:.30,radius:30+pattern.length*5,cannon:parent.cannon});
+  return true;
+}
+
 function fire(e){
   if(e!==player||e.fireCd>0)return;
   const a=e.angle,p=playerParams();e.fireCd=p.reload;
-  const cannon=e.cannonType||'standard',family=cannonFamily(cannon);
+  const cannon=e.cannonType||'standard';
   e.basicShotCount=(e.basicShotCount||0)+1;const shotNo=e.basicShotCount;
 
   if(cannon==='error'&&e.errorSwordMode){
@@ -2211,174 +2426,130 @@ function fire(e){
     e.vx-=Math.cos(a)*10;e.vy-=Math.sin(a)*10;return;
   }
 
-  let shots=[];
+  const part=(offset,damageMul,special,curve=0,speedMul=.96)=>({offset,damageMul,special,curve,speedMul});
+  const carrier=(special,splitDistance,splitPattern,damageMul=1)=>({angle:a,side:0,curve:0,damageMul,special,splitDistance,splitPattern});
+  let shot;
 
-  // 기본 등급
+  // V5.60: 모든 평타는 포구에서 반드시 1발만 출발한다.
   if(cannon==='standard'){
-    shots=[{angle:a,side:0,curve:0,damageMul:shotNo%5===0?1.70:1,special:shotNo%5===0?'precision':''}];
+    shot={angle:a,side:0,curve:0,damageMul:shotNo%5===0?1.70:1,special:shotNo%5===0?'precision':''};
   }else if(cannon==='scout'){
-    const side=shotNo%2?-8:8;
-    shots=shotNo%4===0
-      ?[{angle:a-.05,side:-7,curve:-1,damageMul:.84,special:'scoutDouble'},{angle:a+.05,side:7,curve:1,damageMul:.84,special:'scoutDouble'}]
-      :[{angle:a,side,curve:side<0?-1:1,damageMul:1,special:'scoutWeave'}];
+    shot=shotNo%4===0
+      ?carrier('scoutSplitCarrier',170,[part(-.05,.84,'scoutDouble',-1),part(.05,.84,'scoutDouble',1)])
+      :{angle:a,side:0,curve:shotNo%2?-1:1,damageMul:1,special:'scoutWeave'};
   }else if(cannon==='bastion'){
-    shots=[{angle:a,side:0,curve:0,damageMul:shotNo%6===0?2.20:1,special:shotNo%6===0?'bastionCore':'bastionHeavy'}];
-
-  // 일반
+    shot={angle:a,side:0,curve:0,damageMul:shotNo%6===0?2.20:1,special:shotNo%6===0?'bastionCore':'bastionHeavy'};
   }else if(cannon==='rapid'){
     const jitter=Math.sin(shotNo*2.71)*.026;
-    shots=shotNo%8===0
-      ?[-.045,0,.045].map((v,i)=>({angle:a+v,side:(i-1)*3,curve:i-1,damageMul:.58,special:'acceleratedBurst'}))
-      :[{angle:a+jitter,side:0,curve:Math.sin(shotNo),damageMul:1,special:'rapidJitter'}];
+    shot=shotNo%8===0
+      ?carrier('rapidSplitCarrier',150,[part(-.045,.58,'acceleratedBurst',-1),part(0,.58,'acceleratedBurst',0),part(.045,.58,'acceleratedBurst',1)])
+      :{angle:a+jitter,side:0,curve:Math.sin(shotNo),damageMul:1,special:'rapidJitter'};
   }else if(cannon==='dual'){
-    shots=shotNo%7===0
-      ?[-.07,-.025,.025,.07].map((v,i)=>({angle:a+v,side:(i-1.5)*5,curve:i<2?-1:1,damageMul:.45,special:'dualBurst'}))
-      :[{angle:a-.012,side:-7,curve:-1,damageMul:.68,special:'dualLeft'},{angle:a+.012,side:7,curve:1,damageMul:.68,special:'dualRight'}];
+    shot=shotNo%7===0
+      ?carrier('dualSplitCarrier',165,[part(-.07,.45,'dualBurst',-1),part(-.025,.45,'dualBurst',-1),part(.025,.45,'dualBurst',1),part(.07,.45,'dualBurst',1)])
+      :carrier('dualSplitCarrier',145,[part(-.018,.68,'dualLeft',-1),part(.018,.68,'dualRight',1)]);
   }else if(cannon==='needle'){
-    shots=[{angle:a,side:(shotNo%3-1)*2,curve:0,damageMul:shotNo%6===0?1.55:1,special:shotNo%6===0?'needleCore':'needleAccel'}];
-
-  // 희귀
+    shot={angle:a,side:0,curve:0,damageMul:shotNo%6===0?1.55:1,special:shotNo%6===0?'needleCore':'needleAccel'};
   }else if(cannon==='spread'){
-    shots=[-.25,-.125,0,.125,.25].map(v=>({angle:a+v,side:0,curve:Math.sign(v),damageMul:1,special:'shrapnelCarrier'}));
+    shot=carrier('spreadCarrier',190,[-.25,-.125,0,.125,.25].map(v=>part(v,1,'shrapnelCarrier',Math.sign(v))));
   }else if(cannon==='burst'){
-    const arr=shotNo%5===0?[-.17,-.085,0,.085,.17]:[-.075,0,.075];
-    shots=arr.map((v,i)=>({angle:a+v,side:0,curve:i%2?-1:1,damageMul:shotNo%5===0?.55:.72,special:'burstDisc'}));
+    const arr=shotNo%5===0?[-.17,-.085,0,.085,.17]:[-.075,0,.075],mul=shotNo%5===0?.55:.72;
+    shot=carrier('burstCarrier',175,arr.map((v,i)=>part(v,mul,'burstDisc',i%2?-1:1)));
   }else if(cannon==='crystal'){
-    const arr=shotNo%4===0?[-.30,-.20,-.10,0,.10,.20,.30]:[-.15,0,.15];
-    shots=arr.map((v,i)=>({angle:a+v,side:0,curve:i<(arr.length/2)?-1:1,damageMul:shotNo%4===0?.42:.65,special:'crystalCurve'}));
-
-  // 에픽
+    const arr=shotNo%4===0?[-.30,-.20,-.10,0,.10,.20,.30]:[-.15,0,.15],mul=shotNo%4===0?.42:.65;
+    shot=carrier('crystalCarrier',215,arr.map((v,i)=>part(v,mul,'crystalCurve',i<(arr.length/2)?-1:1)));
   }else if(cannon==='piercer'){
-    shots=[{angle:a,side:0,curve:0,damageMul:1,special:'penetrationAccel'}];
+    shot={angle:a,side:0,curve:0,damageMul:1,special:'penetrationAccel'};
   }else if(cannon==='laser'){
-    shots=shotNo%3===0
-      ?[{angle:a,side:0,curve:0,damageMul:1.75,special:'laserCore'}]
-      :[{angle:a,side:-5,curve:0,damageMul:.58,special:'laserTwin'},{angle:a,side:5,curve:0,damageMul:.58,special:'laserTwin'}];
+    shot=shotNo%3===0
+      ?{angle:a,side:0,curve:0,damageMul:1.75,special:'laserCore'}
+      :carrier('laserSplitCarrier',205,[part(-.022,.58,'laserTwin',0,1),part(.022,.58,'laserTwin',0,1)]);
   }else if(cannon==='drill'){
-    shots=[{angle:a,side:0,curve:shotNo%2?-1:1,damageMul:shotNo%4===0?2.20:1.05,special:shotNo%4===0?'drillCore':'drillSpin'}];
-
-  // 전설
+    shot={angle:a,side:0,curve:shotNo%2?-1:1,damageMul:shotNo%4===0?2.20:1.05,special:shotNo%4===0?'drillCore':'drillSpin'};
   }else if(cannon==='plasma'){
-    shots=[{angle:a,side:0,curve:0,damageMul:1,special:'chainDischarge'}];
+    shot={angle:a,side:0,curve:0,damageMul:1,special:'chainDischarge'};
   }else if(cannon==='thunder'){
-    const arr=shotNo%4===0?[-.10,0,.10]:[-.045,.045];
-    shots=arr.map((v,i)=>({angle:a+v,side:0,curve:i%2?-1:1,damageMul:shotNo%4===0?.72:.64,special:'thunderArc'}));
+    const arr=shotNo%4===0?[-.10,0,.10]:[-.045,.045],mul=shotNo%4===0?.72:.64;
+    shot=carrier('thunderCarrier',215,arr.map((v,i)=>part(v,mul,'thunderArc',i%2?-1:1)));
   }else if(cannon==='inferno'){
-    shots=shotNo%5===0
-      ?[-.15,0,.15].map((v,i)=>({angle:a+v,side:0,curve:i-1,damageMul:.68,special:'infernoTriple'}))
-      :[{angle:a,side:0,curve:shotNo%2?-1:1,damageMul:1,special:'incendiary'}];
-
-  // 신화
+    shot=shotNo%5===0
+      ?carrier('infernoCarrier',195,[-.15,0,.15].map((v,i)=>part(v,.68,'infernoTriple',i-1)))
+      :{angle:a,side:0,curve:shotNo%2?-1:1,damageMul:1,special:'incendiary'};
   }else if(cannon==='rocket'){
-    shots=[{angle:a,side:0,curve:0,damageMul:1,special:'incendiary'}];
+    shot={angle:a,side:0,curve:0,damageMul:1,special:'incendiary'};
   }else if(cannon==='titan'){
-    const side=shotNo%2?-9:9;
-    shots=shotNo%4===0
-      ?[{angle:a-.025,side:-9,curve:0,damageMul:.80,special:'titanTwin'},{angle:a+.025,side:9,curve:0,damageMul:.80,special:'titanTwin'}]
-      :[{angle:a,side,curve:0,damageMul:1,special:'titanAlternating'}];
+    shot=shotNo%4===0
+      ?carrier('titanCarrier',235,[part(-.028,.80,'titanTwin'),part(.028,.80,'titanTwin')])
+      :{angle:a,side:0,curve:0,damageMul:1,special:'titanAlternating'};
   }else if(cannon==='phantom'){
-    shots=shotNo%5===0
-      ?[-.07,0,.07].map((v,i)=>({angle:a+v,side:0,curve:i-1,damageMul:.65,special:'phantomTriple'}))
-      :[{angle:a,side:0,curve:shotNo%2?-1:1,damageMul:1,special:'phantomWave'}];
-
-  // 시크릿
+    shot=shotNo%5===0
+      ?carrier('phantomCarrier',245,[-.07,0,.07].map((v,i)=>part(v,.65,'phantomTriple',i-1)))
+      :{angle:a,side:0,curve:shotNo%2?-1:1,damageMul:1,special:'phantomWave'};
   }else if(cannon==='ring'){
-    shots=[{angle:a,side:0,curve:0,damageMul:1,special:'returnRing'}];
+    shot={angle:a,side:0,curve:0,damageMul:1,special:'returnRing'};
   }else if(cannon==='chrono'){
-    const arr=shotNo%3===0?[-.07,0,.07]:[-.04,.04];
-    shots=arr.map((v,i)=>({angle:a+v,side:(i-(arr.length-1)/2)*4,curve:i<(arr.length/2)?-1:1,damageMul:shotNo%3===0?.56:.72,special:'chronoCurve'}));
+    const arr=shotNo%3===0?[-.07,0,.07]:[-.04,.04],mul=shotNo%3===0?.56:.72;
+    shot=carrier('chronoCarrier',195,arr.map((v,i)=>part(v,mul,'chronoCurve',i<(arr.length/2)?-1:1)));
   }else if(cannon==='void'){
-    shots=[{angle:a,side:0,curve:0,damageMul:shotNo%4===0?1.35:1,special:shotNo%4===0?'voidPulse':'voidGravity'}];
-
-  // 갤럭시
+    shot={angle:a,side:0,curve:0,damageMul:shotNo%4===0?1.35:1,special:shotNo%4===0?'voidPulse':'voidGravity'};
   }else if(cannon==='nova'){
-    shots=[-.10,0,.10].map(v=>({angle:a+v,side:0,curve:Math.sign(v),damageMul:.78,special:'nebulaCarrier'}));
+    shot=carrier('novaCarrier',225,[-.10,0,.10].map(v=>part(v,.78,'nebulaCarrier',Math.sign(v))));
   }else if(cannon==='comet'){
-    shots=shotNo%5===0
-      ?[-.10,0,.10].map((v,i)=>({angle:a+v,side:0,curve:i-1,damageMul:.70,special:'cometTriple'}))
-      :[{angle:a,side:0,curve:0,damageMul:1,special:'cometAccel'}];
+    shot=shotNo%5===0
+      ?carrier('cometCarrier',235,[-.10,0,.10].map((v,i)=>part(v,.70,'cometTriple',i-1)))
+      :{angle:a,side:0,curve:0,damageMul:1,special:'cometAccel'};
   }else if(cannon==='stellar'){
-    const arr=shotNo%6===0?[-.16,-.08,0,.08,.16]:[-.055,.055];
-    shots=arr.map((v,i)=>({angle:a+v,side:0,curve:i<(arr.length/2)?-1:1,damageMul:shotNo%6===0?.42:.66,special:'stellarWave'}));
-
-  // ERROR
+    const arr=shotNo%6===0?[-.16,-.08,0,.08,.16]:[-.055,.055],mul=shotNo%6===0?.42:.66;
+    shot=carrier('stellarCarrier',220,arr.map((v,i)=>part(v,mul,'stellarWave',i<(arr.length/2)?-1:1)));
   }else if(cannon==='error'){
-    shots=shotNo%5===0?[
-      {angle:a-.18,side:-8,curve:-1,damageMul:.55,special:'nullEcho'},
-      {angle:a-.09,side:-4,curve:-1,damageMul:.72,special:'nullEcho'},
-      {angle:a,side:0,curve:0,damageMul:1.65,special:'nullCore'},
-      {angle:a+.09,side:4,curve:1,damageMul:.72,special:'nullEcho'},
-      {angle:a+.18,side:8,curve:1,damageMul:.55,special:'nullEcho'}
-    ]:[{angle:a,side:0,curve:shotNo%2?-1:1,damageMul:1,special:'errorGlitch'}];
+    shot=shotNo%5===0
+      ?carrier('errorCarrier',230,[
+        part(-.18,.55,'nullEcho',-1),part(-.09,.72,'nullEcho',-1),part(0,1.65,'nullCore',0),part(.09,.72,'nullEcho',1),part(.18,.55,'nullEcho',1)
+      ])
+      :{angle:a,side:0,curve:shotNo%2?-1:1,damageMul:1,special:'errorGlitch'};
   }else if(cannon==='glitch'){
-    const arr=shotNo%6===0?[-.18,-.12,-.06,0,.06,.12,.18]:[-.045,.045];
-    shots=arr.map((v,i)=>({angle:a+v,side:0,curve:i%2?-1:1,damageMul:shotNo%6===0?.35:.62,special:'glitchPacket'}));
+    const arr=shotNo%6===0?[-.18,-.12,-.06,0,.06,.12,.18]:[-.045,.045],mul=shotNo%6===0?.35:.62;
+    shot=carrier('glitchCarrier',185,arr.map((v,i)=>part(v,mul,'glitchPacket',i%2?-1:1)));
   }else if(cannon==='zero'){
-    shots=shotNo%4===0
-      ?[{angle:a-.055,side:-5,curve:0,damageMul:.62,special:'zeroEcho'},{angle:a,side:0,curve:0,damageMul:1.20,special:'zeroCore'},{angle:a+.055,side:5,curve:0,damageMul:.62,special:'zeroEcho'}]
-      :[{angle:a,side:0,curve:0,damageMul:1,special:'zeroStraight'}];  }else if(cannon==='deku'){
-    const faJinBoost=performance.now()<(e.dekuFaJinUntil||0);
-    const smash=shotNo%5===0;
-    shots=[{angle:a,side:0,curve:0,damageMul:smash?2.40:1,special:faJinBoost?(smash?'faJinDetroitAirSmash':'faJinAirForce'):(smash?'detroitAirSmash':'airForce')}];
+    shot=shotNo%4===0
+      ?carrier('zeroCarrier',245,[part(-.055,.62,'zeroEcho'),part(0,1.20,'zeroCore'),part(.055,.62,'zeroEcho')])
+      :{angle:a,side:0,curve:0,damageMul:1,special:'zeroStraight'};
+  }else if(cannon==='sniper'){
+    shot={angle:a,side:0,curve:0,damageMul:1,special:'sniperAP'};
+  }else if(cannon==='deku'){
+    const faJinBoost=performance.now()<(e.dekuFaJinUntil||0),smash=shotNo%5===0;
+    shot={angle:a,side:0,curve:0,damageMul:smash?2.40:1,special:faJinBoost?(smash?'faJinDetroitAirSmash':'faJinAirForce'):(smash?'detroitAirSmash':'airForce')};
+  }else{
+    shot={angle:a,side:0,curve:0,damageMul:1,special:''};
   }
 
-  for(let shotIndex=0;shotIndex<shots.length;shotIndex++){
-    const shot=shots[shotIndex];
-    const sa=shot.angle,px=-Math.sin(sa)*shot.side,py=Math.cos(sa)*shot.side;
-    const b={
-      x:e.x+Math.cos(sa)*(e.r+18)+px,y:e.y+Math.sin(sa)*(e.r+18)+py,
-      vx:Math.cos(sa)*p.bulletSpeed+e.vx*.18,vy:Math.sin(sa)*p.bulletSpeed+e.vy*.18,
-      r:6,damage:p.damage*shot.damageMul,life:1.65,
-      owner:e,ownerId:onlineSelfId,team:'player',cannon,shape:projectileShapeForCannon(cannon),
-      pierce:1,splashRadius:0,basicAttack:true,special:shot.special||'',fragment:false,
-      curve:Number(shot.curve)||0,motionSeed:(shotNo*1.731+shotIndex*2.317+cannon.length*.713)%TAU,motionAge:0,
-      hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()
-    };
-
-    // 캐릭터별 탄환 물리값
-    if(cannon==='standard'){b.r=6;b.life=1.65}
-    else if(cannon==='scout'){b.r=5;b.life=1.55;b.vx*=1.08;b.vy*=1.08}
-    else if(cannon==='bastion'){b.r=10;b.life=2.15;b.pierce=shot.special==='bastionCore'?3:1;b.splashRadius=shot.special==='bastionCore'?52:28}
-    else if(cannon==='rapid'){b.r=3.5;b.life=1.28}
-    else if(cannon==='dual'){b.r=5;b.life=1.42}
-    else if(cannon==='needle'){b.r=3;b.life=1.65;b.pierce=shot.special==='needleCore'?4:2}
-    else if(cannon==='spread'){b.r=4;b.life=.95}
-    else if(cannon==='burst'){b.r=5;b.life=1.18}
-    else if(cannon==='crystal'){b.r=5;b.life=1.20;b.pierce=2}
-    else if(cannon==='piercer'){b.r=5;b.life=1.78;b.pierce=4}
-    else if(cannon==='laser'){b.r=4;b.life=1.50;b.pierce=shot.special==='laserCore'?10:5}
-    else if(cannon==='drill'){b.r=shot.special==='drillCore'?11:8;b.life=shot.special==='drillCore'?2.25:1.95;b.pierce=shot.special==='drillCore'?16:8}
-    else if(cannon==='plasma'){b.r=13;b.life=2.15;b.splashRadius=72}
-    else if(cannon==='thunder'){b.r=10;b.life=2.05;b.splashRadius=62}
-    else if(cannon==='inferno'){b.r=10;b.life=2.12;b.splashRadius=100}
-    else if(cannon==='rocket'){b.r=8;b.life=2.22;b.splashRadius=112}
-    else if(cannon==='titan'){b.r=12;b.life=2.55;b.splashRadius=138}
-    else if(cannon==='phantom'){b.r=6;b.life=1.90;b.pierce=6}
-    else if(cannon==='ring'){b.r=12;b.life=1.85;b.pierce=8}
-    else if(cannon==='chrono'){b.r=10;b.life=2.0;b.pierce=9}
-    else if(cannon==='void'){b.r=12;b.life=2.10;b.pierce=4;b.splashRadius=72}
-    else if(cannon==='nova'){b.r=10;b.life=1.90;b.pierce=3;b.splashRadius=46}
-    else if(cannon==='comet'){b.r=8;b.life=2.08;b.pierce=4;b.splashRadius=52}
-    else if(cannon==='stellar'){b.r=9;b.life=2.02;b.pierce=4;b.splashRadius=58}
-    else if(cannon==='error'){
-      b.r=9;b.life=2.30;b.pierce=16;
-      if(shot.special==='nullCore'){b.r=13;b.life=2.65;b.pierce=24;b.vx*=1.10;b.vy*=1.10}
-      else if(shot.special==='nullEcho'){b.r=8;b.life=2.35;b.pierce=18;b.vx*=1.05;b.vy*=1.05}
-    }
-    else if(cannon==='glitch'){b.r=8;b.life=2.15;b.pierce=14}
-    else if(cannon==='zero'){b.r=shot.special==='zeroCore'?13:10;b.life=2.5;b.pierce=shot.special==='zeroCore'?26:20;if(shot.special==='zeroCore'){b.vx*=1.12;b.vy*=1.12}}
-    else if(cannon==='deku'){const smash=String(shot.special||'').includes('DetroitAirSmash')||shot.special==='detroitAirSmash';b.r=smash?12:7;b.life=1.75;b.pierce=smash?8:3;b.splashRadius=smash?95:28;if(smash){b.vx*=1.18;b.vy*=1.18}}
-
-    if(bullets.length>=MAX_BULLETS)bullets.shift();bullets.push(b);broadcastShot(b);spawnAttackFx(cannon,b.x,b.y,fxAngleFromVector(b.vx,b.vy,sa));
-    if(cannon==='deku'&&String(b.special||'').startsWith('faJin'))spawnCombatFx('dekuFaJinAttack',b.x,b.y,{angle:fxAngleFromVector(b.vx,b.vy,sa),color:'#69f5ee',life:.38,radius:String(b.special||'').includes('Detroit')?105:76,cannon:'deku',variant:'faJin'});
+  const sa=shot.angle,px=-Math.sin(sa)*(shot.side||0),py=Math.cos(sa)*(shot.side||0);
+  const b={
+    x:e.x+Math.cos(sa)*(e.r+18)+px,y:e.y+Math.sin(sa)*(e.r+18)+py,
+    vx:Math.cos(sa)*p.bulletSpeed+e.vx*.18,vy:Math.sin(sa)*p.bulletSpeed+e.vy*.18,
+    r:6,damage:p.damage*(Number(shot.damageMul)||1),life:1.65,
+    owner:e,ownerId:onlineSelfId,team:'player',cannon,shape:projectileShapeForCannon(cannon),
+    pierce:1,splashRadius:0,basicAttack:true,special:shot.special||'',fragment:false,
+    curve:Number(shot.curve)||0,motionSeed:(shotNo*1.731+cannon.length*.713)%TAU,motionAge:0,
+    hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()
+  };
+  if(Array.isArray(shot.splitPattern)&&shot.splitPattern.length){
+    b.splitPattern=shot.splitPattern;
+    b.splitDistance=Math.max(80,Number(shot.splitDistance)||180);
+    b.splitOriginX=b.x;b.splitOriginY=b.y;b.splitBaseDamage=p.damage;b.splitDone=false;
   }
+  configureBasicProjectilePhysics(b,cannon,b.special);
+
+  if(bullets.length>=MAX_BULLETS)bullets.shift();
+  bullets.push(b);broadcastShot(b);spawnAttackFx(cannon,b.x,b.y,fxAngleFromVector(b.vx,b.vy,sa));
+  if(cannon==='deku'&&String(b.special||'').startsWith('faJin'))spawnCombatFx('dekuFaJinAttack',b.x,b.y,{angle:fxAngleFromVector(b.vx,b.vy,sa),color:'#69f5ee',life:.38,radius:String(b.special||'').includes('Detroit')?105:76,cannon:'deku',variant:'faJin'});
 
   const recoil={
     standard:12,scout:7,bastion:24,rapid:5,dual:8,needle:6,
     spread:13,burst:10,crystal:11,piercer:15,laser:10,drill:20,
     plasma:16,thunder:13,inferno:18,rocket:22,titan:30,phantom:9,
     ring:13,chrono:10,void:17,nova:17,comet:10,stellar:16,
-    error:27,glitch:18,zero:30,deku:14
+    error:27,glitch:18,zero:30,deku:14,sniper:38
   }[cannon]||12;
   e.vx-=Math.cos(a)*recoil;e.vy-=Math.sin(a)*recoil;
 }
@@ -2401,7 +2572,7 @@ function applySplashDamage(b,x,y){
     const[nx,ny]=norm(dx||1,dy||0);
     applyShapeDamage(s,base*(.35+.65*scale),nx*110*scale,ny*110*scale);
     if(s.hp<=0){
-      if(b.owner===player)gainXp(s.xp);
+      if(b.owner===player)gainPolygonXp(s.xp);
       burst(s.x,s.y,colorForShape(s.type),10);
       shapes.splice(i,1);
     }
@@ -2485,7 +2656,7 @@ function getRewindState(msAgo=4000){
   return best;
 }
 
-function updatePlayer(dt){if(!player.alive)return;refreshRealTimeSkillCooldowns();player.shapeContactCd=Math.max(0,(player.shapeContactCd||0)-dt);const p=playerParams(),stunned=performance.now()<(player.stunUntil||0);let mx=stunned?0:input.moveX,my=stunned?0:input.moveY;if(input.keys.has('KeyA')||input.keys.has('ArrowLeft'))mx-=1;if(input.keys.has('KeyD')||input.keys.has('ArrowRight'))mx+=1;if(input.keys.has('KeyW')||input.keys.has('ArrowUp'))my-=1;if(input.keys.has('KeyS')||input.keys.has('ArrowDown'))my+=1;if(mx||my){[mx,my]=norm(mx,my);player.vx+=mx*p.move*dt*5.2;player.vy+=my*p.move*dt*5.2}const normalAimAngle=Math.atan2(camera.y+input.mouseY-player.y,camera.x+input.mouseX-player.x);
+function updatePlayer(dt){if(!player.alive)return;refreshRealTimeSkillCooldowns();player.shapeContactCd=Math.max(0,(player.shapeContactCd||0)-dt);const p=playerParams(),stunned=performance.now()<(player.stunUntil||0);let mx=stunned?0:input.moveX,my=stunned?0:input.moveY;if(input.keys.has('KeyA')||input.keys.has('ArrowLeft'))mx-=1;if(input.keys.has('KeyD')||input.keys.has('ArrowRight'))mx+=1;if(input.keys.has('KeyW')||input.keys.has('ArrowUp'))my-=1;if(input.keys.has('KeyS')||input.keys.has('ArrowDown'))my+=1;if(mx||my){[mx,my]=norm(mx,my);player.vx+=mx*p.move*dt*5.2;player.vy+=my*p.move*dt*5.2}const aimWorld=screenToWorldPoint(input.mouseX,input.mouseY),normalAimAngle=Math.atan2(aimWorld[1]-player.y,aimWorld[0]-player.x);
 player.angle=heldSkillAim.active&&Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:normalAimAngle;let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);if(!stunned&&(input.firing||input.keys.has('Space')))fire(player);handleShapeContact();if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}recordPlayerHistory()
 function updateShapes(dt){
   const host=isWorldHost();
@@ -2683,7 +2854,7 @@ function updatePlasmaTetherDamage(b,now){
     applyShapeDamage(s,damage);
     burst(s.x,s.y,'#86f5ff',3);
     if(s.hp<=0){
-      gainXp(s.xp);
+      gainPolygonXp(s.xp);
       burst(s.x,s.y,colorForShape(s.type),10);
       shapes.splice(i,1);
     }
@@ -2716,6 +2887,7 @@ function applyUniqueProjectileMotion(b,dt){
   const speed=Math.max(1,Math.hypot(b.vx,b.vy));
   const nx=-b.vy/speed,ny=b.vx/speed;
   const curve=Number(b.curve)||0;
+  if(/Carrier$/.test(String(b.special||'')))return;
 
   switch(b.cannon){
     case 'standard': break; // 완전 직선 기준탄
@@ -2801,6 +2973,21 @@ function applyUniqueProjectileMotion(b,dt){
     case 'zero': { // ZERO: 궤도 흔들림 없는 강제 직선
       break;
     }
+    case 'sniper': {
+      if(String(b.special||'')==='sniperHoming'){
+        let target=null;
+        if(b.targetId){target=String(b.targetId)===onlineSelfId?player:remotePlayers.get(String(b.targetId));if(target&&!target.alive)target=null}
+        if(!target&&b.targetShapeId)target=shapes.find(s=>String(s.id||'')===String(b.targetShapeId)&&s.hp>0)||null;
+        if(!target&&b.targetShapeRef&&b.targetShapeRef.hp>0)target=b.targetShapeRef;
+        if(target){
+          const desired=Math.atan2(target.y-b.y,target.x-b.x),current=Math.atan2(b.vy,b.vx);
+          const diff=angleDifference(desired,current),turn=clamp(diff,-(b.homingTurnRate||5.8)*dt,(b.homingTurnRate||5.8)*dt);
+          bendProjectileVelocity(b,turn);
+          const k=1+(b.homingAccel||.22)*dt;b.vx*=k;b.vy*=k;
+        }
+      }
+      break;
+    }
   }
 }
 
@@ -2811,6 +2998,12 @@ function updateBullets(dt){
     applyUniqueProjectileMotion(b,dt);
     b.x+=b.vx*dt;b.y+=b.vy*dt;
     maybeReturnRingBullet(b);
+    if(!b.networkRemote&&Array.isArray(b.splitPattern)&&!b.splitDone){
+      const dx=b.x-(b.splitOriginX||b.x),dy=b.y-(b.splitOriginY||b.y);
+      if(dx*dx+dy*dy>=b.splitDistance*b.splitDistance){
+        splitBasicCarrier(b);broadcastShotEnd(b);bullets.splice(i,1);continue;
+      }
+    }
     if(b.life<=0||b.x<0||b.y<0||b.x>WORLD||b.y>WORLD){
       if(!b.networkRemote)broadcastShotEnd(b);
       bullets.splice(i,1);continue;
@@ -2829,6 +3022,7 @@ function updateBullets(dt){
       if(b.hitTargets?.has(s))continue;
       const rr=b.r+s.r;
       if((b.x-s.x)**2+(b.y-s.y)**2<rr*rr){
+        if(Array.isArray(b.splitPattern)&&!b.splitDone){splitBasicCarrier(b);remove=true;break}
         b.hitTargets?.add(s);
         const[nx,ny]=norm(b.vx,b.vy);
         applyShapeDamage(s,b.damage,nx*75,ny*75);
@@ -2838,7 +3032,7 @@ function updateBullets(dt){
         if(b.basicAttack&&['plasma','thunder'].includes(b.cannon))chainPlasmaBasicHit(b,b.x,b.y,s,'');
         if(b.basicAttack&&cannonFamily(b.cannon)==='error')errorGlitchImpact(b,b.x,b.y,s,'');
         if(s.hp<=0){
-          if(b.owner===player)gainXp(s.xp);
+          if(b.owner===player)gainPolygonXp(s.xp);
           shapes.splice(j,1);
           burst(s.x,s.y,colorForShape(s.type),10);
         }
@@ -2864,6 +3058,7 @@ function updateBullets(dt){
         if(!enemy.alive||b.hitIds?.has(enemy.id))continue;
         const rr=b.r+(enemy.r||27);
         if((b.x-enemy.x)**2+(b.y-enemy.y)**2<rr*rr){
+          if(Array.isArray(b.splitPattern)&&!b.splitDone){splitBasicCarrier(b);remove=true;break}
           b.hitIds?.add(enemy.id);
           sendDamage(enemy.id,b.damage);
           burst(b.x,b.y,'#ff8a8a',4);
@@ -2940,7 +3135,7 @@ function updateSkillZones(dt){
         z.data.next=.38;z.data.strikes=(z.data.strikes||0)+1;
         let tx=z.x+rand(-z.radius*.85,z.radius*.85),ty=z.y+rand(-z.radius*.85,z.radius*.85),target=null,best=150*150;
         for(const s of shapes){const d2=(s.x-tx)**2+(s.y-ty)**2;if(d2<best&&Math.hypot(s.x-z.x,s.y-z.y)<z.radius){best=d2;target=s}}
-        if(target){tx=target.x;ty=target.y;applyShapeDamage(target,z.damage);if(target.hp<=0){gainXp(target.xp)}}
+        if(target){tx=target.x;ty=target.y;applyShapeDamage(target,z.damage);if(target.hp<=0){gainPolygonXp(target.xp)}}
         for(const e of remotePlayers.values()){if(!e.alive)continue;if((e.x-tx)**2+(e.y-ty)**2<75*75)sendDamage(e.id,z.damage*.85)}
         spawnCombatFx('skyLightning',tx,ty-260,{angle:Math.PI/2,color:'#fff36f',life:.34,radius:260,cannon:'thunder'});
         burst(tx,ty,'#fff37a',15);
@@ -2991,7 +3186,7 @@ function updateSkillZones(dt){
         z.tick=.25;
         const r=z.radius,ax=z.x,ay=z.y-r,bx=z.x-r*.866,by=z.y+r*.5,cx=z.x+r*.866,cy=z.y+r*.5;
         if(pointInTriangle(player.x,player.y,ax,ay,bx,by,cx,cy))player.hp=Math.min(player.maxHp,player.hp+(z.data.heal||player.maxHp*.02));
-        for(let i=shapes.length-1;i>=0;i--){const s=shapes[i];if(!pointInTriangle(s.x,s.y,ax,ay,bx,by,cx,cy))continue;applyShapeDamage(s,z.damage);burst(s.x,s.y,'#e8ffff',3);if(s.hp<=0){gainXp(s.xp);shapes.splice(i,1)}}
+        for(let i=shapes.length-1;i>=0;i--){const s=shapes[i];if(!pointInTriangle(s.x,s.y,ax,ay,bx,by,cx,cy))continue;applyShapeDamage(s,z.damage);burst(s.x,s.y,'#e8ffff',3);if(s.hp<=0){gainPolygonXp(s.xp);shapes.splice(i,1)}}
         for(const e of remotePlayers.values()){if(e.alive&&pointInTriangle(e.x,e.y,ax,ay,bx,by,cx,cy))sendDamage(e.id,z.damage*.75)}
       }
       continue;
@@ -3114,7 +3309,7 @@ function updateSkillZones(dt){
           reportShapeImpulse(s,dx/d*force,dy/d*force);
 
           if(applyShapeDamage(s,z.damage)){
-            gainXp(s.xp);
+            gainPolygonXp(s.xp);
             burst(s.x,s.y,colorForShape(s.type),10);
             shapes.splice(i,1);
           }
@@ -3156,13 +3351,16 @@ function updateSkillZones(dt){
 
     // Existing gravity / burn zones.
     z.tick=(z.tick||0)-dt;const doTick=z.tick<=0;if(doTick)z.tick=z.type==='burn'?.25:.22;
-    for(let i=shapes.length-1;i>=0;i--){const s=shapes[i],dx=z.x-s.x,dy=z.y-s.y,d=Math.hypot(dx,dy)||1;if(d>z.radius)continue;if(z.type==='gravity'){const force=(1-d/z.radius)*820;s.vx+=dx/d*force*dt;s.vy+=dy/d*force*dt;if(doTick&&onlineReady&&!isWorldHost()&&s.id)sendOnline('shapeImpulse',{hostId:worldHostId,shapeId:String(s.id),sourceId:onlineSelfId,dvx:dx/d*force*.18,dvy:dy/d*force*.18})}if(doTick){applyShapeDamage(s,z.damage);burst(s.x,s.y,z.type==='burn'?'#ff9a42':'#8da9ff',z.type==='burn'?3:2);if(s.hp<=0){gainXp(s.xp);burst(s.x,s.y,colorForShape(s.type),10);shapes.splice(i,1)}}}
+    for(let i=shapes.length-1;i>=0;i--){const s=shapes[i],dx=z.x-s.x,dy=z.y-s.y,d=Math.hypot(dx,dy)||1;if(d>z.radius)continue;if(z.type==='gravity'){const force=(1-d/z.radius)*820;s.vx+=dx/d*force*dt;s.vy+=dy/d*force*dt;if(doTick&&onlineReady&&!isWorldHost()&&s.id)sendOnline('shapeImpulse',{hostId:worldHostId,shapeId:String(s.id),sourceId:onlineSelfId,dvx:dx/d*force*.18,dvy:dy/d*force*.18})}if(doTick){applyShapeDamage(s,z.damage);burst(s.x,s.y,z.type==='burn'?'#ff9a42':'#8da9ff',z.type==='burn'?3:2);if(s.hp<=0){gainPolygonXp(s.xp);burst(s.x,s.y,colorForShape(s.type),10);shapes.splice(i,1)}}}
     if(doTick)for(const enemy of remotePlayers.values()){if(!enemy.alive)continue;const dx=z.x-enemy.x,dy=z.y-enemy.y;if(dx*dx+dy*dy<=z.radius*z.radius)sendDamage(enemy.id,z.damage*(z.type==='burn'?1:.75))}
   }
 }
+function sniperViewScale(){return player?.cannonType==='sniper'&&performance.now()<(player.sniperScopeUntil||0)?1/3:1}
+function viewScreenBounds(pad=0){const s=sniperViewScale(),hw=innerWidth/(2*s),hh=innerHeight/(2*s),cx=innerWidth/2,cy=innerHeight/2;return{left:cx-hw-pad,right:cx+hw+pad,top:cy-hh-pad,bottom:cy+hh+pad}}
+function screenToWorldPoint(screenX,screenY){const s=sniperViewScale(),cx=innerWidth/2,cy=innerHeight/2;return[camera.x+cx+(screenX-cx)/s,camera.y+cy+(screenY-cy)/s]}
 function cameraUpdate(){const tx=player.x-innerWidth/2,ty=player.y-innerHeight/2;camera.x+=(tx-camera.x)*.12;camera.y+=(ty-camera.y)*.12;camera.x=clamp(camera.x,0,Math.max(0,WORLD-innerWidth));camera.y=clamp(camera.y,0,Math.max(0,WORLD-innerHeight))}
 const worldToScreen=(x,y)=>[x-camera.x,y-camera.y];
-function drawGrid(){ctx.fillStyle='#152235';ctx.fillRect(0,0,innerWidth,innerHeight);const sx=-(camera.x%GRID),sy=-(camera.y%GRID);ctx.strokeStyle='rgba(255,255,255,.045)';ctx.lineWidth=1;ctx.beginPath();for(let x=sx;x<innerWidth;x+=GRID){ctx.moveTo(x,0);ctx.lineTo(x,innerHeight)}for(let y=sy;y<innerHeight;y+=GRID){ctx.moveTo(0,y);ctx.lineTo(innerWidth,y)}ctx.stroke()}
+function drawGrid(){const b=viewScreenBounds(80);ctx.fillStyle='#152235';ctx.fillRect(b.left,b.top,b.right-b.left,b.bottom-b.top);let sx=-(camera.x%GRID),sy=-(camera.y%GRID);while(sx>b.left)sx-=GRID;while(sy>b.top)sy-=GRID;ctx.strokeStyle='rgba(255,255,255,.045)';ctx.lineWidth=1;ctx.beginPath();for(let x=sx;x<b.right;x+=GRID){ctx.moveTo(x,b.top);ctx.lineTo(x,b.bottom)}for(let y=sy;y<b.bottom;y+=GRID){ctx.moveTo(b.left,y);ctx.lineTo(b.right,y)}ctx.stroke()}
 function polygon(x,y,r,sides,a){ctx.beginPath();for(let i=0;i<sides;i++){const q=a+i*TAU/sides,px=x+Math.cos(q)*r,py=y+Math.sin(q)*r;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)}ctx.closePath()}
 let renderPressure=0;
 function updateRenderPressure(){
@@ -3170,18 +3368,18 @@ function updateRenderPressure(){
   renderPressure=load>820?2:load>480?1:0;
 }
 function screenVisibleWorld(x,y,pad=100){
-  const sx=x-camera.x,sy=y-camera.y;
-  return sx>=-pad&&sy>=-pad&&sx<=innerWidth+pad&&sy<=innerHeight+pad;
+  const sx=x-camera.x,sy=y-camera.y,b=viewScreenBounds(pad);
+  return sx>=b.left&&sy>=b.top&&sx<=b.right&&sy<=b.bottom;
 }
 function segmentMayTouchScreen(x1,y1,x2,y2,pad=120){
-  const ax=x1-camera.x,ay=y1-camera.y,bx=x2-camera.x,by=y2-camera.y;
-  if(ax<-pad&&bx<-pad)return false;
-  if(ay<-pad&&by<-pad)return false;
-  if(ax>innerWidth+pad&&bx>innerWidth+pad)return false;
-  if(ay>innerHeight+pad&&by>innerHeight+pad)return false;
+  const ax=x1-camera.x,ay=y1-camera.y,bx=x2-camera.x,by=y2-camera.y,b=viewScreenBounds(pad);
+  if(ax<b.left&&bx<b.left)return false;
+  if(ay<b.top&&by<b.top)return false;
+  if(ax>b.right&&bx>b.right)return false;
+  if(ay>b.bottom&&by>b.bottom)return false;
   return true;
 }
-function drawShape(s){const[x,y]=worldToScreen(s.x,s.y);if(x<-80||y<-80||x>innerWidth+80||y>innerHeight+80)return;const spawnP=clamp((s.spawnAge||0)/.34,0,1),ease=1-Math.pow(1-spawnP,3),rr=s.r*(.35+.65*ease);ctx.save();ctx.globalAlpha=.28+.72*ease;ctx.shadowColor='rgba(0,0,0,.25)';ctx.shadowBlur=renderPressure?0:10;ctx.shadowOffsetY=renderPressure?0:4;polygon(x,y,rr,s.sides,s.angle);ctx.fillStyle=colorForShape(s.type);ctx.fill();ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.strokeStyle=edgeForShape(s.type);ctx.lineWidth=5;ctx.stroke();if(s.hp<s.maxHp){const w=s.r*1.6;ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(x-w/2,y+s.r+8,w,4);ctx.fillStyle='#7ee787';ctx.fillRect(x-w/2,y+s.r+8,w*(s.hp/s.maxHp),4)}ctx.restore()}
+function drawShape(s){const[x,y]=worldToScreen(s.x,s.y),vb=viewScreenBounds(80);if(x<vb.left||y<vb.top||x>vb.right||y>vb.bottom)return;const spawnP=clamp((s.spawnAge||0)/.34,0,1),ease=1-Math.pow(1-spawnP,3),rr=s.r*(.35+.65*ease);ctx.save();ctx.globalAlpha=.28+.72*ease;ctx.shadowColor='rgba(0,0,0,.25)';ctx.shadowBlur=renderPressure?0:10;ctx.shadowOffsetY=renderPressure?0:4;polygon(x,y,rr,s.sides,s.angle);ctx.fillStyle=colorForShape(s.type);ctx.fill();ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.strokeStyle=edgeForShape(s.type);ctx.lineWidth=5;ctx.stroke();if(s.hp<s.maxHp){const w=s.r*1.6;ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(x-w/2,y+s.r+8,w,4);ctx.fillStyle='#7ee787';ctx.fillRect(x-w/2,y+s.r+8,w*(s.hp/s.maxHp),4)}ctx.restore()}
 function drawCharacterMark(cannon,r){
   const marks={
     scout:['chevron','#bdf7ff'],bastion:['shield','#d8ecff'],
@@ -3275,6 +3473,10 @@ function drawPlayerCannon(cannon,r){
       barrel(r*.08,-7,r+30,14,'#6775a4','#39446e',4);ctx.fillStyle='#ffffff';ctx.strokeStyle='#aeeeff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r+48,0);ctx.lineTo(r+31,-11);ctx.lineTo(r+20,0);ctx.lineTo(r+31,11);ctx.closePath();ctx.fill();ctx.stroke();for(const yy of [-17,17])line(r+4,yy,r+26,yy*.35,'#dfffff',2);break;
     case 'deku':
       barrel(r*.08,-7,r+39,14,'#174b36','#0b3128',5);ctx.strokeStyle='#baff70';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(r+11,-13);ctx.lineTo(r+24,-4);ctx.lineTo(r+17,3);ctx.lineTo(r+37,13);ctx.stroke();break;
+    case 'sniper':
+      barrel(r*.04,-5,r+78,10,'#263844','#79dcff',2);barrel(r+30,-9,26,18,'#182630','#4ca9ca',3);
+      ctx.strokeStyle='#d9f8ff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r+58,-9);ctx.lineTo(r+92,0);ctx.lineTo(r+58,9);ctx.stroke();
+      ctx.fillStyle='#9feaff';ctx.beginPath();ctx.arc(r+25,-12,5,0,TAU);ctx.fill();break;
     case 'error':
       barrel(r*.03,-12,r+44,24,'#090a0c','#72ff43',2);ctx.strokeStyle='#ff42df';ctx.lineWidth=2;ctx.strokeRect(r+8,-15,28,6);ctx.strokeStyle='#42eaff';ctx.strokeRect(r+15,8,34,5);break;
     case 'glitch':
@@ -3408,19 +3610,76 @@ function drawUniqueTankBody(cannon,r,t,theme){
     case 'comet': ctx.strokeStyle='#a2f6ff';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-r*.35,-r*.24);ctx.lineTo(-r*1.18,0);ctx.lineTo(-r*.35,r*.24);ctx.stroke();ctx.fillStyle='#dfffff';ctx.beginPath();ctx.moveTo(r*.52,0);ctx.lineTo(r*.05,-r*.26);ctx.lineTo(r*.05,r*.26);ctx.closePath();ctx.fill();break;
     case 'stellar': for(let k=0;k<3;k++)dot(-Math.PI/2+k*TAU/3,r*.82,6,'#ffffff');ctx.strokeStyle='#eaffff';ctx.lineWidth=3;ctx.beginPath();for(let k=0;k<3;k++){const q=-Math.PI/2+k*TAU/3,x=Math.cos(q)*r*.82,y=Math.sin(q)*r*.82;k?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.stroke();break;
     case 'deku': ctx.strokeStyle='#caff70';ctx.lineWidth=3;for(let k=0;k<4;k++){const q=-.7+k*TAU/4;ctx.beginPath();ctx.moveTo(Math.cos(q)*r*.55,Math.sin(q)*r*.55);ctx.lineTo(Math.cos(q+.16)*r*1.04,Math.sin(q+.16)*r*1.04);ctx.stroke()}break;
+    case 'sniper':
+      ctx.strokeStyle='#bdefff';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,r*.68,0,TAU);ctx.stroke();
+      ctx.lineWidth=2;for(let k=0;k<4;k++)spoke(k*TAU/4,r*.45,r*.92,'#7ddcff',2);
+      ctx.fillStyle='#e6fbff';ctx.beginPath();ctx.arc(0,0,4,0,TAU);ctx.fill();break;
     case 'error': ctx.strokeStyle='#72ff43';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,r*.86,.1,1.4);ctx.stroke();ctx.strokeStyle='#ff42df';ctx.beginPath();ctx.arc(Math.sin(t*13)*3,0,r*.92,2.0,3.35);ctx.stroke();ctx.strokeStyle='#42eaff';ctx.beginPath();ctx.arc(0,Math.cos(t*11)*3,r*.78,4.0,5.55);ctx.stroke();break;
     case 'glitch': ctx.strokeStyle='#ff42df';ctx.lineWidth=4;ctx.setLineDash([10,6]);ctx.beginPath();ctx.arc(0,0,r*.92,t,t+Math.PI*1.05);ctx.stroke();ctx.strokeStyle='#42eaff';ctx.beginPath();ctx.arc(0,0,r*.77,-t,-t+Math.PI*.92);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#72ff43';ctx.fillRect(r*.15,-3,r*.46,6);break;
     case 'zero': ctx.strokeStyle='#ffffff';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,r*.60,0,TAU);ctx.stroke();ctx.beginPath();ctx.moveTo(-r*.43,r*.43);ctx.lineTo(r*.43,-r*.43);ctx.stroke();ctx.fillStyle='#050506';ctx.beginPath();ctx.arc(0,0,r*.22,0,TAU);ctx.fill();break;
   }
   ctx.shadowBlur=0;ctx.restore();
 }
+function evolutionBarrelSpecs(type,r){
+  const b=(a=0,side=0,len=1,w=1)=>({a,side,len,w});
+  switch(type){
+    case 'twin':return[b(0,-8,1,.78),b(0,8,1,.78)];
+    case 'sniperClass':case 'assassin':case 'ranger':case 'stalker':case 'predator':return[b(0,0,type==='ranger'?1.65:type==='assassin'?1.5:1.35,.72)];
+    case 'hunter':return[b(0,-5,1.30,.74),b(0,5,1.08,.68)];
+    case 'machineGun':case 'sprayer':return[b(0,0,1.05,type==='sprayer'?1.30:1.18)];
+    case 'flankGuard':return[b(0,0,1,.82),b(Math.PI,0,.88,.72)];
+    case 'tripleShot':return[b(0,0,1,.72),b(-.29,0,.92,.68),b(.29,0,.92,.68)];
+    case 'quadTank':return[0,Math.PI/2,Math.PI,Math.PI*1.5].map(a=>b(a,0,.84,.68));
+    case 'twinFlank':return[b(0,-7,.92,.66),b(0,7,.92,.66),b(Math.PI,-7,.84,.62),b(Math.PI,7,.84,.62)];
+    case 'trapper':case 'megaTrapper':return[b(0,0,type==='megaTrapper'?.88:.82,type==='megaTrapper'?1.45:1.18)];
+    case 'destroyer':case 'annihilator':case 'skimmer':case 'glider':case 'rocketeer':return[b(0,0,type==='annihilator'?1.18:1.08,type==='annihilator'?1.72:1.48)];
+    case 'gunner':case 'autoGunner':case 'streamliner':return[-9,-3,3,9].map(side=>b(0,side,type==='streamliner'?1.16:.95,.48));
+    case 'shotgun':case 'palletShot':return[b(0,0,.90,1.48)];
+    case 'dualBarrel':return[b(0,-7,.96,.88),b(0,7,.96,.88)];
+    case 'triAngle':case 'booster':case 'fighter':return[b(0,0,.95,.74),b(Math.PI-.62,0,.76,.62),b(Math.PI+.62,0,.76,.62)];
+    case 'auto3':return[0,TAU/3,TAU*2/3].map(a=>b(a,0,.72,.60));
+    case 'triplet':return[b(0,-8,1.0,.66),b(0,0,1.10,.72),b(0,8,1.0,.66)];
+    case 'pentaShot':return[-.52,-.25,0,.25,.52].map(a=>b(a,0,.88,.56));
+    case 'spreadShot':return[-.72,-.36,0,.36,.72].map(a=>b(a,0,.84,.52));
+    case 'octoTank':return Array.from({length:8},(_,i)=>b(i*TAU/8,0,.70,.54));
+    case 'auto5':return Array.from({length:5},(_,i)=>b(i*TAU/5,0,.72,.56));
+    case 'tripleTwin':return[0,TAU/3,TAU*2/3].flatMap(a=>[b(a,-6,.82,.55),b(a,6,.82,.55)]);
+    case 'triTrapper':return[0,TAU/3,TAU*2/3].map(a=>b(a,0,.72,1.05));
+    case 'gunnerTrapper':return[b(0,-7,.90,.50),b(0,7,.90,.50),b(Math.PI,0,.72,1.00)];
+    case 'autoTrapper':return[b(0,0,.76,1.08),b(Math.PI,0,.58,.50)];
+    case 'autoTank':return[b(0,0,.94,.72),b(Math.PI*.72,0,.58,.50)];
+    default:return[];
+  }
+}
+function drawEvolutionChassis(e,r){
+  const type=e.classType||'basic';if(type==='basic')return;
+  const smasher=['smasher','landmine','autoSmasher','spike'].includes(type);
+  ctx.save();
+  if(smasher){
+    const spikes=type==='spike'?12:type==='landmine'?8:6;
+    ctx.fillStyle='rgba(203,211,220,.90)';ctx.strokeStyle='rgba(82,96,110,.95)';ctx.lineWidth=2;
+    for(let i=0;i<spikes;i++){const a=i*TAU/spikes;ctx.save();ctx.rotate(a);ctx.beginPath();ctx.moveTo(r*.72,-5);ctx.lineTo(r*1.38,0);ctx.lineTo(r*.72,5);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}
+    ctx.strokeStyle='rgba(220,228,235,.92)';ctx.lineWidth=5;ctx.beginPath();ctx.arc(0,0,r*.88,0,TAU);ctx.stroke();
+  }
+  for(const spec of evolutionBarrelSpecs(type,r)){
+    ctx.save();ctx.rotate(spec.a||0);ctx.translate(0,spec.side||0);
+    const len=r*(.78*(spec.len||1)),w=Math.max(6,r*.32*(spec.w||1));
+    ctx.fillStyle='rgba(177,190,201,.94)';ctx.strokeStyle='rgba(66,80,94,.96)';ctx.lineWidth=2;
+    ctx.fillRect(r*.28,-w/2,len,w);ctx.strokeRect(r*.28,-w/2,len,w);ctx.restore();
+  }
+  if(['auto3','auto5','autoGunner','autoTrapper','autoSmasher','autoTank'].includes(type)){
+    ctx.fillStyle='#d8e1e8';ctx.strokeStyle='#526171';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,-r*.48,7,0,TAU);ctx.fill();ctx.stroke();
+    ctx.fillRect(1,-r*.51,16,6);
+  }
+  ctx.restore();
+}
 function drawTank(e){
   if(!e.alive)return;const isP=e===player;
   const cloakActive=isP?performance.now()<(e.cloakUntil||0):(e.cloaked===true&&(!e.cloakUntilWall||Date.now()<e.cloakUntilWall));
   const dekuSmokeActive=(e.cannonType||'')==='deku'&&(isP?performance.now()<(e.dekuSmokeUntil||0):Date.now()<(e.dekuSmokeUntilWall||0));
   if(!isP&&(cloakActive||dekuSmokeActive))return;
-  const[x,y]=worldToScreen(e.x,e.y);
-  if(x<-165||y<-165||x>innerWidth+165||y>innerHeight+165)return;
+  const[x,y]=worldToScreen(e.x,e.y),vb=viewScreenBounds(165);
+  if(x<vb.left||y<vb.top||x>vb.right||y>vb.bottom)return;
   const cannon=e.cannonType||'standard',family=cannonFamily(cannon),theme=TANK_THEMES[cannon]||TANK_THEMES.standard,r=e.r;
   const teamColor=isP?'#5cc0ff':'#ff646d',t=performance.now()*.001;
 
@@ -3456,6 +3715,9 @@ function drawTank(e){
     for(let k=-3;k<=3;k++){const yy=k*9+Math.sin(t*13+k)*3;ctx.beginPath();ctx.moveTo(-r-50-Math.abs(k)*8,yy);ctx.lineTo(-r-9,yy*.55);ctx.stroke()}
     ctx.strokeStyle='rgba(205,255,255,.74)';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,0,r+15+Math.sin(t*10)*3,(r+15)*.45,t*1.8,0,TAU);ctx.stroke();ctx.shadowBlur=0;ctx.restore();
   }
+
+  // Diep.io evolution barrels/chassis are drawn behind the equipped cannon skin.
+  drawEvolutionChassis(e,r);
 
   // ERROR 검 모드에서는 포신 대신 ERROR 검을 든다.
   if(swordModeActive)drawErrorSword(e,r,t);else drawPlayerCannon(cannon,r);
@@ -3531,7 +3793,7 @@ function drawPlasmaTethers(){
     if(!owner||!owner.alive)continue;
     const [sx,sy]=plasmaTetherStart(owner);
     const [ax,ay]=worldToScreen(sx,sy),[bx,by]=worldToScreen(b.x,b.y);
-    if((ax<-180&&bx<-180)||(ay<-180&&by<-180)||(ax>innerWidth+180&&bx>innerWidth+180)||(ay>innerHeight+180&&by>innerHeight+180))continue;
+    const vb=viewScreenBounds(180);if((ax<vb.left&&bx<vb.left)||(ay<vb.top&&by<vb.top)||(ax>vb.right&&bx>vb.right)||(ay>vb.bottom&&by>vb.bottom))continue;
     const pulse=.78+.22*Math.sin(performance.now()*.022+(b.x+b.y)*.01);
     drawPlasmaLightningPath(ax,ay,bx,by,pulse);
   }
@@ -4068,6 +4330,17 @@ function drawUniqueProjectile(b,time,phase){
   if(shape==='piercerLance'){
     ctx.globalAlpha=.25;ctx.fillStyle='#b780ff';ctx.fillRect(-52,-2,38,4);ctx.globalAlpha=1;ctx.shadowColor='#b98aff';ctx.shadowBlur=16;ctx.fillStyle='#d9c7ff';ctx.strokeStyle='#8355cf';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(21,0);ctx.lineTo(2,-5);ctx.lineTo(-17,-3);ctx.lineTo(-23,0);ctx.lineTo(-17,3);ctx.lineTo(2,5);ctx.closePath();ctx.fill();ctx.stroke();ctx.shadowBlur=0;return true;
   }
+  if(shape==='sniperRound'){
+    ctx.shadowColor='#9eeaff';ctx.shadowBlur=18;ctx.strokeStyle='#e9fbff';ctx.lineWidth=3.2;ctx.beginPath();ctx.moveTo(-54,0);ctx.lineTo(18,0);ctx.stroke();
+    ctx.strokeStyle='#4ebde6';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(-76,-2);ctx.lineTo(7,-2);ctx.moveTo(-76,2);ctx.lineTo(7,2);ctx.stroke();
+    ctx.fillStyle='#ffffff';ctx.beginPath();ctx.moveTo(23,0);ctx.lineTo(7,-4);ctx.lineTo(7,4);ctx.closePath();ctx.fill();ctx.shadowBlur=0;return true;
+  }
+  if(shape==='sniperHomingMissile'){
+    const pulse2=.7+.3*Math.sin(time*12);ctx.shadowColor='#78dcff';ctx.shadowBlur=18;
+    ctx.fillStyle='#dff8ff';ctx.strokeStyle='#4d9ebd';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(20,0);ctx.lineTo(5,-8);ctx.lineTo(-13,-6);ctx.lineTo(-17,0);ctx.lineTo(-13,6);ctx.lineTo(5,8);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle='#71d7ff';ctx.beginPath();ctx.moveTo(-13,-5);ctx.lineTo(-31,-10*pulse2);ctx.lineTo(-17,0);ctx.lineTo(-31,10*pulse2);ctx.lineTo(-13,5);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(220,250,255,.9)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(3,0,4,0,TAU);ctx.stroke();ctx.shadowBlur=0;return true;
+  }
   if(shape==='laserRay'){
     ctx.shadowColor='#e1a8ff';ctx.shadowBlur=18;ctx.fillStyle='#fff';ctx.fillRect(-28,-2,54,4);ctx.globalAlpha=.55;ctx.fillStyle='#bd72ff';ctx.fillRect(-44,-5,60,2);ctx.fillRect(-44,3,60,2);ctx.globalAlpha=1;ctx.shadowBlur=0;return true;
   }
@@ -4378,10 +4651,10 @@ function drawMinimap(){
 }
 function basicAimSpec(cannon){
   const p=playerParams();
-  const life={standard:1.65,scout:1.55,bastion:2.15,rapid:1.28,dual:1.42,needle:1.65,spread:.95,burst:1.18,crystal:1.20,piercer:1.78,laser:1.50,drill:1.95,plasma:2.15,thunder:2.05,inferno:2.12,rocket:2.22,titan:2.55,phantom:1.90,ring:1.85,chrono:2.0,void:2.10,nova:1.90,comet:2.08,stellar:2.02,error:2.30,glitch:2.15,zero:2.50,deku:1.75}[cannon]||1.65;
+  const life={standard:1.65,scout:1.55,bastion:2.15,rapid:1.28,dual:1.42,needle:1.65,spread:.95,burst:1.18,crystal:1.20,piercer:1.78,laser:1.50,drill:1.95,plasma:2.15,thunder:2.05,inferno:2.12,rocket:2.22,titan:2.55,phantom:1.90,ring:1.85,chrono:2.0,void:2.10,nova:1.90,comet:2.08,stellar:2.02,error:2.30,glitch:2.15,zero:2.50,deku:1.75,sniper:3.60}[cannon]||1.65;
   const cone={spread:.25,burst:.17,crystal:.30,thunder:.10,chrono:.07,nova:.10,stellar:.16,glitch:.18};
   if(cannon==='error'&&player.errorSwordMode)return{type:'cone',range:235,half:1.15};
-  return cone[cannon]?{type:'cone',range:clamp(p.bulletSpeed*life,380,1750),half:cone[cannon]}:{type:'lane',range:clamp(p.bulletSpeed*life,380,1750),width:{bastion:34,dual:32,needle:15,piercer:20,laser:16,drill:29,plasma:34,inferno:38,rocket:38,titan:46,ring:34,void:38,error:38,zero:42,deku:24}[cannon]||24};
+  return cone[cannon]?{type:'cone',range:clamp(p.bulletSpeed*life,380,1750),half:cone[cannon]}:{type:'lane',range:clamp(p.bulletSpeed*life,380,1750),width:{bastion:34,dual:32,needle:15,piercer:20,laser:16,drill:29,plasma:34,inferno:38,rocket:38,titan:46,ring:34,void:38,error:38,zero:42,deku:24,sniper:12}[cannon]||24};
 }
 function skillAimSpec(cannon,slot){
   if(slot===1){
@@ -4390,12 +4663,12 @@ function skillAimSpec(cannon,slot){
       return{type:'self',radius:245};
     }
     return{
-      standard:{type:'target',distance:650,radius:310},scout:{type:'dash',distance:650,width:28,end:80},bastion:{type:'wall',distance:220,length:330,width:34},rapid:{type:'self',radius:80},dual:{type:'self',radius:115},needle:{type:'line',distance:820,width:24},spread:{type:'cone',distance:500,half:.78},burst:{type:'target',distance:520,radius:170},crystal:{type:'target',distance:360,radius:118},piercer:{type:'line',distance:1050,width:34},laser:{type:'cone',distance:720,half:.85},drill:{type:'line',distance:1050,width:58},plasma:{type:'target',distance:430,radius:245},thunder:{type:'target',distance:520,radius:300},inferno:{type:'wall',distance:360,length:560,width:92},rocket:{type:'target',distance:540,radius:330},titan:{type:'line',distance:760,width:110},phantom:{type:'dash',distance:phantomPreviewDistance(),width:42,end:150},ring:{type:'target',distance:460,radius:92},chrono:{type:'target',distance:440,radius:310},void:{type:'target',distance:500,radius:300},nova:{type:'target',distance:520,radius:420},comet:{type:'dash',distance:850,width:100,end:150},stellar:{type:'triangle',distance:360,radius:340},deku:{type:'self',radius:330},glitch:{type:'target',distance:560,radius:150},zero:{type:'line',distance:1250,width:72}
+      standard:{type:'target',distance:650,radius:310},scout:{type:'dash',distance:650,width:28,end:80},bastion:{type:'wall',distance:220,length:330,width:34},rapid:{type:'self',radius:80},dual:{type:'self',radius:115},needle:{type:'line',distance:820,width:24},spread:{type:'cone',distance:500,half:.78},burst:{type:'target',distance:520,radius:170},crystal:{type:'target',distance:360,radius:118},piercer:{type:'line',distance:1050,width:34},laser:{type:'cone',distance:720,half:.85},drill:{type:'line',distance:1050,width:58},plasma:{type:'target',distance:430,radius:245},thunder:{type:'target',distance:520,radius:300},inferno:{type:'wall',distance:360,length:560,width:92},rocket:{type:'target',distance:540,radius:330},titan:{type:'line',distance:760,width:110},phantom:{type:'dash',distance:phantomPreviewDistance(),width:42,end:150},ring:{type:'target',distance:460,radius:92},chrono:{type:'target',distance:440,radius:310},void:{type:'target',distance:500,radius:300},nova:{type:'target',distance:520,radius:420},comet:{type:'dash',distance:850,width:100,end:150},stellar:{type:'triangle',distance:360,radius:340},deku:{type:'self',radius:330},sniper:{type:'self',radius:125},glitch:{type:'target',distance:560,radius:150},zero:{type:'line',distance:1250,width:72}
     }[cannon]||null;
   }
   if(slot===2){
     if(cannon==='error'&&performance.now()<(player.overclockUntil||0))return{type:'dash',distance:460,width:55,end:92};
-    return{rocket:{type:'self',radius:148},titan:{type:'self',radius:132},phantom:{type:'self',radius:105},ring:{type:'self',radius:175},chrono:{type:'self',radius:185},void:{type:'self',radius:430},nova:{type:'self',radius:185},comet:{type:'target',distance:620,radius:370},stellar:{type:'self',radius:145},error:{type:'self',radius:125},glitch:{type:'dash',distance:900,width:96,end:96},zero:{type:'self',radius:560},deku:{type:'line',distance:800,width:58}}[cannon]||null;
+    return{rocket:{type:'self',radius:148},titan:{type:'self',radius:132},phantom:{type:'self',radius:105},ring:{type:'self',radius:175},chrono:{type:'self',radius:185},void:{type:'self',radius:430},nova:{type:'self',radius:185},comet:{type:'target',distance:620,radius:370},stellar:{type:'self',radius:145},error:{type:'self',radius:125},glitch:{type:'dash',distance:900,width:96,end:96},zero:{type:'self',radius:560},deku:{type:'line',distance:800,width:58},sniper:{type:'cone',distance:1800,half:.48}}[cannon]||null;
   }
   if(slot===3){if(cannon==='error')return{type:'dash',distance:360,width:80,end:235};if(cannon==='deku')return{type:'self',radius:140}}
   if(slot===4&&cannon==='deku')return{type:'self',radius:170};
@@ -4447,16 +4720,28 @@ function update(dt){
     void saveCurrentRun(false);
   }
 }
+function drawSniperScopeOverlay(){
+  if(!running||!player?.alive||player.cannonType!=='sniper')return;
+  const left=Math.max(0,((player.sniperScopeUntil||0)-performance.now())/1000);
+  if(left<=0)return;
+  const cx=innerWidth/2,cy=innerHeight/2,rr=Math.min(innerWidth,innerHeight)*.43;
+  ctx.save();ctx.strokeStyle='rgba(190,243,255,.82)';ctx.lineWidth=2;ctx.setLineDash([10,9]);ctx.beginPath();ctx.arc(cx,cy,rr,0,TAU);ctx.stroke();ctx.setLineDash([]);
+  ctx.strokeStyle='rgba(215,250,255,.72)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(cx-rr,cy);ctx.lineTo(cx+rr,cy);ctx.moveTo(cx,cy-rr);ctx.lineTo(cx,cy+rr);ctx.stroke();
+  ctx.fillStyle='rgba(220,250,255,.92)';ctx.font='700 13px system-ui';ctx.textAlign='center';ctx.fillText(`3× SCOPE  ${left.toFixed(1)}s`,cx,cy-rr-12);ctx.restore();
+}
 function render(){
   updateRenderPressure();
   ctx.save();
   if(shake>0){ctx.translate(rand(-shake,shake),rand(-shake,shake));shake*=.86}
+  const viewScale=sniperViewScale();
+  if(viewScale!==1){ctx.translate(innerWidth/2,innerHeight/2);ctx.scale(viewScale,viewScale);ctx.translate(-innerWidth/2,-innerHeight/2)}
   drawGrid();drawBoundary();shapes.forEach(drawShape);drawPlasmaTethers();drawSkillZones();drawCombatEffects('base');drawBullets();
   remotePlayers.forEach(drawTank);drawTank(player);drawParticles();
   // V5.50: Deku VFX is deliberately rendered last so Blackwhip/Fa Jin/Gearshift cannot be hidden by tanks or bullets.
   drawCombatEffects('deku');
-  ctx.restore();
   drawAimGuides();
+  ctx.restore();
+  drawSniperScopeOverlay();
   drawMinimap();
 }
 let lastFrameErrorLog=0;
