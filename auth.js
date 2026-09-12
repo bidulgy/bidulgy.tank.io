@@ -371,7 +371,7 @@ const CANNONS=Object.freeze({
     skill2:'R FATE LOCK · 4초간 대영역 적과 탄환을 거의 정지'
   },
   deku:{
-    id:'deku',name:'데쿠',rarity:'divine',rarityLabel:'디바인',chance:.00005,
+    id:'deku',name:'데쿠',rarity:'divine',rarityLabel:'디바인',chance:.000033333,
     desc:'원 포 올의 여러 능력을 사용하는 초희귀 디바인 탱크입니다.',
     passive:'평타 · AIR FORCE: 공압탄 · 5번째 평타는 DETROIT AIR SMASH 강화탄',
     skill:'Q 연막 · 5초 동안 대형 연막 전개 · 상대 화면/미니맵에서 몸체 은폐',
@@ -380,19 +380,26 @@ const CANNONS=Object.freeze({
     skill4:'Y 변속 · 7초 동안 공격력/탄속/연사/이동속도 강화'
   },
   sniper:{
-    id:'sniper',name:'스나이퍼',rarity:'divine',rarityLabel:'디바인',chance:.00005,
+    id:'sniper',name:'스나이퍼',rarity:'divine',rarityLabel:'디바인',chance:.000033333,
     desc:'전장을 멀리 내려다보며 한 발에 큰 피해를 주는 초장거리 디바인 저격 탱크입니다.',
     passive:'평타 · 초고속 철갑 저격탄: 매우 강하고 7회 관통하지만 다음 사격까지 재장전 시간이 매우 김',
     skill:'Q 3× 전술 조준경 · 10초 동안 실제 보이는 거리가 3배로 증가',
     skill2:'R 스나이퍼 유도탄 · 적 플레이어 또는 목표를 추적하는 고속 유도탄 발사'
+  },
+  bloodlust:{
+    id:'bloodlust',name:'블러드러스트',rarity:'divine',rarityLabel:'디바인',chance:.000033334,
+    desc:'적에게 준 피해를 자신의 체력으로 흡수하며 오래 싸울수록 강해지는 흡혈형 디바인 탱크입니다.',
+    passive:'평타 · 혈식 탄환: 기본 명중 피해의 22% 흡혈 · 5번째 혈아탄은 1.9배 피해와 38% 흡혈',
+    skill:'Q 피의 광란 · 8초간 공격력·연사·이동속도 강화 + 흡혈률 60% 이상으로 증가 + 즉시 체력 12% 회복',
+    skill2:'R 핏빛 수확 · 주변 520 범위의 모든 적을 흡수 공격하고 누적 피해의 60%를 회복'
   }
 });
 
-const AUTH_BUILD='V5.69';
-console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · 5 cannons per non-Divine rarity`);
+const AUTH_BUILD='V5.74';
+console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · Divine Bloodlust lifesteal tank`);
 const CANNON_DISPLAY_ORDER=Object.freeze([
-  'sniper','deku',
-  ...Object.keys(CANNONS).filter(id=>id!=='sniper'&&id!=='deku')
+  'bloodlust','sniper','deku',
+  ...Object.keys(CANNONS).filter(id=>!['bloodlust','sniper','deku'].includes(id))
 ]);
 function displayCannons(){return CANNON_DISPLAY_ORDER.map(id=>CANNONS[id]).filter(Boolean)}
 

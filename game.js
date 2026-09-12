@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.72 · infinite projectile range/pierce + sniper damage buff');
+console.info('[Sworder VS Tank] game V5.74 · Divine Bloodlust lifesteal tank');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -51,7 +51,7 @@ const CANNON_FAMILY=Object.freeze({
   rocket:'rocket',titan:'rocket',phantom:'piercer',
   ring:'ring',chrono:'ring',void:'nova',
   nova:'nova',comet:'nova',stellar:'nova',
-  error:'error',glitch:'error',zero:'error',deku:'deku',sniper:'piercer',
+  error:'error',glitch:'error',zero:'error',deku:'deku',sniper:'piercer',bloodlust:'bloodlust',
   blaster:'standard',ranger:'standard',ricochet:'spread',mortar:'standard',
   shredder:'piercer',seeker:'piercer',frost:'ring',magnet:'nova',
   cyclone:'piercer',juggernaut:'rocket',mirror:'ring',lancer:'piercer',
@@ -97,7 +97,7 @@ const PROJECTILE_SHAPE=Object.freeze({
   rocket:'rocketMissile', titan:'titanShell', phantom:'phantomBolt',
   ring:'dimensionRing', chrono:'chronoRing', void:'voidOrb',
   nova:'novaStar', comet:'cometCore', stellar:'stellarStar',
-  error:'errorBlock', glitch:'glitchPacket', zero:'zeroCore', deku:'dekuAirForce', sniper:'sniperRound',
+  error:'errorBlock', glitch:'glitchPacket', zero:'zeroCore', deku:'dekuAirForce', sniper:'sniperRound', bloodlust:'bloodOrb',
   blaster:'standardSlug',ranger:'scoutArrow',ricochet:'burstDisc',mortar:'bastionShell',
   shredder:'drillBit',seeker:'piercerLance',frost:'chronoRing',magnet:'voidOrb',
   cyclone:'laserRay',juggernaut:'titanShell',mirror:'dimensionRing',lancer:'piercerLance',
@@ -137,6 +137,7 @@ const CANNON_SKILLS=Object.freeze({
   zero:{name:'ZERO LINE',cooldown:30,color:'#f0f0f0'},
   deku:{name:'연막',cooldown:18,color:'#9dff78'},
   sniper:{name:'3× 전술 조준경',cooldown:22,color:'#8ee8ff'},
+  bloodlust:{name:'피의 광란',cooldown:22,color:'#ff5a68'},
   blaster:{name:'집중 폭격',cooldown:14,color:'#8fc7ff'},
   ranger:{name:'와이어 대시',cooldown:12,color:'#7ee8ff'},
   ricochet:{name:'바운스 코어',cooldown:16,color:'#70f0d8'},
@@ -169,6 +170,7 @@ const CANNON_SKILLS_2=Object.freeze({
   zero:{name:'ABSOLUTE ZERO',cooldown:30,color:'#ffffff',kind:'freeze'},
   deku:{name:'검은 채찍',cooldown:16,color:'#9dff78',kind:'blackwhip'},
   sniper:{name:'스나이퍼 유도탄',cooldown:20,color:'#bdefff',kind:'homing'},
+  bloodlust:{name:'핏빛 수확',cooldown:26,color:'#ff6675',kind:'lifesteal'},
   cyclone:{name:'ORBIT BLADES',cooldown:30,color:'#c9d6ff',kind:'starOrbit'},
   juggernaut:{name:'철벽 모드',cooldown:28,color:'#ffd39a',kind:'fortress'},
   mirror:{name:'MIRROR PARRY',cooldown:22,color:'#f1d7ff',kind:'parry'},
@@ -219,6 +221,7 @@ const TANK_THEMES=Object.freeze({
   zero:{body:'#0b0b0d',edge:'#e8f3ff',glow:'#ffffff'},
   deku:{body:'#1f8257',edge:'#0c4435',glow:'#baff70'},
   sniper:{body:'#23313d',edge:'#7fdcff',glow:'#c6f5ff'},
+  bloodlust:{body:'#741f2b',edge:'#3a0912',glow:'#ff5368'},
   blaster:{body:'#4f81b7',edge:'#244c78',glow:'#9ed3ff'},ranger:{body:'#3aa6a6',edge:'#1d6167',glow:'#8ff9ec'},
   ricochet:{body:'#54a98d',edge:'#285f50',glow:'#8fffd0'},mortar:{body:'#8f7259',edge:'#554331',glow:'#ffd09a'},
   shredder:{body:'#704b9c',edge:'#3c275d',glow:'#d2a8ff'},seeker:{body:'#6b78a9',edge:'#39456f',glow:'#d7e1ff'},
@@ -1246,10 +1249,15 @@ function playerParams(){
   else if(baseCannon==='zero'){damage*=3.05;bulletSpeed*=1.16;reload*=2.05;move*=.93}
   else if(baseCannon==='deku'){damage*=1.72;bulletSpeed*=1.34;reload*=.88;move*=1.18}
   else if(baseCannon==='sniper'){damage*=10.00;bulletSpeed*=2.40;reload*=5.60;move*=.90}
+  else if(baseCannon==='bloodlust'){damage*=2.35;bulletSpeed*=1.12;reload*=.72;move*=1.10}
   const extra=CANNON_STAT_MODS[cannon];
   if(extra){damage*=extra.damage||1;bulletSpeed*=extra.bulletSpeed||1;reload*=extra.reload||1;move*=extra.move||1;}
 
   const now=performance.now();
+  if(cannon==='bloodlust'){
+    if(now<(player.bloodlustFrenzyUntil||0)){damage*=1.25;bulletSpeed*=1.08;reload*=.58;move*=1.25}
+    else player.bloodlustFrenzyUntil=0;
+  }else player.bloodlustFrenzyUntil=0;
   if(now<(player.fortressUntil||0)){move*=.70}
   if(now<(player.overclockUntil||0)){move*=1.85}
   if(now<(player.siegeUntil||0)){damage*=1.55;reload*=.48;bulletSpeed*=1.12;move*=.34}
@@ -1307,7 +1315,8 @@ function spawnAttackFx(cannon,x,y,angle,remote=false){
     ring:['ringMuzzle','#c6a3ff',.28,42],
     nova:['novaMuzzle','#75efff',.34,52],
     error:['errorMuzzle','#76ff43',.32,55],
-    deku:['dekuMuzzle','#baff70',.24,58]
+    deku:['dekuMuzzle','#baff70',.24,58],
+    bloodlust:['plasmaMuzzle','#ff5368',.26,46]
   };
   const f=types[cannonFamily(cannon)]||types.standard;
   let fxAngle=normalizeFxAngle(angle);
@@ -1345,6 +1354,10 @@ function receiveRemoteSkill(payload){
       }
       if(skillType==='dekuFaJin'){spawnCombatFx('dekuFaJin',x,y,{angle,color:'#baff70',life:1.35,radius:185,cannon:'deku'});return}
       if(skillType==='dekuGearshift'){spawnCombatFx('dekuGearshift',x,y,{angle,color:'#80efff',life:1.55,radius:220,cannon:'deku'});return}
+    }
+    if(cannon==='bloodlust'){
+      if(skillType==='bloodlustFrenzy'){spawnCombatFx('uniqueSkill',x,y,{angle,color:'#ff5368',life:1.05,radius:155,cannon:'bloodlust'});return}
+      if(skillType==='bloodHarvest'){spawnCombatFx('uniqueSkill',tx,ty,{angle:0,color:'#ff354f',life:1.15,radius,cannon:'bloodlust'});return}
     }
     if(cannon==='phantom'&&skillType==='phantomMarks'){
       const ox=safeRemoteNumber(payload.originX,x),oy=safeRemoteNumber(payload.originY,y),dx=safeRemoteNumber(payload.destX,tx),dy=safeRemoteNumber(payload.destY,ty),ownerId=String(payload.ownerId||'');
@@ -2060,7 +2073,14 @@ function activateSkill(errorChargeRatio=0,aimOverride=null){
   player.skillCd=def.cooldown;player.skillMax=def.cooldown;player.skillReadyAt=Date.now()+def.cooldown*1000;
   const p=playerParams(),a=player.angle,now=performance.now();
 
-  if(skillCannon==='standard'){
+  if(skillCannon==='bloodlust'){
+    player.bloodlustFrenzyUntil=now+8000;
+    player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.12);
+    spawnCombatFx('uniqueSkill',player.x,player.y,{angle:a,color:'#ff5368',life:1.05,radius:155,cannon:'bloodlust'});
+    burst(player.x,player.y,'#ff5368',34);
+    sendUniqueSkill(cannon,'bloodlustFrenzy',{targetX:player.x,targetY:player.y,radius:155,life:1.05});
+    broadcastLocalState(true);
+  }else if(skillCannon==='standard'){
     const[tx,ty]=skillAimPoint(650);addSkillZone('artillery',{x:tx,y:ty,radius:310,life:1.25,damage:p.damage*5.8});
     sendUniqueSkill(cannon,'artillery',{targetX:tx,targetY:ty,radius:310,life:1.25});
 
@@ -2228,6 +2248,46 @@ function sniperAcquireTarget(angle){
   }
   return best;
 }
+// V5.73: sniper basic rounds fly straight first, then acquire the nearest un-hit enemy around the round itself.
+function sniperBulletAcquireNearbyTarget(b,maxRange=1200){
+  if(!b)return null;
+  const ownerId=String(b.ownerId||'');
+  let best=null,bestD2=maxRange*maxRange;
+  const considerPlayer=(obj,id)=>{
+    id=String(id||obj?.id||'');
+    if(!obj||obj.alive===false||!id||id===ownerId||b.hitIds?.has(id))return;
+    const dx=obj.x-b.x,dy=obj.y-b.y,d2=dx*dx+dy*dy;
+    if(d2<bestD2){bestD2=d2;best={kind:'player',id,ref:obj}}
+  };
+  const considerShape=(obj)=>{
+    if(!obj||obj.hp<=0||b.hitTargets?.has(obj))return;
+    const dx=obj.x-b.x,dy=obj.y-b.y,d2=dx*dx+dy*dy;
+    if(d2<bestD2){bestD2=d2;best={kind:'shape',ref:obj}}
+  };
+
+  // Local bullets target every remote player. A remote visual bullet may target us or any other non-owner player.
+  if(b.networkRemote){
+    if(player?.alive&&String(onlineSelfId||'')!==ownerId)considerPlayer(player,onlineSelfId);
+    for(const enemy of remotePlayers.values())considerPlayer(enemy,enemy?.id);
+  }else{
+    for(const enemy of remotePlayers.values())considerPlayer(enemy,enemy?.id);
+  }
+  for(const shape of shapes)considerShape(shape);
+  return best;
+}
+function sniperBulletResolveTarget(b){
+  const target=b?.sniperSeekTarget;
+  if(!target)return null;
+  if(target.kind==='player'){
+    const id=String(target.id||'');
+    const obj=id===String(onlineSelfId||'')?player:remotePlayers.get(id);
+    if(!obj||obj.alive===false||id===String(b.ownerId||'')||b.hitIds?.has(id))return null;
+    return obj;
+  }
+  const obj=target.ref;
+  if(!obj||obj.hp<=0||b.hitTargets?.has(obj))return null;
+  return obj;
+}
 function activateSkill2(){
   if(!running||paused||!player?.alive)return;
   const cannon=player.cannonType||'standard',skill2Cannon=cannonRBehavior(cannon),def=CANNON_SKILLS_2[cannon];if(!def)return;
@@ -2240,7 +2300,18 @@ function activateSkill2(){
   if(player.skill2Cd>0&&!dekuWhipChainCast)return;
   if(!dekuWhipChainCast){player.skill2Cd=def.cooldown;player.skill2Max=def.cooldown;player.skill2ReadyAt=wallNow+def.cooldown*1000}
 
-  if(skill2Cannon==='rocket'){
+  if(skill2Cannon==='bloodlust'){
+    const radius=520,damage=p.damage*2.8,r2=radius*radius;let drained=0;
+    for(let i=shapes.length-1;i>=0;i--){
+      const s=shapes[i],dx=s.x-player.x,dy=s.y-player.y,d2=dx*dx+dy*dy;if(d2>r2||s.hp<=0)continue;
+      const before=Math.max(0,Number(s.hp)||0),d=Math.sqrt(d2)||1;applyShapeDamage(s,damage,-dx/d*150,-dy/d*150);drained+=Math.min(before,damage);burst(s.x,s.y,'#ff4b60',5);
+      if(s.hp<=0){gainPolygonXp(s.xp);burst(s.x,s.y,colorForShape(s.type),10);shapes.splice(i,1)}
+    }
+    for(const enemy of remotePlayers.values()){if(!enemy.alive)continue;const dx=enemy.x-player.x,dy=enemy.y-player.y;if(dx*dx+dy*dy>r2)continue;sendDamage(enemy.id,damage);drained+=damage}
+    player.hp=Math.min(player.maxHp,player.hp+Math.min(drained*.60,player.maxHp*.55));
+    spawnCombatFx('uniqueSkill',player.x,player.y,{angle:0,color:'#ff354f',life:1.15,radius,cannon:'bloodlust'});burst(player.x,player.y,'#ff5368',55);
+    sendUniqueSkill(cannon,'bloodHarvest',{targetX:player.x,targetY:player.y,radius,life:1.15});broadcastLocalState(true);
+  }else if(skill2Cannon==='rocket'){
     player.fortressUntil=now+6000;
     player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.12);
     addSkillZone('ironDome',{x:player.x,y:player.y,radius:148,life:6.0,damage:0,tick:0});
@@ -2499,6 +2570,7 @@ function configureBasicProjectilePhysics(b,cannon,special=''){
   else if(cannon==='zero'){b.r=special==='zeroCore'?13:10;b.life=2.5;b.pierce=special==='zeroCore'?26:20;if(special==='zeroCore'){b.vx*=1.12;b.vy*=1.12}}
   else if(cannon==='deku'){const smash=String(special||'').includes('DetroitAirSmash')||special==='detroitAirSmash';b.r=smash?12:7;b.life=1.75;b.pierce=smash?8:3;b.splashRadius=smash?95:28;if(smash){b.vx*=1.18;b.vy*=1.18}}
   else if(cannon==='sniper'){b.r=5;b.life=3.6;b.pierce=7;b.vx*=1.15;b.vy*=1.15}
+  else if(cannon==='bloodlust'){const feast=special==='bloodFeast';b.r=feast?12:8;b.life=2.4;b.pierce=feast?8:4;if(feast){b.vx*=1.10;b.vy*=1.10}}
 }
 function spawnBasicSplitFragment(parent,spec,x,y,index=0){
   const baseAngle=Math.atan2(parent.vy,parent.vx),a=baseAngle+(Number(spec.offset)||0);
@@ -2641,6 +2713,8 @@ function fire(e){
     shot=shotNo%4===0
       ?carrier('zeroCarrier',245,[part(-.055,.62,'zeroEcho'),part(0,1.20,'zeroCore'),part(.055,.62,'zeroEcho')])
       :{angle:a,side:0,curve:0,damageMul:1,special:'zeroStraight'};
+  }else if(baseCannon==='bloodlust'){
+    const feast=shotNo%5===0;shot={angle:a,side:0,curve:0,damageMul:feast?1.90:1,special:feast?'bloodFeast':'bloodRound'};
   }else if(baseCannon==='sniper'){
     shot={angle:a,side:0,curve:0,damageMul:1,special:'sniperAP'};
   }else if(baseCannon==='deku'){
@@ -2679,6 +2753,10 @@ function fire(e){
     b.splitOriginX=b.x;b.splitOriginY=b.y;b.splitBaseDamage=p.damage;b.splitDone=false;
   }
   configureBasicProjectilePhysics(b,cannon,b.special);
+  if(baseCannon==='sniper'&&b.special==='sniperAP'){
+    b.sniperSeekOriginX=b.x;b.sniperSeekOriginY=b.y;
+    b.sniperSeekTarget=null;b.sniperSeekNextSearchAt=0;
+  }
 
   if(bullets.length>=MAX_BULLETS)bullets.shift();
   bullets.push(b);broadcastShot(b);spawnAttackFx(cannon,b.x,b.y,fxAngleFromVector(b.vx,b.vy,sa));
@@ -2689,7 +2767,7 @@ function fire(e){
     spread:13,burst:10,crystal:11,piercer:15,laser:10,drill:20,
     plasma:16,thunder:13,inferno:18,rocket:22,titan:30,phantom:9,
     ring:13,chrono:10,void:17,nova:17,comet:10,stellar:16,
-    error:27,glitch:18,zero:30,deku:14,sniper:38
+    error:27,glitch:18,zero:30,deku:14,sniper:38,bloodlust:16
   }[baseCannon]||12;
   e.vx-=Math.cos(sa)*recoil;e.vy-=Math.sin(sa)*recoil;
 }
@@ -3113,8 +3191,12 @@ function applyUniqueProjectileMotion(b,dt){
     case 'zero': { // ZERO: 궤도 흔들림 없는 강제 직선
       break;
     }
+    case 'bloodlust': {
+      const f=Math.sin(t*10+seed)*38;b.vx+=nx*f*dt;b.vy+=ny*f*dt;if(b.special==='bloodFeast'){const k=1+.10*dt;b.vx*=k;b.vy*=k}break;
+    }
     case 'sniper': {
-      if(String(b.special||'')==='sniperHoming'){
+      const special=String(b.special||'');
+      if(special==='sniperHoming'){
         let target=null;
         if(b.targetId){target=String(b.targetId)===onlineSelfId?player:remotePlayers.get(String(b.targetId));if(target&&!target.alive)target=null}
         if(!target&&b.targetShapeId)target=shapes.find(s=>String(s.id||'')===String(b.targetShapeId)&&s.hp>0)||null;
@@ -3125,12 +3207,43 @@ function applyUniqueProjectileMotion(b,dt){
           bendProjectileVelocity(b,turn);
           const k=1+(b.homingAccel||.22)*dt;b.vx*=k;b.vy*=k;
         }
+      }else if(special==='sniperAP'){
+        // Keep the original aim for the first 260 world units, then steer toward the nearest enemy within 1200.
+        if(!Number.isFinite(b.sniperSeekOriginX)){b.sniperSeekOriginX=b.x;b.sniperSeekOriginY=b.y}
+        const travelX=b.x-b.sniperSeekOriginX,travelY=b.y-b.sniperSeekOriginY;
+        if(travelX*travelX+travelY*travelY>=260*260){
+          let target=sniperBulletResolveTarget(b);
+          if(!target){
+            b.sniperSeekTarget=null;
+            if(t>=(b.sniperSeekNextSearchAt||0)){
+              b.sniperSeekTarget=sniperBulletAcquireNearbyTarget(b,1200);
+              b.sniperSeekNextSearchAt=t+.12;
+              target=sniperBulletResolveTarget(b);
+            }
+          }
+          if(target){
+            const targetVx=Number(target.vx)||0,targetVy=Number(target.vy)||0;
+            const dist=Math.hypot(target.x-b.x,target.y-b.y),lead=Math.min(.22,dist/Math.max(1,speed)*.38);
+            const tx=target.x+targetVx*lead,ty=target.y+targetVy*lead;
+            const desired=Math.atan2(ty-b.y,tx-b.x),current=Math.atan2(b.vy,b.vx);
+            const diff=angleDifference(desired,current),turn=clamp(diff,-7.2*dt,7.2*dt);
+            bendProjectileVelocity(b,turn);
+          }
+        }
       }
       break;
     }
   }
 }
 
+function applyBloodlustLifesteal(b,dealtDamage){
+  if(!b||b.owner!==player||b.cannon!=='bloodlust'||!player?.alive)return;
+  const amount=Math.max(0,Number(dealtDamage)||0);if(amount<=0)return;
+  const frenzy=performance.now()<(player.bloodlustFrenzyUntil||0),feast=b.special==='bloodFeast';
+  const ratio=feast?(frenzy?.78:.38):(frenzy?.60:.22),heal=amount*ratio;if(heal<=0)return;
+  player.hp=Math.min(player.maxHp,player.hp+heal);
+  if(heal>2)spawnCombatFx('uniqueSkill',b.x,b.y,{angle:0,color:'#ff5368',life:.22,radius:22+Math.min(34,heal*.25),cannon:'bloodlust'});
+}
 function updateBullets(dt){
   for(let i=bullets.length-1;i>=0;i--){
     const b=bullets[i];
@@ -3167,8 +3280,11 @@ function updateBullets(dt){
       if((b.x-s.x)**2+(b.y-s.y)**2<rr*rr){
         if(Array.isArray(b.splitPattern)&&!b.splitDone){splitBasicCarrier(b);remove=true;break}
         b.hitTargets?.add(s);
+        if(b.basicAttack&&cannonBaseBehavior(b.cannon)==='sniper'&&b.special==='sniperAP'){b.sniperSeekTarget=null;b.sniperSeekNextSearchAt=0}
         const[nx,ny]=norm(b.vx,b.vy);
+        const bloodHpBefore=b.cannon==='bloodlust'?Math.max(0,Number(s.hp)||0):0;
         applyShapeDamage(s,b.damage,nx*75,ny*75);
+        if(b.cannon==='bloodlust')applyBloodlustLifesteal(b,Math.min(bloodHpBefore,b.damage));
         burst(b.x,b.y,colorForShape(s.type),3);
         if(b.basicAttack&&cannonBaseBehavior(b.cannon)==='spread')spawnSpreadFragments(b,b.x,b.y);
         if(b.basicAttack&&cannonBaseBehavior(b.cannon)==='nova')spawnNovaFragments(b,b.x,b.y);
@@ -3201,7 +3317,9 @@ function updateBullets(dt){
         if((b.x-enemy.x)**2+(b.y-enemy.y)**2<rr*rr){
           if(Array.isArray(b.splitPattern)&&!b.splitDone){splitBasicCarrier(b);remove=true;break}
           b.hitIds?.add(enemy.id);
+          if(b.basicAttack&&cannonBaseBehavior(b.cannon)==='sniper'&&b.special==='sniperAP'){b.sniperSeekTarget=null;b.sniperSeekNextSearchAt=0}
           sendDamage(enemy.id,b.damage);
+          if(b.cannon==='bloodlust')applyBloodlustLifesteal(b,b.damage);
           burst(b.x,b.y,'#ff8a8a',4);
           if(b.basicAttack&&cannonBaseBehavior(b.cannon)==='spread')spawnSpreadFragments(b,b.x,b.y);
           if(b.basicAttack&&cannonBaseBehavior(b.cannon)==='nova')spawnNovaFragments(b,b.x,b.y);
@@ -3612,6 +3730,8 @@ function drawPlayerCannon(cannon,r){
       barrel(r*.08,-7,r+30,14,'#6775a4','#39446e',4);ctx.fillStyle='#ffffff';ctx.strokeStyle='#aeeeff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r+48,0);ctx.lineTo(r+31,-11);ctx.lineTo(r+20,0);ctx.lineTo(r+31,11);ctx.closePath();ctx.fill();ctx.stroke();for(const yy of [-17,17])line(r+4,yy,r+26,yy*.35,'#dfffff',2);break;
     case 'deku':
       barrel(r*.08,-7,r+39,14,'#174b36','#0b3128',5);ctx.strokeStyle='#baff70';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(r+11,-13);ctx.lineTo(r+24,-4);ctx.lineTo(r+17,3);ctx.lineTo(r+37,13);ctx.stroke();break;
+    case 'bloodlust':
+      barrel(r*.05,-10,r+48,20,'#55131e','#26060b',6);ctx.strokeStyle='#ff6577';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(r+18,-13);ctx.lineTo(r+49,-5);ctx.lineTo(r+62,0);ctx.lineTo(r+49,5);ctx.lineTo(r+18,13);ctx.stroke();ctx.fillStyle='#ff334f';ctx.beginPath();ctx.arc(r+50,0,6,0,TAU);ctx.fill();break;
     case 'sniper':
       barrel(r*.04,-5,r+78,10,'#263844','#79dcff',2);barrel(r+30,-9,26,18,'#182630','#4ca9ca',3);
       ctx.strokeStyle='#d9f8ff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(r+58,-9);ctx.lineTo(r+92,0);ctx.lineTo(r+58,9);ctx.stroke();
@@ -3749,6 +3869,8 @@ function drawUniqueTankBody(cannon,r,t,theme){
     case 'comet': ctx.strokeStyle='#a2f6ff';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-r*.35,-r*.24);ctx.lineTo(-r*1.18,0);ctx.lineTo(-r*.35,r*.24);ctx.stroke();ctx.fillStyle='#dfffff';ctx.beginPath();ctx.moveTo(r*.52,0);ctx.lineTo(r*.05,-r*.26);ctx.lineTo(r*.05,r*.26);ctx.closePath();ctx.fill();break;
     case 'stellar': for(let k=0;k<3;k++)dot(-Math.PI/2+k*TAU/3,r*.82,6,'#ffffff');ctx.strokeStyle='#eaffff';ctx.lineWidth=3;ctx.beginPath();for(let k=0;k<3;k++){const q=-Math.PI/2+k*TAU/3,x=Math.cos(q)*r*.82,y=Math.sin(q)*r*.82;k?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.stroke();break;
     case 'deku': ctx.strokeStyle='#caff70';ctx.lineWidth=3;for(let k=0;k<4;k++){const q=-.7+k*TAU/4;ctx.beginPath();ctx.moveTo(Math.cos(q)*r*.55,Math.sin(q)*r*.55);ctx.lineTo(Math.cos(q+.16)*r*1.04,Math.sin(q+.16)*r*1.04);ctx.stroke()}break;
+    case 'bloodlust':
+      ctx.strokeStyle='#ff697a';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,r*.72,t*.7,t*.7+Math.PI*1.55);ctx.stroke();for(let k=0;k<6;k++){const q=k*TAU/6-t*.25;spoke(q,r*.58,r*.98,k%2?'#ff334f':'#8b0c20',3)}ctx.fillStyle='#ff3049';ctx.beginPath();ctx.arc(0,0,r*.20,0,TAU);ctx.fill();break;
     case 'sniper':
       ctx.strokeStyle='#bdefff';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,r*.68,0,TAU);ctx.stroke();
       ctx.lineWidth=2;for(let k=0;k<4;k++)spoke(k*TAU/4,r*.45,r*.92,'#7ddcff',2);
@@ -4560,6 +4682,11 @@ function drawUniqueProjectile(b,time,phase){
   }
   if(shape==='piercerLance'){
     ctx.globalAlpha=.25;ctx.fillStyle='#b780ff';ctx.fillRect(-52,-2,38,4);ctx.globalAlpha=1;ctx.shadowColor='#b98aff';ctx.shadowBlur=16;ctx.fillStyle='#d9c7ff';ctx.strokeStyle='#8355cf';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(21,0);ctx.lineTo(2,-5);ctx.lineTo(-17,-3);ctx.lineTo(-23,0);ctx.lineTo(-17,3);ctx.lineTo(2,5);ctx.closePath();ctx.fill();ctx.stroke();ctx.shadowBlur=0;return true;
+  }
+  if(shape==='bloodOrb'){
+    ctx.globalAlpha=.25;ctx.fillStyle='#ff243f';ctx.fillRect(-42,-3,30,6);ctx.globalAlpha=1;ctx.shadowColor='#ff334f';ctx.shadowBlur=20;
+    const rr=b.special==='bloodFeast'?12:8,grad=ctx.createRadialGradient(-3,-3,1,0,0,rr+3);grad.addColorStop(0,'#ffe4e8');grad.addColorStop(.35,'#ff6375');grad.addColorStop(1,'#6f0716');
+    ctx.fillStyle=grad;ctx.strokeStyle='#ff9aa6';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,0,rr+2,rr*.72,0,0,TAU);ctx.fill();ctx.stroke();ctx.fillStyle='#ff203c';ctx.beginPath();ctx.moveTo(rr+7,0);ctx.lineTo(rr-2,-5);ctx.lineTo(rr-2,5);ctx.closePath();ctx.fill();ctx.shadowBlur=0;return true;
   }
   if(shape==='sniperRound'){
     ctx.shadowColor='#9eeaff';ctx.shadowBlur=18;ctx.strokeStyle='#e9fbff';ctx.lineWidth=3.2;ctx.beginPath();ctx.moveTo(-54,0);ctx.lineTo(18,0);ctx.stroke();

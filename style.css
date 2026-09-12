@@ -1037,3 +1037,7 @@
   .class-panel{top:max(44px,calc(env(safe-area-inset-top) + 38px))!important;max-height:58vh!important}
   .upgrade-panel{bottom:var(--m-safe-b)!important;left:calc(max(12px,env(safe-area-inset-left)) + 112px)!important;max-height:58vh!important}
 }
+
+/* ===== V5.74 DIVINE BLOODLUST ===== */
+.mini-cannon.cannon-bloodlust{background:#741f2b;border-color:#ff5368;box-shadow:0 0 14px rgba(255,65,88,.45)}
+.mini-cannon.cannon-bloodlust:after{content:"";position:absolute;right:-10px;top:1px;width:13px;height:13px;border-radius:50%;background:#ff334f;box-shadow:0 0 12px #ff334f}
