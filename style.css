@@ -671,3 +671,369 @@
 
 /* V5.47: DEKU Y SKILL HARD GUARD */
 #skill4Btn[hidden],#skill4Btn.hidden{display:none!important}
+
+/* ===== V5.63 MOBILE COMPACT SKILL HUD ===== */
+@media(max-width:760px),(pointer:coarse){
+  /* 보유 스킬만 자동으로 채워지는 2열 컴팩트 HUD */
+  .skill-hud{
+    display:grid!important;
+    grid-template-columns:repeat(2,50px)!important;
+    grid-auto-rows:50px!important;
+    gap:6px!important;
+    position:absolute!important;
+    inset:auto 12px max(136px,calc(env(safe-area-inset-bottom) + 136px)) auto!important;
+    width:auto!important;height:auto!important;
+    pointer-events:none!important;z-index:46!important;
+  }
+  .skill-hud.hidden{display:none!important}
+  .skill-hud .skill-button.hidden,
+  .skill-hud .skill-button[hidden]{display:none!important}
+  .skill-hud .skill-button{
+    position:relative!important;inset:auto!important;
+    width:50px!important;height:50px!important;min-width:50px!important;
+    display:grid!important;grid-template-columns:1fr!important;place-items:center!important;
+    padding:0!important;margin:0!important;gap:0!important;
+    border-width:2px!important;border-radius:14px!important;
+    pointer-events:auto!important;overflow:hidden!important;
+    box-shadow:0 5px 14px rgba(0,0,0,.30)!important;
+    transform:none!important;
+  }
+  .skill-hud .skill-button.ready{transform:scale(1.02)!important}
+  .skill-hud .skill-key{
+    width:24px!important;height:24px!important;border-radius:7px!important;
+    font-size:12px!important;line-height:24px!important;
+    background:rgba(255,255,255,.13)!important;
+    text-shadow:0 1px 3px rgba(0,0,0,.65)!important;
+  }
+  .skill-hud .skill-key:after{content:none!important}
+  .skill-hud .skill-copy{
+    position:absolute!important;left:2px!important;right:2px!important;bottom:3px!important;
+    line-height:.95!important;pointer-events:none!important;text-align:center!important;
+  }
+  .skill-hud .skill-copy strong{
+    display:block!important;font-size:7px!important;color:#fff!important;font-weight:1000!important;
+    white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+    text-shadow:0 1px 2px rgba(0,0,0,.95)!important;
+  }
+  .skill-hud .skill-copy small{
+    display:block!important;margin-top:1px!important;font-size:5.8px!important;color:#dff7ff!important;
+    white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+    text-shadow:0 1px 2px rgba(0,0,0,.9)!important;
+  }
+  /* Deku must always occupy a full 2x2 grid: Q 연막 / R 검은 채찍 / T 발경 / Y 변속 */
+  .skill-hud[data-cannon="deku"] #skillBtn,
+  .skill-hud[data-cannon="deku"] #skill2Btn,
+  .skill-hud[data-cannon="deku"] #skill3Btn,
+  .skill-hud[data-cannon="deku"] #skill4Btn{
+    display:grid!important;
+  }
+  .skill-hud .skill-fill{height:3px!important}
+  .skill-hud .skill-button:disabled{opacity:.58!important}
+  /* 작은 버튼에 맞춰 공격 터치 원도 약간 아래/오른쪽으로 유지 */
+  .aim-zone{width:58%!important}
+  .mobile-tip{display:none!important}
+}
+
+/* ===== V5.64 DIEP-STYLE NON-BLOCKING EVOLUTION ===== */
+.class-panel{
+  inset:auto!important;
+  left:14px!important;top:86px!important;
+  width:238px!important;height:auto!important;
+  display:block!important;
+  padding:0!important;
+  background:transparent!important;
+  backdrop-filter:none!important;
+  pointer-events:none!important;
+  z-index:58!important;
+}
+.class-panel.hidden{display:none!important}
+.class-panel .panel-card{
+  width:100%!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  pointer-events:none!important;
+}
+.class-panel .panel-card>small{
+  display:block;
+  width:max-content;
+  max-width:100%;
+  margin:0 0 4px 2px;
+  color:#d9efff!important;
+  font-size:9px!important;
+  font-weight:1000!important;
+  letter-spacing:.06em!important;
+  text-shadow:0 2px 5px rgba(0,0,0,.85);
+}
+.class-panel .panel-card>h2{
+  margin:0 0 6px 2px!important;
+  color:#fff!important;
+  font-size:12px!important;
+  line-height:1.1!important;
+  text-shadow:0 2px 5px rgba(0,0,0,.85);
+}
+.class-panel .class-choices{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  gap:5px!important;
+}
+.class-panel .class-choice{
+  position:relative;
+  width:100%!important;
+  min-height:42px!important;
+  padding:7px 9px 7px 12px!important;
+  border:1px solid rgba(186,226,255,.42)!important;
+  border-left:5px solid #63c4ff!important;
+  border-radius:5px!important;
+  background:linear-gradient(90deg,rgba(38,127,187,.92),rgba(21,74,116,.88))!important;
+  color:#fff!important;
+  text-align:left!important;
+  box-shadow:0 3px 9px rgba(0,0,0,.30)!important;
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+}
+.class-panel .class-choice:hover,
+.class-panel .class-choice:active{
+  filter:brightness(1.14);
+  transform:translateX(2px);
+}
+.class-panel .class-choice strong{
+  display:block!important;
+  font-size:12px!important;
+  line-height:1.05!important;
+  font-weight:1000!important;
+}
+.class-panel .class-choice span{
+  display:block!important;
+  margin-top:3px!important;
+  color:rgba(237,249,255,.78)!important;
+  font-size:8px!important;
+  line-height:1.2!important;
+}
+
+@media(max-width:760px),(pointer:coarse){
+  /* Diep.io 모바일처럼 진화 선택지는 화면을 덮지 않고 좌측 상단에 작은 탭으로 남는다. */
+  .class-panel{
+    left:max(6px,env(safe-area-inset-left))!important;
+    top:max(56px,calc(env(safe-area-inset-top) + 48px))!important;
+    width:132px!important;
+    max-height:48vh!important;
+    overflow-y:auto!important;
+    scrollbar-width:none!important;
+  }
+  .class-panel::-webkit-scrollbar{display:none!important}
+  .class-panel .panel-card>small{font-size:6.5px!important;margin-left:1px!important;margin-bottom:2px!important}
+  .class-panel .panel-card>h2{font-size:9px!important;margin:0 0 4px 1px!important}
+  .class-panel .class-choices{gap:3px!important}
+  .class-panel .class-choice{
+    min-height:31px!important;
+    padding:5px 5px 5px 8px!important;
+    border-left-width:4px!important;
+    border-radius:4px!important;
+  }
+  .class-panel .class-choice strong{font-size:9.5px!important}
+  .class-panel .class-choice span{display:none!important}
+
+  /* HUD를 가볍게 줄여 실제 플레이 영역을 더 많이 남긴다. */
+  .top-ui{padding-top:max(5px,env(safe-area-inset-top))!important}
+  .hud-center{
+    width:min(58vw,280px)!important;
+    padding:5px 7px 6px!important;
+    border-radius:9px!important;
+    background:rgba(5,12,22,.38)!important;
+    border-color:rgba(255,255,255,.07)!important;
+  }
+  .level-line{font-size:9px!important}
+  .level-line b{font-size:11px!important}
+  .xp-track{height:5px!important;margin-top:4px!important}
+  .upgrade-panel{
+    width:148px!important;
+    background:rgba(5,12,22,.48)!important;
+    border-radius:9px!important;
+  }
+  .joystick{opacity:.72!important}
+}
+
+
+/* ===== V5.69 NEW 5-PER-RARITY CANNON PREVIEWS ===== */
+.mini-cannon.cannon-blaster{background:#4f81b7;border-color:#9ed3ff}.mini-cannon.cannon-ranger{background:#3aa6a6;border-color:#8ff9ec}
+.mini-cannon.cannon-ricochet{background:#54a98d;border-color:#8fffd0}.mini-cannon.cannon-mortar{background:#8f7259;border-color:#ffd09a}
+.mini-cannon.cannon-shredder{background:#704b9c;border-color:#d2a8ff}.mini-cannon.cannon-seeker{background:#6b78a9;border-color:#d7e1ff}
+.mini-cannon.cannon-frost{background:#5d91b5;border-color:#c0f3ff}.mini-cannon.cannon-magnet{background:#6b4f8e;border-color:#c49aff}
+.mini-cannon.cannon-cyclone{background:#884f9d;border-color:#f2b9ff}.mini-cannon.cannon-juggernaut{background:#8d5f48;border-color:#ffd09c}
+.mini-cannon.cannon-mirror{background:#8065a8;border-color:#f0d0ff}.mini-cannon.cannon-lancer{background:#667ca7;border-color:#dae7ff}
+.mini-cannon.cannon-leviathan{background:#385f77;border-color:#9feaff}.mini-cannon.cannon-valkyrie{background:#477d8f;border-color:#a2f2ff}
+.mini-cannon.cannon-berserker{background:#8d3e34;border-color:#ff9a78}.mini-cannon.cannon-oracle{background:#8a8151;border-color:#fff2ae}
+
+/* ===== V5.70 MOBILE CONTROL OPTIMIZATION ===== */
+@media (max-width:760px),(pointer:coarse){
+  :root{
+    --m-skill:48px;
+    --m-gap:5px;
+    --m-safe-r:max(10px,env(safe-area-inset-right));
+    --m-safe-b:max(12px,env(safe-area-inset-bottom));
+  }
+
+  /* Skill buttons: only visible skills participate in the layout. */
+  .skill-hud{
+    display:grid!important;
+    grid-template-columns:repeat(2,var(--m-skill))!important;
+    grid-auto-flow:row!important;
+    grid-auto-rows:var(--m-skill)!important;
+    gap:var(--m-gap)!important;
+    right:var(--m-safe-r)!important;
+    bottom:calc(var(--m-safe-b) + 126px)!important;
+    left:auto!important;top:auto!important;
+    width:max-content!important;height:max-content!important;
+    align-items:end!important;justify-items:end!important;
+    pointer-events:none!important;
+    z-index:52!important;
+  }
+  .skill-hud.hidden{display:none!important}
+  .skill-hud .skill-button.hidden,
+  .skill-hud .skill-button[hidden]{display:none!important}
+  .skill-hud .skill-button{
+    position:relative!important;inset:auto!important;
+    width:var(--m-skill)!important;height:var(--m-skill)!important;min-width:var(--m-skill)!important;
+    padding:0!important;margin:0!important;
+    display:grid!important;place-items:center!important;
+    border-radius:12px!important;border-width:2px!important;
+    pointer-events:auto!important;touch-action:manipulation!important;
+    -webkit-tap-highlight-color:transparent!important;
+    user-select:none!important;-webkit-user-select:none!important;
+    box-shadow:0 4px 11px rgba(0,0,0,.32)!important;
+    transform:none!important;transition:transform .06s,filter .08s,opacity .08s!important;
+  }
+  .skill-hud .skill-button:active{transform:scale(.91)!important;filter:brightness(1.18)!important}
+  .skill-hud .skill-button.ready{box-shadow:0 0 10px rgba(116,220,255,.18),0 4px 11px rgba(0,0,0,.30)!important}
+  .skill-hud .skill-button:disabled{opacity:.52!important;filter:saturate(.62)!important}
+
+  /* Key badge stays readable without covering the skill name. */
+  .skill-hud .skill-key{
+    position:absolute!important;left:4px!important;top:4px!important;
+    width:18px!important;height:18px!important;
+    display:grid!important;place-items:center!important;
+    border-radius:6px!important;border:1px solid rgba(255,255,255,.15)!important;
+    background:rgba(3,10,18,.46)!important;
+    font-size:10px!important;line-height:18px!important;font-weight:1000!important;
+    text-shadow:0 1px 2px rgba(0,0,0,.8)!important;
+  }
+  .skill-hud .skill-key:after{content:none!important}
+  .skill-hud .skill-copy{
+    position:absolute!important;left:3px!important;right:3px!important;bottom:4px!important;
+    display:block!important;text-align:center!important;line-height:1!important;pointer-events:none!important;
+  }
+  .skill-hud .skill-copy strong{
+    display:block!important;font-size:6.9px!important;line-height:1.05!important;font-weight:1000!important;
+    color:#fff!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+    text-shadow:0 1px 2px rgba(0,0,0,.95)!important;
+  }
+  .skill-hud .skill-copy small{
+    display:block!important;margin-top:2px!important;font-size:5.6px!important;line-height:1!important;
+    color:#d9f5ff!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+  }
+  .skill-hud .skill-fill{height:3px!important;bottom:0!important;border-radius:999px!important}
+
+  /* 1 skill = one button. 2 skills = horizontal pair. 3/4 = compact 2x2. */
+  .skill-hud[data-skill-count="1"]{grid-template-columns:var(--m-skill)!important}
+  .skill-hud[data-skill-count="2"]{grid-template-columns:repeat(2,var(--m-skill))!important}
+  .skill-hud[data-skill-count="3"],
+  .skill-hud[data-skill-count="4"]{grid-template-columns:repeat(2,var(--m-skill))!important}
+
+  /* Deku hard guard: Q/R/T/Y always remain visible as a 2x2 set. */
+  .skill-hud[data-cannon="deku"] #skillBtn,
+  .skill-hud[data-cannon="deku"] #skill2Btn,
+  .skill-hud[data-cannon="deku"] #skill3Btn,
+  .skill-hud[data-cannon="deku"] #skill4Btn{display:grid!important}
+
+  /* Aim pad: slightly smaller so it does not fight with skill buttons. */
+  .aim-zone{width:56%!important;z-index:25!important}
+  .aim-zone:after{
+    right:var(--m-safe-r)!important;
+    bottom:var(--m-safe-b)!important;
+    width:96px!important;height:96px!important;
+    border-width:2px!important;
+    opacity:.78!important;
+  }
+
+  /* Movement stick: smaller footprint, same useful touch area. */
+  .joystick{
+    left:max(12px,env(safe-area-inset-left))!important;
+    bottom:var(--m-safe-b)!important;
+    width:116px!important;height:116px!important;
+    opacity:.68!important;touch-action:none!important;
+  }
+  .stick-knob{
+    left:38px!important;top:38px!important;
+    width:40px!important;height:40px!important;
+  }
+
+  /* Stat upgrade panel: compact but preserve >=30px touch targets. */
+  .upgrade-panel{
+    left:max(7px,env(safe-area-inset-left))!important;
+    bottom:calc(var(--m-safe-b) + 120px)!important;
+    width:142px!important;max-height:38vh!important;
+    padding:6px!important;border-radius:9px!important;
+    overflow-y:auto!important;scrollbar-width:none!important;
+  }
+  .upgrade-panel::-webkit-scrollbar{display:none!important}
+  .stat{padding:4px 5px!important;margin-top:3px!important;gap:3px!important}
+  .stat-name{font-size:9px!important}
+  .stat button{
+    width:30px!important;height:30px!important;min-width:30px!important;
+    border-radius:8px!important;font-size:18px!important;
+    touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;
+  }
+  .stat-bars{gap:1px!important}.stat-bars i{width:7px!important;height:3px!important}
+
+  /* Evolution choices stay non-blocking but are easier to tap. */
+  .class-panel{
+    left:max(6px,env(safe-area-inset-left))!important;
+    top:max(52px,calc(env(safe-area-inset-top) + 46px))!important;
+    width:130px!important;max-height:46vh!important;
+  }
+  .class-panel .class-choices{gap:3px!important}
+  .class-panel .class-choice{
+    min-height:36px!important;padding:5px 6px 5px 8px!important;
+    touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;
+  }
+  .class-panel .class-choice:active{transform:translateX(2px) scale(.98)!important}
+  .class-panel .class-choice strong{font-size:9.5px!important}
+  .class-panel .class-choice span{display:none!important}
+
+  /* Top action buttons remain reachable without taking much play space. */
+  .top-actions{gap:4px!important}
+  .top-actions .round-btn{width:34px!important;height:34px!important;border-radius:10px!important;font-size:14px!important}
+  .leave-battle-button{height:34px!important;min-width:66px!important;padding:0 9px!important;font-size:10px!important}
+}
+
+/* Very small / short phones */
+@media (max-width:390px),(max-height:650px) and (pointer:coarse){
+  :root{--m-skill:44px;--m-gap:4px}
+  .skill-hud{bottom:calc(var(--m-safe-b) + 112px)!important}
+  .aim-zone:after{width:88px!important;height:88px!important}
+  .joystick{width:106px!important;height:106px!important}
+  .stick-knob{left:35px!important;top:35px!important;width:36px!important;height:36px!important}
+  .upgrade-panel{bottom:calc(var(--m-safe-b) + 109px)!important;width:134px!important}
+  .hud-center{width:min(56vw,240px)!important}
+}
+
+/* Landscape phone: keep all four skills in one row left of the fire pad. */
+@media (orientation:landscape) and (max-height:560px) and (pointer:coarse){
+  :root{--m-skill:44px;--m-gap:4px}
+  .skill-hud,
+  .skill-hud[data-skill-count="3"],
+  .skill-hud[data-skill-count="4"]{
+    grid-template-columns:repeat(4,var(--m-skill))!important;
+    grid-auto-flow:column!important;
+    right:calc(var(--m-safe-r) + 104px)!important;
+    bottom:var(--m-safe-b)!important;
+  }
+  .skill-hud[data-skill-count="1"]{grid-template-columns:var(--m-skill)!important}
+  .skill-hud[data-skill-count="2"]{grid-template-columns:repeat(2,var(--m-skill))!important}
+  .class-panel{top:max(44px,calc(env(safe-area-inset-top) + 38px))!important;max-height:58vh!important}
+  .upgrade-panel{bottom:var(--m-safe-b)!important;left:calc(max(12px,env(safe-area-inset-left)) + 112px)!important;max-height:58vh!important}
+}
