@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.61 · Diep evolution tree');
+console.info('[Sworder VS Tank] game V5.66 · remote bullets spawn at muzzle');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -722,8 +722,9 @@ function findNetworkBullet(ownerId,netId){
 function addRemoteShot(payload){
   if(!payload||String(payload.ownerId||'')===onlineSelfId)return;
   const vx=safeRemoteNumber(payload.vx),vy=safeRemoteNumber(payload.vy);
-  const sentAt=safeRemoteNumber(payload.sentAt,Date.now());
-  const age=clamp((Date.now()-sentAt)/1000,0,.45);
+  // V5.66: remote bullets must be born at the shooter's actual muzzle position.
+  // Do not fast-forward their initial position by network latency; that made enemy shots
+  // pop into view only after they had already travelled away from the tank.
   const startX=safeRemoteNumber(payload.x),startY=safeRemoteNumber(payload.y);
   const shotAngle=fxAngleFromVector(vx,vy,safeRemoteNumber(payload.angle,0));
   const remoteCannon=String(payload.cannon||'standard');
@@ -738,20 +739,20 @@ function addRemoteShot(payload){
   }
   bullets.push({
     netId:String(payload.netId||payload.id||''),
-    x:startX+vx*age,y:startY+vy*age,
+    x:startX,y:startY,
     vx,vy,
     r:Math.max(2,safeRemoteNumber(payload.r,6)),
     damage:Math.max(0,safeRemoteNumber(payload.damage,0)),
-    life:Math.max(.05,safeRemoteNumber(payload.life,1.3)-age),
+    life:Math.max(.05,safeRemoteNumber(payload.life,1.3)),
     owner:null,ownerId:String(payload.ownerId||''),
-    team:'remote',networkRemote:true,
+    team:'remote',networkRemote:true,remoteBornAt:performance.now(),
     cannon:String(payload.cannon||'standard'),
     shape:String(payload.shape||'round'),
     pierce:Math.max(1,safeRemoteNumber(payload.pierce,1)),
     splashRadius:Math.max(0,safeRemoteNumber(payload.splashRadius,0)),
     basicAttack:payload.basicAttack===true,special:String(payload.special||''),fragment:payload.fragment===true,returned:payload.returned===true,
     targetId:String(payload.targetId||''),targetShapeId:String(payload.targetShapeId||''),
-    curve:safeRemoteNumber(payload.curve,0),motionSeed:safeRemoteNumber(payload.motionSeed,0),motionAge:Math.max(0,safeRemoteNumber(payload.motionAge,0)+age),
+    curve:safeRemoteNumber(payload.curve,0),motionSeed:safeRemoteNumber(payload.motionSeed,0),motionAge:Math.max(0,safeRemoteNumber(payload.motionAge,0)),
     hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()
   });
 }
@@ -1070,12 +1071,9 @@ function gainXp(a){
     player.level++;
     player.points++;
     player.xpNeed=xpNeed(player.level);
-    if(EVOLUTION_MILESTONES.includes(player.level)&&(player.evolutionTier||0)<player.level){
-      showClassUpgrade(player.level);
-      break;
-    }
   }
   if(player.level>=45){player.level=45;player.xp=0}
+  if(player.level>=15)showClassUpgrade(player.level);
   updateUI();
 }
 // V5.62: polygon kills grant 50% XP, while score reward stays unchanged.
@@ -1091,36 +1089,41 @@ function gainPolygonXp(rawXp){
 function updateUI(){ui.level.textContent=player.level;ui.score.textContent=player.score.toLocaleString();ui.xp.style.width=player.level>=45?'100%':`${clamp(player.xp/player.xpNeed*100,0,100)}%`;ui.points.textContent=player.points;ui.upgradePanel.classList.toggle('has-points',player.points>0);renderUpgrades()}
 function renderUpgrades(){ui.upgrades.innerHTML=statsDef.map(([k,l])=>{const n=player.stats[k]||0;return`<div class="stat"><span class="stat-name">${l}</span><span class="stat-bars">${Array.from({length:7},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join('')}</span><button type="button" data-stat="${k}" ${player.points<=0||n>=7?'disabled':''}>+</button></div>`}).join('');ui.upgrades.querySelectorAll('[data-stat]').forEach(b=>b.onclick=()=>upgrade(b.dataset.stat))}
 function upgrade(k){if(player.points<=0||player.stats[k]>=7)return;player.points--;player.stats[k]++;if(k==='maxHealth'){const old=player.maxHp;player.maxHp=120+player.stats.maxHealth*18;player.hp+=player.maxHp-old}updateUI()}
-function finishEvolutionMilestone(level){
-  player.evolutionTier=Math.max(player.evolutionTier||0,level);
+function hideEvolutionPanel(){
   classUpgradeShown=false;
-  ui.classPanel.classList.add('hidden');
-  paused=false;
-  broadcastLocalState(true);
-  updateUI();
-  // Large XP rewards can cross more than one level while the selection panel was open.
-  setTimeout(()=>gainXp(0),0);
+  if(ui.classPanel){ui.classPanel.classList.add('hidden');ui.classPanel.dataset.upgradeKey=''}
 }
 function showClassUpgrade(level=player.level){
-  const milestone=EVOLUTION_MILESTONES.includes(level)?level:EVOLUTION_MILESTONES.find(v=>v>=level)||45;
-  const choices=eligibleEvolutionChildren(player.classType||'basic',milestone);
-  if(!choices.length){finishEvolutionMilestone(milestone);return}
-  classUpgradeShown=true;paused=true;
+  if(!player?.alive||player.level<15){hideEvolutionPanel();return}
+  const current=player.classType||'basic';
+  const choices=eligibleEvolutionChildren(current,Math.min(45,Math.max(15,level)));
+  if(!choices.length){hideEvolutionPanel();return}
+  classUpgradeShown=true;
+  // V5.64: Diep.io처럼 전투를 멈추지 않고 좌측 진화 목록만 표시한다.
+  const highest=player.level>=45?45:player.level>=30?30:15;
+  const upgradeKey=`${current}:${highest}:${choices.join(',')}`;
+  if(ui.classPanel&&!ui.classPanel.classList.contains('hidden')&&ui.classPanel.dataset.upgradeKey===upgradeKey)return;
+  if(ui.classPanel)ui.classPanel.dataset.upgradeKey=upgradeKey;
   const card=ui.classPanel?.querySelector('.panel-card');
-  if(card){const small=card.querySelector('small'),title=card.querySelector('h2');if(small)small.textContent=`LEVEL ${milestone} · DIEP.IO EVOLUTION`;if(title)title.textContent=`${evolutionName(player.classType)} → 진화 선택`}
-  const buttons=choices.map(id=>{const c=DIEP_EVOLUTION_INFO[id];return`<button class="class-choice" data-class="${id}"><strong>${c.name}</strong><span>LV ${c.tier} · ${c.desc}</span></button>`}).join('');
-  ui.classChoices.innerHTML=buttons+`<button class="class-choice" data-class="__skip"><strong>현재 탱크 유지</strong><span>지금 진화하지 않고 다음 단계까지 유지합니다.</span></button>`;
-  ui.classPanel.classList.remove('hidden');
-  ui.classChoices.querySelectorAll('[data-class]').forEach(b=>b.onclick=()=>{
-    const id=b.dataset.class;
-    if(id==='__skip'){finishEvolutionMilestone(milestone);return}
-    if(!DIEP_EVOLUTION_INFO[id])return;
+  if(card){
+    const small=card.querySelector('small'),title=card.querySelector('h2');
+    if(small)small.textContent=`LV ${highest} · TANK UPGRADE`;
+    if(title)title.textContent=evolutionName(current);
+  }
+  ui.classChoices.innerHTML=choices.map(id=>{
+    const c=DIEP_EVOLUTION_INFO[id];
+    return `<button class="class-choice" data-class="${id}" type="button"><strong>${c.name}</strong><span>${c.desc}</span></button>`;
+  }).join('');
+  ui.classPanel?.classList.remove('hidden');
+  ui.classChoices?.querySelectorAll('[data-class]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.class,c=DIEP_EVOLUTION_INFO[id];
+    if(!c)return;
     player.classType=id;
+    player.evolutionTier=Math.max(player.evolutionTier||0,c.tier||0);
     broadcastLocalState(true);
-    const next=eligibleEvolutionChildren(id,milestone);
-    // Diep.io allows delayed lower-tier upgrades; when already high enough, immediately expose the next tier too.
-    if(next.length){showClassUpgrade(milestone);return}
-    finishEvolutionMilestone(milestone);
+    // 레벨을 늦게 올렸다면 Diep.io처럼 다음 단계 선택지가 바로 이어서 남는다.
+    showClassUpgrade(player.level);
+    updateUI();
   });
 }
 function playerParams(){
@@ -2426,6 +2429,13 @@ function fire(e){
     e.vx-=Math.cos(a)*10;e.vy-=Math.sin(a)*10;return;
   }
 
+  const evoType=e.classType||'basic';
+  // Smasher / Landmine / Spike는 Diep.io처럼 기본 총구가 없어 평타 탄환을 발사하지 않는다.
+  if(evolutionHasNoBasicGun(evoType)){
+    e.fireCd=Math.max(.12,p.reload*.55);
+    return;
+  }
+
   const part=(offset,damageMul,special,curve=0,speedMul=.96)=>({offset,damageMul,special,curve,speedMul});
   const carrier=(special,splitDistance,splitPattern,damageMul=1)=>({angle:a,side:0,curve:0,damageMul,special,splitDistance,splitPattern});
   let shot;
@@ -2523,9 +2533,22 @@ function fire(e){
     shot={angle:a,side:0,curve:0,damageMul:1,special:''};
   }
 
+  // V5.64: 선택한 진화체의 실제 포신 순서/각도/측면 위치에서 탄환을 생성한다.
+  const evoMuzzle=evolutionMuzzleForShot(evoType,e.r,shotNo);
+  if(evoMuzzle){
+    const originalAngle=Number.isFinite(shot.angle)?shot.angle:a;
+    const localShotOffset=originalAngle-a;
+    shot.angle=a+(evoMuzzle.a||0)+localShotOffset;
+    shot.side=(Number(shot.side)||0)+(Number(evoMuzzle.side)||0);
+    if(evoMuzzle.kind==='rimAuto')shot.evoMuzzleDistance=e.r*1.12;
+    else if(evoMuzzle.kind==='centerAuto')shot.evoMuzzleDistance=e.r*.72;
+    else shot.evoMuzzleDistance=e.r*(.28+.78*(evoMuzzle.len||1)) + 3;
+  }
+
   const sa=shot.angle,px=-Math.sin(sa)*(shot.side||0),py=Math.cos(sa)*(shot.side||0);
+  const muzzleDistance=Number(shot.evoMuzzleDistance)||e.r+18;
   const b={
-    x:e.x+Math.cos(sa)*(e.r+18)+px,y:e.y+Math.sin(sa)*(e.r+18)+py,
+    x:e.x+Math.cos(sa)*muzzleDistance+px,y:e.y+Math.sin(sa)*muzzleDistance+py,
     vx:Math.cos(sa)*p.bulletSpeed+e.vx*.18,vy:Math.sin(sa)*p.bulletSpeed+e.vy*.18,
     r:6,damage:p.damage*(Number(shot.damageMul)||1),life:1.65,
     owner:e,ownerId:onlineSelfId,team:'player',cannon,shape:projectileShapeForCannon(cannon),
@@ -2551,7 +2574,7 @@ function fire(e){
     ring:13,chrono:10,void:17,nova:17,comet:10,stellar:16,
     error:27,glitch:18,zero:30,deku:14,sniper:38
   }[cannon]||12;
-  e.vx-=Math.cos(a)*recoil;e.vy-=Math.sin(a)*recoil;
+  e.vx-=Math.cos(sa)*recoil;e.vy-=Math.sin(sa)*recoil;
 }
 function burst(x,y,color,count=8){
   if(particles.length>=MAX_PARTICLES)return;
@@ -3355,7 +3378,7 @@ function updateSkillZones(dt){
     if(doTick)for(const enemy of remotePlayers.values()){if(!enemy.alive)continue;const dx=z.x-enemy.x,dy=z.y-enemy.y;if(dx*dx+dy*dy<=z.radius*z.radius)sendDamage(enemy.id,z.damage*(z.type==='burn'?1:.75))}
   }
 }
-function sniperViewScale(){return player?.cannonType==='sniper'&&performance.now()<(player.sniperScopeUntil||0)?1/3:1}
+function sniperViewScale(){const mobileView=innerWidth<=760||matchMedia('(pointer:coarse)').matches;const base=mobileView?.76:1;return player?.cannonType==='sniper'&&performance.now()<(player.sniperScopeUntil||0)?base/3:base}
 function viewScreenBounds(pad=0){const s=sniperViewScale(),hw=innerWidth/(2*s),hh=innerHeight/(2*s),cx=innerWidth/2,cy=innerHeight/2;return{left:cx-hw-pad,right:cx+hw+pad,top:cy-hh-pad,bottom:cy+hh+pad}}
 function screenToWorldPoint(screenX,screenY){const s=sniperViewScale(),cx=innerWidth/2,cy=innerHeight/2;return[camera.x+cx+(screenX-cx)/s,camera.y+cy+(screenY-cy)/s]}
 function cameraUpdate(){const tx=player.x-innerWidth/2,ty=player.y-innerHeight/2;camera.x+=(tx-camera.x)*.12;camera.y+=(ty-camera.y)*.12;camera.x=clamp(camera.x,0,Math.max(0,WORLD-innerWidth));camera.y=clamp(camera.y,0,Math.max(0,WORLD-innerHeight))}
@@ -3621,35 +3644,86 @@ function drawUniqueTankBody(cannon,r,t,theme){
   ctx.shadowBlur=0;ctx.restore();
 }
 function evolutionBarrelSpecs(type,r){
-  const b=(a=0,side=0,len=1,w=1)=>({a,side,len,w});
+  const b=(a=0,side=0,len=1,w=1,kind='barrel')=>({a,side,len,w,kind});
   switch(type){
     case 'twin':return[b(0,-8,1,.78),b(0,8,1,.78)];
-    case 'sniperClass':case 'assassin':case 'ranger':case 'stalker':case 'predator':return[b(0,0,type==='ranger'?1.65:type==='assassin'?1.5:1.35,.72)];
-    case 'hunter':return[b(0,-5,1.30,.74),b(0,5,1.08,.68)];
-    case 'machineGun':case 'sprayer':return[b(0,0,1.05,type==='sprayer'?1.30:1.18)];
+    case 'sniperClass':return[b(0,0,1.34,.70)];
+    case 'machineGun':return[b(0,0,1.00,1.22)];
     case 'flankGuard':return[b(0,0,1,.82),b(Math.PI,0,.88,.72)];
-    case 'tripleShot':return[b(0,0,1,.72),b(-.29,0,.92,.68),b(.29,0,.92,.68)];
-    case 'quadTank':return[0,Math.PI/2,Math.PI,Math.PI*1.5].map(a=>b(a,0,.84,.68));
-    case 'twinFlank':return[b(0,-7,.92,.66),b(0,7,.92,.66),b(Math.PI,-7,.84,.62),b(Math.PI,7,.84,.62)];
-    case 'trapper':case 'megaTrapper':return[b(0,0,type==='megaTrapper'?.88:.82,type==='megaTrapper'?1.45:1.18)];
-    case 'destroyer':case 'annihilator':case 'skimmer':case 'glider':case 'rocketeer':return[b(0,0,type==='annihilator'?1.18:1.08,type==='annihilator'?1.72:1.48)];
-    case 'gunner':case 'autoGunner':case 'streamliner':return[-9,-3,3,9].map(side=>b(0,side,type==='streamliner'?1.16:.95,.48));
-    case 'shotgun':case 'palletShot':return[b(0,0,.90,1.48)];
-    case 'dualBarrel':return[b(0,-7,.96,.88),b(0,7,.96,.88)];
-    case 'triAngle':case 'booster':case 'fighter':return[b(0,0,.95,.74),b(Math.PI-.62,0,.76,.62),b(Math.PI+.62,0,.76,.62)];
-    case 'auto3':return[0,TAU/3,TAU*2/3].map(a=>b(a,0,.72,.60));
-    case 'triplet':return[b(0,-8,1.0,.66),b(0,0,1.10,.72),b(0,8,1.0,.66)];
-    case 'pentaShot':return[-.52,-.25,0,.25,.52].map(a=>b(a,0,.88,.56));
-    case 'spreadShot':return[-.72,-.36,0,.36,.72].map(a=>b(a,0,.84,.52));
-    case 'octoTank':return Array.from({length:8},(_,i)=>b(i*TAU/8,0,.70,.54));
-    case 'auto5':return Array.from({length:5},(_,i)=>b(i*TAU/5,0,.72,.56));
-    case 'tripleTwin':return[0,TAU/3,TAU*2/3].flatMap(a=>[b(a,-6,.82,.55),b(a,6,.82,.55)]);
-    case 'triTrapper':return[0,TAU/3,TAU*2/3].map(a=>b(a,0,.72,1.05));
-    case 'gunnerTrapper':return[b(0,-7,.90,.50),b(0,7,.90,.50),b(Math.PI,0,.72,1.00)];
-    case 'autoTrapper':return[b(0,0,.76,1.08),b(Math.PI,0,.58,.50)];
-    case 'autoTank':return[b(0,0,.94,.72),b(Math.PI*.72,0,.58,.50)];
+
+    // Triple Shot: Diep.io처럼 중앙 1 + 좌우 45도.
+    case 'tripleShot':return[b(0,0,1,.72),b(-Math.PI/4,0,.94,.66),b(Math.PI/4,0,.94,.66)];
+    case 'quadTank':return[0,Math.PI/2,Math.PI,Math.PI*1.5].map(a=>b(a,0,.86,.68));
+    case 'twinFlank':return[b(0,-7,.94,.64),b(0,7,.94,.64),b(Math.PI,-7,.88,.60),b(Math.PI,7,.88,.60)];
+
+    case 'assassin':return[b(0,0,1.50,.66)];
+    // Hunter/Predator/Streamliner는 Diep.io처럼 같은 축에 겹친 포신.
+    case 'hunter':return[b(0,0,1.34,.62),b(0,0,1.04,.90)];
+    case 'ranger':return[b(0,0,1.72,.62)];
+    case 'stalker':return[b(0,0,1.55,.64)];
+    case 'predator':return[b(0,0,1.46,.56),b(0,0,1.20,.72),b(0,0,.94,.92)];
+    case 'streamliner':return[
+      b(0,0,1.38,.44),b(0,0,1.24,.50),b(0,0,1.10,.56),b(0,0,.96,.62),b(0,0,.82,.68)
+    ];
+
+    case 'trapper':return[b(0,0,.84,1.16)];
+    case 'triTrapper':return[0,TAU/3,TAU*2/3].map(a=>b(a,0,.74,1.04));
+    case 'megaTrapper':return[b(0,0,.90,1.52)];
+    case 'gunnerTrapper':return[b(0,-7,.91,.48),b(0,7,.91,.48),b(Math.PI,0,.74,1.05)];
+    case 'autoTrapper':return[b(0,0,.78,1.10)];
+
+    case 'destroyer':return[b(0,0,1.08,1.48)];
+    case 'annihilator':return[b(0,0,1.20,1.78)];
+    case 'skimmer':return[b(0,0,1.10,1.48)];
+    case 'glider':return[b(0,0,1.08,1.42)];
+    case 'rocketeer':return[b(0,0,1.18,1.40)];
+
+    case 'gunner':case 'autoGunner':return[
+      b(0,-9,.91,.43),b(0,-3,1.02,.43),b(0,3,1.02,.43),b(0,9,.91,.43)
+    ];
+    case 'sprayer':return[b(0,0,1.02,1.24),b(0,0,.78,.58)];
+    case 'shotgun':case 'palletShot':return[b(0,0,.92,1.48)];
+    case 'dualBarrel':return[b(0,-7,.98,.86),b(0,7,.98,.86)];
+
+    case 'triAngle':return[b(0,0,.98,.72),b(Math.PI-.62,0,.78,.60),b(Math.PI+.62,0,.78,.60)];
+    // Booster: 전방 1 + 후방 4.
+    case 'booster':return[
+      b(0,0,.98,.72),
+      b(Math.PI-.40,0,.78,.58),b(Math.PI+.40,0,.78,.58),
+      b(Math.PI-.82,0,.70,.52),b(Math.PI+.82,0,.70,.52)
+    ];
+    // Fighter: 전방/후방 계열 + 좌우 측면 포신.
+    case 'fighter':return[
+      b(0,0,.98,.72),b(Math.PI-.62,0,.76,.58),b(Math.PI+.62,0,.76,.58),
+      b(-Math.PI/2,0,.70,.52),b(Math.PI/2,0,.70,.52)
+    ];
+    case 'auto3':return[0,TAU/3,TAU*2/3].map(a=>b(a,0,.70,.54,'rimAuto'));
+
+    case 'triplet':return[b(0,-8,1.00,.62),b(0,0,1.10,.68),b(0,8,1.00,.62)];
+    case 'pentaShot':return[-Math.PI/4,-Math.PI/8,0,Math.PI/8,Math.PI/4].map(a=>b(a,0,.90,.54));
+    // Spread Shot: 공식 11포신.
+    case 'spreadShot':return Array.from({length:11},(_,i)=>b((-5+i)*Math.PI/12,0,.78,.42));
+    case 'octoTank':return Array.from({length:8},(_,i)=>b(i*TAU/8,0,.72,.52));
+    case 'auto5':return Array.from({length:5},(_,i)=>b(i*TAU/5,0,.70,.52,'rimAuto'));
+    case 'tripleTwin':return[0,TAU/3,TAU*2/3].flatMap(a=>[b(a,-6,.84,.53),b(a,6,.84,.53)]);
+
+    case 'autoTank':return[b(0,0,.76,.56,'centerAuto')];
+    case 'autoSmasher':return[b(0,0,.66,.50,'centerAuto')];
+
+    // Smasher 계열은 총구 없음.
+    case 'smasher':case 'landmine':case 'spike':return[];
     default:return[];
   }
+}
+function evolutionHasNoBasicGun(type){
+  return ['smasher','landmine','spike'].includes(type);
+}
+function evolutionMuzzleForShot(type,r,shotNo){
+  if(!type||type==='basic')return null;
+  const specs=evolutionBarrelSpecs(type,r);
+  if(!specs.length)return null;
+  // V5.64: 이전 "한 번에 한 탄" 규칙을 유지하면서 포신을 순서대로 사용.
+  return specs[Math.max(0,(Math.floor(shotNo||1)-1)%specs.length)];
 }
 function drawEvolutionChassis(e,r){
   const type=e.classType||'basic';if(type==='basic')return;
@@ -3661,17 +3735,54 @@ function drawEvolutionChassis(e,r){
     for(let i=0;i<spikes;i++){const a=i*TAU/spikes;ctx.save();ctx.rotate(a);ctx.beginPath();ctx.moveTo(r*.72,-5);ctx.lineTo(r*1.38,0);ctx.lineTo(r*.72,5);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}
     ctx.strokeStyle='rgba(220,228,235,.92)';ctx.lineWidth=5;ctx.beginPath();ctx.arc(0,0,r*.88,0,TAU);ctx.stroke();
   }
-  for(const spec of evolutionBarrelSpecs(type,r)){
+
+  const drawBarrel=(spec)=>{
     ctx.save();ctx.rotate(spec.a||0);ctx.translate(0,spec.side||0);
-    const len=r*(.78*(spec.len||1)),w=Math.max(6,r*.32*(spec.w||1));
-    ctx.fillStyle='rgba(177,190,201,.94)';ctx.strokeStyle='rgba(66,80,94,.96)';ctx.lineWidth=2;
-    ctx.fillRect(r*.28,-w/2,len,w);ctx.strokeRect(r*.28,-w/2,len,w);ctx.restore();
+    const len=r*(.78*(spec.len||1)),w=Math.max(5,r*.32*(spec.w||1));
+    ctx.fillStyle='rgba(177,190,201,.96)';ctx.strokeStyle='rgba(66,80,94,.98)';ctx.lineWidth=2;
+    // Machine-gun style wide barrels taper slightly, otherwise rectangular Diep-style cannon.
+    if(['machineGun','sprayer','shotgun','palletShot'].includes(type)&&spec.kind==='barrel'){
+      ctx.beginPath();ctx.moveTo(r*.28,-w*.36);ctx.lineTo(r*.28+len,-w*.52);ctx.lineTo(r*.28+len,w*.52);ctx.lineTo(r*.28,w*.36);ctx.closePath();ctx.fill();ctx.stroke();
+    }else{
+      ctx.fillRect(r*.28,-w/2,len,w);ctx.strokeRect(r*.28,-w/2,len,w);
+    }
+    ctx.restore();
+  };
+  const drawRimAuto=(spec)=>{
+    const a=spec.a||0,tx=Math.cos(a)*r*.58,ty=Math.sin(a)*r*.58;
+    ctx.save();ctx.translate(tx,ty);ctx.rotate(a);
+    ctx.fillStyle='#cfd9e1';ctx.strokeStyle='#536273';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(0,0,7.5,0,TAU);ctx.fill();ctx.stroke();
+    ctx.fillRect(2,-3,r*.52,6);ctx.strokeRect(2,-3,r*.52,6);
+    ctx.restore();
+  };
+  const drawCenterAuto=(a=0)=>{
+    ctx.save();ctx.rotate(a);
+    ctx.fillStyle='#d8e1e8';ctx.strokeStyle='#526171';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(0,0,8,0,TAU);ctx.fill();ctx.stroke();
+    ctx.fillRect(2,-3,r*.64,6);ctx.strokeRect(2,-3,r*.64,6);
+    ctx.restore();
+  };
+
+  for(const spec of evolutionBarrelSpecs(type,r)){
+    if(spec.kind==='rimAuto')drawRimAuto(spec);
+    else if(spec.kind==='centerAuto')drawCenterAuto(spec.a||0);
+    else drawBarrel(spec);
   }
-  if(['auto3','auto5','autoGunner','autoTrapper','autoSmasher','autoTank'].includes(type)){
-    ctx.fillStyle='#d8e1e8';ctx.strokeStyle='#526171';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,-r*.48,7,0,TAU);ctx.fill();ctx.stroke();
-    ctx.fillRect(1,-r*.51,16,6);
-  }
+  // Auto Gunner / Auto Trapper have their normal weaponry plus exactly one center auto turret.
+  if(type==='autoGunner'||type==='autoTrapper')drawCenterAuto(-.58);
   ctx.restore();
+}
+
+function drawEvolutionAutoTurretCaps(e,r){
+  const type=e.classType||'basic';
+  const specs=evolutionBarrelSpecs(type,r);
+  const cap=(x,y)=>{ctx.fillStyle='#d8e1e8';ctx.strokeStyle='#526171';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,7.5,0,TAU);ctx.fill();ctx.stroke()};
+  for(const spec of specs){
+    if(spec.kind==='rimAuto')cap(Math.cos(spec.a||0)*r*.58,Math.sin(spec.a||0)*r*.58);
+    else if(spec.kind==='centerAuto')cap(0,0);
+  }
+  if(type==='autoGunner'||type==='autoTrapper')cap(0,0);
 }
 function drawTank(e){
   if(!e.alive)return;const isP=e===player;
@@ -3719,10 +3830,14 @@ function drawTank(e){
   // Diep.io evolution barrels/chassis are drawn behind the equipped cannon skin.
   drawEvolutionChassis(e,r);
 
-  // ERROR 검 모드에서는 포신 대신 ERROR 검을 든다.
-  if(swordModeActive)drawErrorSword(e,r,t);else drawPlayerCannon(cannon,r);
+  // 진화 후에는 추가 중앙 포신을 겹쳐 그리지 않고, 진화체 포신만 사용한다.
+  // ERROR 검 모드는 포신 대신 검 자체가 무기이므로 그대로 표시.
+  if(swordModeActive)drawErrorSword(e,r,t);
+  else if((e.classType||'basic')==='basic')drawPlayerCannon(cannon,r);
 
   drawUniqueTankBody(cannon,r,t,theme);
+  // Auto 3/5 및 Auto 계열 터릿 캡은 차체 위에 그려 Diep.io처럼 보이게 한다.
+  drawEvolutionAutoTurretCaps(e,r);
 
   ctx.restore();
 
@@ -4418,7 +4533,8 @@ function drawBullets(){
   let remoteVisualIndex=0;
   for(const b of bullets){
     if(!screenVisibleWorld(b.x,b.y,190))continue;
-    if(b.networkRemote&&renderPressure>=2&&((remoteVisualIndex++)&1))continue;
+    const newbornRemote=b.networkRemote&&performance.now()-(b.remoteBornAt||0)<220;
+    if(b.networkRemote&&!newbornRemote&&renderPressure>=2&&((remoteVisualIndex++)&1))continue;
     const[x,y]=worldToScreen(b.x,b.y);
     const a=fxAngleFromVector(b.vx,b.vy,0);
     const phase=b.x*.013+b.y*.017+time*5;
