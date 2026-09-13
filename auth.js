@@ -117,13 +117,13 @@ const CANNONS=Object.freeze({
     id:'blaster',name:'블래스터',rarity:'common',rarityLabel:'일반',chance:12.29998,
     desc:'균형형 대구경 에너지 포로 묵직한 단발 화력을 냅니다.',
     passive:'평타 · 파워 코어: 5번째 탄이 1.7배 피해 + 2회 관통',
-    skill:'Q 집중 폭격 · 조준 지점에 고화력 포격을 낙하시킴'
+    skill:'Q 코어 캐논 · 초대형 에너지탄을 직접 발사해 넓게 폭발'
   },
   ranger:{
     id:'ranger',name:'레인저',rarity:'common',rarityLabel:'일반',chance:12.29998,
     desc:'빠른 이동과 긴 사거리의 경량 정찰포입니다.',
     passive:'평타 · 레인저 더블: 4번째 탄이 전진 후 2갈래로 분열',
-    skill:'Q 와이어 대시 · 전방으로 빠르게 이동하며 경로를 공격'
+    skill:'Q 헌터 스텝 · 3단 잔상을 남기며 목표 지점까지 관통 돌진'
   },
 
   // 희귀 25.63% / 5캐릭터
@@ -149,13 +149,13 @@ const CANNONS=Object.freeze({
     id:'ricochet',name:'리코셰',rarity:'rare',rarityLabel:'희귀',chance:5.126,
     desc:'휘어지는 원반탄과 분열탄으로 움직이는 목표를 압박합니다.',
     passive:'평타 · 리코셰 코어: 단일 모탄이 3갈래로 분열 · 5번째는 5갈래',
-    skill:'Q 바운스 코어 · 목표 지점에서 폭발 후 원반탄을 사방으로 방출'
+    skill:'Q 핀볼 코어 · 서로 다른 각도로 휘는 고관통 원반탄 5발 동시 발사'
   },
   mortar:{
     id:'mortar',name:'박격포',rarity:'rare',rarityLabel:'희귀',chance:5.126,
     desc:'느리지만 넓은 폭발 범위를 가진 중형 포탄을 사용합니다.',
     passive:'평타 · 중량탄: 묵직한 폭발탄 · 6번째 탄은 강화 코어',
-    skill:'Q 박격 폭격 · 조준 지점에 지연 폭발 포격을 낙하시킴'
+    skill:'Q 융단 박격 · 조준선 위 5개 지점이 순차 폭발'
   },
 
   // 에픽 10.255% / 5캐릭터
@@ -181,13 +181,13 @@ const CANNONS=Object.freeze({
     id:'shredder',name:'슈레더',rarity:'epic',rarityLabel:'에픽',chance:2.051,
     desc:'회전하는 절삭탄으로 적을 여러 번 관통하는 공격형 탱크입니다.',
     passive:'평타 · 절삭 드릴: 관통력이 높고 4번째 탄은 대형 슈레더 코어',
-    skill:'Q 메가 슈레더 · 거대한 회전탄이 긴 시간 전장을 관통'
+    skill:'Q 톱날 폭풍 · 3개의 대형 회전 절삭탄이 부채꼴로 전진'
   },
   seeker:{
     id:'seeker',name:'시커',rarity:'epic',rarityLabel:'에픽',chance:2.051,
     desc:'직선 고속탄으로 멀리 있는 목표를 빠르게 제거합니다.',
     passive:'평타 · 추적 조준: 고속 관통탄이 명중할수록 더 강해짐',
-    skill:'Q 롱 레일 · 초장거리 고속 관통선을 즉시 발사'
+    skill:'Q 추적 레일 · 가장 가까운 목표를 휘어 추적하는 고속 관통 레일탄'
   },
 
   // 전설 2% / 5캐릭터
@@ -213,13 +213,13 @@ const CANNONS=Object.freeze({
     id:'frost',name:'프로스트',rarity:'legendary',rarityLabel:'전설',chance:.4,
     desc:'차가운 시간탄으로 적의 움직임을 억제하는 제어형 탱크입니다.',
     passive:'평타 · 서리 코어: 곡선 궤도의 고관통 냉각탄',
-    skill:'Q 냉각 지대 · 넓은 영역의 적과 탄환을 극도로 감속'
+    skill:'Q 빙결 감옥 · 영역 안 적을 지속 피해와 강한 감속으로 가둠'
   },
   magnet:{
     id:'magnet',name:'마그넷',rarity:'legendary',rarityLabel:'전설',chance:.4,
     desc:'중력성 탄환으로 주변 적과 도형의 움직임을 끌어당깁니다.',
     passive:'평타 · 자력 코어: 비행 중 주변 도형을 끌어당기는 중력탄',
-    skill:'Q 자력장 · 목표 지역에 강한 흡인장을 생성'
+    skill:'Q 극성 붕괴 · 목표 지점으로 적을 끌어모으며 지속 피해'
   },
 
   // 신화 .5% / 5캐릭터
@@ -248,15 +248,15 @@ const CANNONS=Object.freeze({
     id:'cyclone',name:'사이클론',rarity:'mythic',rarityLabel:'신화',chance:.1,
     desc:'빠른 레이저와 회전 공격을 결합한 지속 화력형 탱크입니다.',
     passive:'평타 · 사이클론 레일: 빠른 직선 레이저 · 3번째 탄 강화',
-    skill:'Q 회전 레이저 · 전방을 크게 훑는 고속 레이저 스윕',
-    skill2:'R ORBIT BLADES · 7초 동안 공격 위성 5기가 주위를 공전'
+    skill:'Q 사이클론 컷 · 플레이어 중심 2개의 회전 광선이 전장을 절단',
+    skill2:'R VORTEX PRISON · 7초 동안 4중 회전 광선 감옥 생성'
   },
   juggernaut:{
     id:'juggernaut',name:'저거너트',rarity:'mythic',rarityLabel:'신화',chance:.1,
     desc:'느리지만 매우 강한 중포와 생존력을 가진 돌파형 탱크입니다.',
     passive:'평타 · 저거너트 포탄: 대형 폭발탄 · 4번째는 2갈래 중포탄으로 분열',
-    skill:'Q 충격 균열 · 전방 지면을 연속 폭발시킴',
-    skill2:'R 철벽 모드 · 6초간 피해 감소 + 즉시 체력 회복'
+    skill:'Q 저거너트 러시 · 중장갑 돌진으로 경로와 도착 지점을 강타',
+    skill2:'R KINETIC REVENGE · 체력 회복 후 7초간 근접 충격장을 유지'
   },
 
   // 시크릿 .1% / 5캐릭터
@@ -285,15 +285,15 @@ const CANNONS=Object.freeze({
     id:'mirror',name:'미러',rarity:'secret',rarityLabel:'시크릿',chance:.02,
     desc:'되돌아오는 에너지 링과 방어 반격을 사용하는 변칙형 탱크입니다.',
     passive:'평타 · 미러 링: 멀리 날아간 링이 사용자에게 되돌아옴',
-    skill:'Q 미러 게이트 · 일정 시간 내 평타를 포탈에서 한 번 더 복제',
-    skill2:'R MIRROR PARRY · 적 탄환을 반격 링으로 되돌리는 방어장'
+    skill:'Q 프리즘 분신 · 주변 5개 분신이 동시에 목표를 사격',
+    skill2:'R MIRROR WORLD · 7.5초 동안 4개의 회전 분신이 자동 사격'
   },
   lancer:{
     id:'lancer',name:'랜서',rarity:'secret',rarityLabel:'시크릿',chance:.02,
     desc:'초고속 직선 관통탄으로 긴 사거리를 장악하는 돌격 저격형입니다.',
     passive:'평타 · 랜스 코어: 관통할수록 공격력과 탄속이 증가',
-    skill:'Q 랜스 브레이크 · 화면을 가르는 초장거리 관통선',
-    skill2:'R PHASE PARRY · 회전 방어장으로 적 탄환을 반사'
+    skill:'Q 페이즈 랜스 · 직선상의 적을 베며 목표 위치까지 순간 돌진',
+    skill2:'R DIMENSION IMPALE · 초장거리 차원 돌진 + 관통 일격 + 도착 폭발'
   },
 
   // 갤럭시 .01% / 5캐릭터
@@ -322,15 +322,15 @@ const CANNONS=Object.freeze({
     id:'leviathan',name:'리바이어던',rarity:'galaxy',rarityLabel:'갤럭시',chance:.002,
     desc:'초대형 중포와 공간 제압을 결합한 거대 화력형 탱크입니다.',
     passive:'평타 · 리바이어던 포탄: 초대형 폭발탄 · 주기적으로 2갈래 중포탄 분열',
-    skill:'Q 코어 붕괴 · 충전 후 넓은 범위를 한 번에 폭발',
-    skill2:'R GRAVITY BREAK · 자신 주변에서 적과 탄환을 강하게 밀어냄'
+    skill:'Q 심해의 아가리 · 목표 지점의 적을 중심으로 끌어당기며 지속 압착',
+    skill2:'R ABYSS COLLAPSE · 자신 주변 거대 중력장이 적을 끌어당기며 붕괴 피해'
   },
   valkyrie:{
     id:'valkyrie',name:'발키리',rarity:'galaxy',rarityLabel:'갤럭시',chance:.002,
     desc:'고속 이동과 연속 가속탄을 사용하는 기동전 특화 탱크입니다.',
     passive:'평타 · 발키리 코어: 비행할수록 빨라지는 고속 관통탄',
-    skill:'Q 발키리 돌파 · 장거리 돌진하며 피해 궤적을 남김',
-    skill2:'R WING ORBIT · 7초 동안 공격 위성 5기가 주위를 공전'
+    skill:'Q 천익 돌파 · 장거리 돌진 후 후방으로 5개의 날개창 발사',
+    skill2:'R EINHERJAR RAIN · 지정 지역에 18회의 빛의 창 낙하'
   },
 
   // ERROR .005% / 5캐릭터
@@ -360,15 +360,15 @@ const CANNONS=Object.freeze({
     id:'berserker',name:'버서커',rarity:'error',rarityLabel:'ERROR',chance:.001,
     desc:'등급 테마와 무관하게 순수한 초고속 연사와 돌파력에 집중한 탱크입니다.',
     passive:'평타 · 광폭 탄띠: 초고속 연사 · 8번째 탄은 3갈래 가속탄으로 분열',
-    skill:'Q 광폭 난사 · 짧은 시간 자동 초고속 사격',
-    skill2:'R RAGE ARMOR · 6초간 피해 감소 + 체력 회복'
+    skill:'Q 광전사의 참격 · 체력을 소모해 주변 충격파와 10방향 참격탄 발사',
+    skill2:'R LAST BLOOD · 9초간 잃은 체력이 많을수록 강해지는 광역 혈전장'
   },
   oracle:{
     id:'oracle',name:'오라클',rarity:'error',rarityLabel:'ERROR',chance:.001,
     desc:'등급 테마와 무관하게 시간 제어와 정밀 사격에 특화된 전략형 탱크입니다.',
     passive:'평타 · 예측 코어: 고관통 시간탄이 곡선 궤도로 목표를 압박',
-    skill:'Q 예지 영역 · 넓은 영역의 적과 탄환을 극도로 감속',
-    skill2:'R FATE LOCK · 4초간 대영역 적과 탄환을 거의 정지'
+    skill:'Q 예언 낙인 · 목표 주변 3개의 예언 지점이 시간차로 연속 폭발',
+    skill2:'R THREE FATES · 점점 커지는 3개의 운명 원이 순차 붕괴'
   },
   deku:{
     id:'deku',name:'데쿠',rarity:'divine',rarityLabel:'디바인',chance:.000033333,
@@ -395,8 +395,8 @@ const CANNONS=Object.freeze({
   }
 });
 
-const AUTH_BUILD='V5.74';
-console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · Divine Bloodlust lifesteal tank`);
+const AUTH_BUILD='V5.76';
+console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · unique skill overhaul`);
 const CANNON_DISPLAY_ORDER=Object.freeze([
   'bloodlust','sniper','deku',
   ...Object.keys(CANNONS).filter(id=>!['bloodlust','sniper','deku'].includes(id))
