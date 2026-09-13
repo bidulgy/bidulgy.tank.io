@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.76 · unique skills + sniper-only pierce + evolution cannon fix');
+console.info('[Sworder VS Tank] game V5.77 · range fix + boomerang fix + distinct dual skills');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -146,14 +146,14 @@ const CANNON_SKILLS=Object.freeze({
   seeker:{name:'추적 레일',cooldown:19,color:'#d8c0ff'},
   frost:{name:'빙결 감옥',cooldown:23,color:'#a9eeff'},
   magnet:{name:'극성 붕괴',cooldown:24,color:'#b68cff'},
-  cyclone:{name:'사이클론 컷',cooldown:21,color:'#ffb9ff'},
+  cyclone:{name:'STORM CRESCENT',cooldown:20,color:'#ffb9ff'},
   juggernaut:{name:'저거너트 러시',cooldown:24,color:'#ffc58a'},
-  mirror:{name:'프리즘 분신',cooldown:21,color:'#efc8ff'},
-  lancer:{name:'페이즈 랜스',cooldown:19,color:'#d5e0ff'},
-  leviathan:{name:'심해의 아가리',cooldown:26,color:'#9deeff'},
+  mirror:{name:'PRISM BREAK',cooldown:20,color:'#efc8ff'},
+  lancer:{name:'LANCE CANNON',cooldown:19,color:'#d5e0ff'},
+  leviathan:{name:'ABYSS ROAR',cooldown:24,color:'#9deeff'},
   valkyrie:{name:'천익 돌파',cooldown:21,color:'#8deaff'},
-  berserker:{name:'광전사의 참격',cooldown:18,color:'#ff8a70'},
-  oracle:{name:'예언 낙인',cooldown:23,color:'#f4e9a8'}
+  berserker:{name:'BLOOD CLEAVE',cooldown:18,color:'#ff8a70'},
+  oracle:{name:'FUTURE EYE',cooldown:21,color:'#f4e9a8'}
 });
 const CANNON_SKILLS_2=Object.freeze({
   rocket:{name:'IRON DOME',cooldown:28,color:'#ffc06a',kind:'fortress'},
@@ -1359,6 +1359,13 @@ function receiveRemoteSkill(payload){
       if(skillType==='bloodlustFrenzy'){spawnCombatFx('uniqueSkill',x,y,{angle,color:'#ff5368',life:1.05,radius:155,cannon:'bloodlust'});return}
       if(skillType==='bloodHarvest'){spawnCombatFx('uniqueSkill',tx,ty,{angle:0,color:'#ff354f',life:1.15,radius,cannon:'bloodlust'});return}
     }
+    const signatureFx={
+      stormCrescent:'cycloneCrescent',vortexPrison:'vortexCast',prismBreak:'mirrorShatter',mirrorWorld:'mirrorWorldCast',
+      lanceCannon:'lancerShot',dimensionImpale:'dimensionRift',abyssRoar:'leviathanRoar',abyssCollapse:'abyssCast',
+      bloodCleave:'berserkerSlash',lastBlood:'lastBloodCast',futureEye:'oracleEye',threeFates:'fateCast'
+    }[skillType];
+    const signatureZone=new Set(['vortexPrison','mirrorWorld','abyssCollapse','lastBlood','threeFates']);
+    if(signatureFx){spawnCombatFx(signatureFx,skillType==='threeFates'?tx:x,skillType==='threeFates'?ty:y,{angle:travelAngle,color:CANNON_SKILLS[cannon]?.color||'#fff',life:1.0,radius:Math.max(90,safeRemoteNumber(payload.length,radius)),cannon});if(!signatureZone.has(skillType))return;}
     if(cannon==='phantom'&&skillType==='phantomMarks'){
       const ox=safeRemoteNumber(payload.originX,x),oy=safeRemoteNumber(payload.originY,y),dx=safeRemoteNumber(payload.destX,tx),dy=safeRemoteNumber(payload.destY,ty),ownerId=String(payload.ownerId||'');
       skillZones.push({type:'phantomAssassinMark',x:ox,y:oy,radius,life,maxLife:life,damage:0,tick:0,angle:0,length:0,width:0,ownerId,networkRemote:true,pulses:0,interval:.4,data:{mark:'origin'}});
@@ -1372,7 +1379,7 @@ function receiveRemoteSkill(payload){
       spawnCombatFx('phantomMarkBurst',ox,oy,{angle:0,color:'#cabdff',life:.72,radius:190,cannon:'phantom'});spawnCombatFx('phantomMarkBurst',dx,dy,{angle:0,color:'#cabdff',life:.72,radius:190,cannon:'phantom'});
       const remote=remotePlayers.get(ownerId);if(remote){remote.x=remote.tx=ox;remote.y=remote.ty=oy}return;
     }
-    const zoneTypes=new Set(['artillery','barrier','rapidOverdrive','twinDrones','burstBomb','crystalPrism','laserSweep','plasmaCage','thunderStorm','flameWall','missileRain','earthFissure','ringGate','timeField','gravity','supernovaCore','cometTrail','constellation','secondStar','starOrbit','absoluteZero','ironDome','siegeAura','ringParry','rewindEcho','antiMatter','cometShower','glitchDriveAura','glitchWarpTrail']);
+    const zoneTypes=new Set(['artillery','barrier','rapidOverdrive','twinDrones','burstBomb','crystalPrism','laserSweep','plasmaCage','thunderStorm','flameWall','missileRain','earthFissure','ringGate','timeField','gravity','supernovaCore','cometTrail','constellation','secondStar','starOrbit','absoluteZero','ironDome','siegeAura','ringParry','rewindEcho','antiMatter','cometShower','glitchDriveAura','glitchWarpTrail','vortexPrison','mirrorWorld','abyssCollapse','lastBlood','threeFates','kineticArmor']);
     if(zoneTypes.has(skillType)){
       skillZones.push({type:skillType,x:tx,y:ty,radius,life,maxLife:life,damage:0,tick:0,angle:fxAngleToTarget(x,y,tx,ty,safeRemoteNumber(payload.zoneAngle,angle)),length:safeRemoteNumber(payload.length,0),width:safeRemoteNumber(payload.width,0),ownerId:String(payload.ownerId||''),networkRemote:true,pulses:0,interval:.4,data:{}});
     }else{
@@ -2097,21 +2104,36 @@ function activateSkill(errorChargeRatio=0,aimOverride=null){
   }else if(skillCannon==='magnet'){
     const[tx,ty]=skillAimPoint(500);addSkillZone('polarityCrush',{x:tx,y:ty,radius:330,life:3.6,damage:p.damage*.36,tick:0});spawnCombatFx('uniqueSkill',tx,ty,{angle:0,color:def.color,life:1.1,radius:330,cannon});sendUniqueSkill(cannon,'polarityCrush',{targetX:tx,targetY:ty,radius:330,life:3.6});
   }else if(skillCannon==='cyclone'){
-    addSkillZone('cycloneCut',{x:player.x,y:player.y,radius:610,life:2.5,damage:p.damage*.66,tick:0,data:{angle:a}});sendUniqueSkill(cannon,'cycloneCut',{targetX:player.x,targetY:player.y,radius:610,life:2.5});
+    // V5.77: Q is a forward projectile skill; R remains the stationary VORTEX PRISON.
+    for(const off of [-.24,0,.24]){
+      const b=spawnSkillProjectileAt(cannon,player.x+Math.cos(a)*42,player.y+Math.sin(a)*42,a+off,{damageMul:2.65,speedMul:1.48,life:1.85,pierce:6,r:9,shape:'laserRay',special:'stormCrescent',curve:Math.sign(off)});
+      b.crescentSide=Math.sign(off);
+    }
+    spawnCombatFx('cycloneCrescent',player.x,player.y,{angle:a,color:def.color,life:.72,radius:720,cannon});
+    sendUniqueSkill(cannon,'stormCrescent',{targetX:player.x+Math.cos(a)*720,targetY:player.y+Math.sin(a)*720,length:720,radius:720});
   }else if(skillCannon==='juggernaut'){
     const ox=player.x,oy=player.y,[tx,ty]=skillAimPoint(580),aa=Math.atan2(ty-oy,tx-ox),len=Math.hypot(tx-ox,ty-oy);damageSkillLine(ox,oy,aa,len,72,p.damage*4.2,'#ffc58a',620);player.x=tx;player.y=ty;player.phaseUntil=now+650;player.vx=Math.cos(aa)*520;player.vy=Math.sin(aa)*520;skillAreaDamage(tx,ty,150,p.damage*2.4,'#ffc58a');shake=Math.max(shake,18);broadcastLocalState(true);sendUniqueSkill(cannon,'juggernautRush',{targetX:tx,targetY:ty,length:len});
   }else if(skillCannon==='mirror'){
-    const target=nearestSkillTarget(player.x,player.y,900);for(let k=0;k<5;k++){const q=k*TAU/5,r=150,x=player.x+Math.cos(q)*r,y=player.y+Math.sin(q)*r,aa=target?Math.atan2(target.y-y,target.x-x):a;spawnSkillProjectileAt(cannon,x,y,aa,{damageMul:1.05,speedMul:1.15,life:4,pierce:4,r:10,shape:'dimensionRing',special:'prismClone'})}spawnCombatFx('uniqueSkill',player.x,player.y,{angle:a,color:def.color,life:.9,radius:190,cannon});sendUniqueSkill(cannon,'prismClones',{targetX:target?.x||player.x,targetY:target?.y||player.y});
+    // Q shatters a prism forward; R is the persistent MIRROR WORLD clone field.
+    for(const off of [-.34,-.22,-.11,0,.11,.22,.34])spawnSkillProjectileAt(cannon,player.x+Math.cos(a)*36,player.y+Math.sin(a)*36,a+off,{damageMul:1.35,speedMul:1.32,life:1.75,pierce:2,r:7,shape:'dimensionRing',special:'prismShard'});
+    spawnCombatFx('mirrorShatter',player.x,player.y,{angle:a,color:def.color,life:.82,radius:520,cannon});
+    sendUniqueSkill(cannon,'prismBreak',{targetX:player.x+Math.cos(a)*520,targetY:player.y+Math.sin(a)*520,length:520,radius:520});
   }else if(skillCannon==='lancer'){
-    const ox=player.x,oy=player.y,[tx,ty]=skillAimPoint(820),aa=Math.atan2(ty-oy,tx-ox),len=Math.hypot(tx-ox,ty-oy);damageSkillLine(ox,oy,aa,len,34,p.damage*7.0,'#e5edff',180);player.x=tx;player.y=ty;player.phaseUntil=now+720;spawnCombatFx('uniqueSkill',ox,oy,{angle:aa,color:def.color,life:.65,radius:len,cannon});broadcastLocalState(true);sendUniqueSkill(cannon,'phaseLance',{targetX:tx,targetY:ty,length:len});
+    // Q no longer teleports. It is a pure ultra-long lance shot; R owns the dimensional dash identity.
+    const length=1180;damageSkillLine(player.x,player.y,a,length,28,p.damage*8.4,'#eef7ff',135);spawnCombatFx('lancerShot',player.x,player.y,{angle:a,color:def.color,life:.55,radius:length,cannon});shake=Math.max(shake,11);sendUniqueSkill(cannon,'lanceCannon',{targetX:player.x+Math.cos(a)*length,targetY:player.y+Math.sin(a)*length,length,radius:length});
   }else if(skillCannon==='leviathan'){
-    const[tx,ty]=skillAimPoint(520);addSkillZone('abyssMaw',{x:tx,y:ty,radius:360,life:4.2,damage:p.damage*.38,tick:0});spawnCombatFx('uniqueSkill',tx,ty,{angle:0,color:def.color,life:1.2,radius:360,cannon});sendUniqueSkill(cannon,'abyssMaw',{targetX:tx,targetY:ty,radius:360,life:4.2});
+    // Q is a directional shockwave that blasts enemies away; R is the opposite inward collapse.
+    const range=650;damageSkillCone(player.x,player.y,a,range,.66,p.damage*5.4,'#a9efff',720);spawnCombatFx('leviathanRoar',player.x,player.y,{angle:a,color:def.color,life:.9,radius:range,cannon});shake=Math.max(shake,17);sendUniqueSkill(cannon,'abyssRoar',{targetX:player.x+Math.cos(a)*range,targetY:player.y+Math.sin(a)*range,length:range,radius:range});
   }else if(skillCannon==='valkyrie'){
     const ox=player.x,oy=player.y,[tx,ty]=skillAimPoint(700),aa=Math.atan2(ty-oy,tx-ox);player.x=tx;player.y=ty;player.phaseUntil=now+600;for(const off of [-.34,-.17,0,.17,.34])spawnSkillProjectileAt(cannon,tx,ty,aa+Math.PI+off,{damageMul:1.75,speedMul:1.35,life:4,pierce:4,r:8,shape:'cometCore',special:'wingSpear'});broadcastLocalState(true);spawnCombatFx('uniqueSkill',ox,oy,{angle:aa,color:def.color,life:.7,radius:700,cannon});sendUniqueSkill(cannon,'heavenWingDash',{targetX:tx,targetY:ty});
   }else if(skillCannon==='berserker'){
-    skillAreaDamage(player.x,player.y,230,p.damage*3.4,'#ff8a70');for(let k=0;k<10;k++){const q=k*TAU/10+a;spawnSkillProjectileAt(cannon,player.x,player.y,q,{damageMul:.95,speedMul:1.25,life:3,pierce:2,r:7,shape:'rapidTracer',special:'rageSlash'})}player.hp=Math.max(1,player.hp-player.maxHp*.08);spawnCombatFx('uniqueSkill',player.x,player.y,{angle:a,color:def.color,life:.9,radius:240,cannon});sendUniqueSkill(cannon,'rageSlash',{targetX:player.x,targetY:player.y,radius:230});
+    // Q is now a directional cleave instead of another circular aura like R LAST BLOOD.
+    damageSkillCone(player.x,player.y,a,520,.50,p.damage*4.6,'#ff8a70',520);for(const off of [-.18,-.09,0,.09,.18])spawnSkillProjectileAt(cannon,player.x+Math.cos(a)*30,player.y+Math.sin(a)*30,a+off,{damageMul:1.18,speedMul:1.42,life:1.25,pierce:2,r:7,shape:'rapidTracer',special:'bloodCleave'});player.hp=Math.max(1,player.hp-player.maxHp*.06);spawnCombatFx('berserkerSlash',player.x,player.y,{angle:a,color:def.color,life:.72,radius:520,cannon});sendUniqueSkill(cannon,'bloodCleave',{targetX:player.x+Math.cos(a)*520,targetY:player.y+Math.sin(a)*520,length:520,radius:520});
   }else if(skillCannon==='oracle'){
-    const[tx,ty]=skillAimPoint(620);for(let k=0;k<3;k++){const q=k*TAU/3,r=150,x=tx+Math.cos(q)*r,y=ty+Math.sin(q)*r;addSkillZone('fateMark',{x,y,radius:135,life:1.1+k*.42,damage:p.damage*(2.2+k*.55),data:{detonateAt:.10}})}spawnCombatFx('uniqueSkill',tx,ty,{angle:0,color:def.color,life:1.0,radius:280,cannon});sendUniqueSkill(cannon,'fateMarks',{targetX:tx,targetY:ty,radius:280});
+    // Q is a single predictive seeker shot; R remains THREE FATES' expanding delayed circles.
+    const target=nearestSkillTarget(player.x,player.y,1350),aa=target?Math.atan2(target.y-player.y,target.x-player.x):a;
+    const b=spawnSkillProjectileAt(cannon,player.x+Math.cos(aa)*38,player.y+Math.sin(aa)*38,aa,{damageMul:6.6,speedMul:1.34,life:2.6,pierce:3,r:9,shape:'chronoRing',special:'oracleSeer',targetId:target?.kind==='player'?target.obj.id:'',targetShapeId:target?.kind==='shape'?target.obj.id:''});if(target?.kind==='shape')b.targetShapeRef=target.obj;
+    spawnCombatFx('oracleEye',player.x,player.y,{angle:aa,color:def.color,life:.85,radius:420,cannon});sendUniqueSkill(cannon,'futureEye',{targetX:target?.x||player.x+Math.cos(aa)*900,targetY:target?.y||player.y+Math.sin(aa)*900,length:900,radius:420});
   }else if(skillCannon==='standard'){
     const[tx,ty]=skillAimPoint(650);addSkillZone('artillery',{x:tx,y:ty,radius:310,life:1.25,damage:p.damage*5.8});
     sendUniqueSkill(cannon,'artillery',{targetX:tx,targetY:ty,radius:310,life:1.25});
@@ -2344,21 +2366,21 @@ function activateSkill2(){
     spawnCombatFx('uniqueSkill',player.x,player.y,{angle:0,color:'#ff354f',life:1.15,radius,cannon:'bloodlust'});burst(player.x,player.y,'#ff5368',55);
     sendUniqueSkill(cannon,'bloodHarvest',{targetX:player.x,targetY:player.y,radius,life:1.15});broadcastLocalState(true);
   }else if(skill2Cannon==='cyclone'){
-    addSkillZone('vortexPrison',{x:player.x,y:player.y,radius:260,life:7.0,damage:p.damage*.48,tick:0,data:{angle:a}});spawnCombatFx('uniqueSkill',player.x,player.y,{angle:a,color:def.color,life:1.0,radius:280,cannon});sendUniqueSkill(cannon,'vortexPrison',{targetX:player.x,targetY:player.y,radius:260,life:7});
+    addSkillZone('vortexPrison',{x:player.x,y:player.y,radius:260,life:7.0,damage:p.damage*.48,tick:0,data:{angle:a}});spawnCombatFx('vortexCast',player.x,player.y,{angle:a,color:def.color,life:1.1,radius:280,cannon});sendUniqueSkill(cannon,'vortexPrison',{targetX:player.x,targetY:player.y,radius:260,life:7});
   }else if(skill2Cannon==='juggernaut'){
     player.juggernautCounterUntil=now+7000;player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.18);addSkillZone('kineticArmor',{x:player.x,y:player.y,radius:150,life:7,damage:p.damage*.65,tick:0});spawnCombatFx('uniqueSkill',player.x,player.y,{angle:a,color:def.color,life:1.0,radius:170,cannon});sendUniqueSkill(cannon,'kineticArmor',{targetX:player.x,targetY:player.y,radius:150,life:7});
   }else if(skill2Cannon==='mirror'){
-    addSkillZone('mirrorWorld',{x:player.x,y:player.y,radius:190,life:7.5,damage:p.damage*.62,tick:0,data:{next:0}});sendUniqueSkill(cannon,'mirrorWorld',{targetX:player.x,targetY:player.y,radius:190,life:7.5});
+    addSkillZone('mirrorWorld',{x:player.x,y:player.y,radius:190,life:7.5,damage:p.damage*.62,tick:0,data:{next:0}});spawnCombatFx('mirrorWorldCast',player.x,player.y,{angle:a,color:def.color,life:1.05,radius:210,cannon});sendUniqueSkill(cannon,'mirrorWorld',{targetX:player.x,targetY:player.y,radius:190,life:7.5});
   }else if(skill2Cannon==='lancer'){
-    const ox=player.x,oy=player.y,[tx,ty]=skillAimPoint(980),aa=Math.atan2(ty-oy,tx-ox),len=Math.hypot(tx-ox,ty-oy);damageSkillLine(ox,oy,aa,len,58,p.damage*10.5,'#eff6ff',0);player.x=tx;player.y=ty;player.phaseUntil=now+950;skillAreaDamage(tx,ty,130,p.damage*3.0,'#eff6ff');broadcastLocalState(true);spawnCombatFx('uniqueSkill',ox,oy,{angle:aa,color:def.color,life:.85,radius:len,cannon});sendUniqueSkill(cannon,'dimensionImpale',{targetX:tx,targetY:ty,length:len});
+    const ox=player.x,oy=player.y,[tx,ty]=skillAimPoint(980),aa=Math.atan2(ty-oy,tx-ox),len=Math.hypot(tx-ox,ty-oy);damageSkillLine(ox,oy,aa,len,58,p.damage*10.5,'#eff6ff',0);player.x=tx;player.y=ty;player.phaseUntil=now+950;skillAreaDamage(tx,ty,130,p.damage*3.0,'#eff6ff');broadcastLocalState(true);spawnCombatFx('dimensionRift',ox,oy,{angle:aa,color:def.color,life:.95,radius:len,cannon});sendUniqueSkill(cannon,'dimensionImpale',{targetX:tx,targetY:ty,length:len,radius:len});
   }else if(skill2Cannon==='leviathan'){
-    addSkillZone('abyssCollapse',{x:player.x,y:player.y,radius:520,life:4.8,damage:p.damage*.52,tick:0});sendUniqueSkill(cannon,'abyssCollapse',{targetX:player.x,targetY:player.y,radius:520,life:4.8});
+    addSkillZone('abyssCollapse',{x:player.x,y:player.y,radius:520,life:4.8,damage:p.damage*.52,tick:0});spawnCombatFx('abyssCast',player.x,player.y,{angle:0,color:def.color,life:1.15,radius:520,cannon});sendUniqueSkill(cannon,'abyssCollapse',{targetX:player.x,targetY:player.y,radius:520,life:4.8});
   }else if(skill2Cannon==='valkyrie'){
     const[tx,ty]=skillAimPoint(560);addSkillZone('einherjarRain',{x:tx,y:ty,radius:360,life:6.0,damage:p.damage*1.45,tick:0,data:{next:.08,count:0}});sendUniqueSkill(cannon,'einherjarRain',{targetX:tx,targetY:ty,radius:360,life:6});
   }else if(skill2Cannon==='berserker'){
-    player.berserkerLastBloodUntil=now+9000;const missing=1-player.hp/Math.max(1,player.maxHp);player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.12);addSkillZone('lastBlood',{x:player.x,y:player.y,radius:190,life:9,damage:p.damage*(.45+missing*.8),tick:0,data:{next:0}});spawnCombatFx('uniqueSkill',player.x,player.y,{angle:a,color:def.color,life:1.1,radius:210,cannon});sendUniqueSkill(cannon,'lastBlood',{targetX:player.x,targetY:player.y,radius:190,life:9});
+    player.berserkerLastBloodUntil=now+9000;const missing=1-player.hp/Math.max(1,player.maxHp);player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.12);addSkillZone('lastBlood',{x:player.x,y:player.y,radius:190,life:9,damage:p.damage*(.45+missing*.8),tick:0,data:{next:0}});spawnCombatFx('lastBloodCast',player.x,player.y,{angle:a,color:def.color,life:1.1,radius:210,cannon});sendUniqueSkill(cannon,'lastBlood',{targetX:player.x,targetY:player.y,radius:190,life:9});
   }else if(skill2Cannon==='oracle'){
-    const[tx,ty]=skillAimPoint(600);for(let k=0;k<3;k++)addSkillZone('threeFates',{x:tx,y:ty,radius:180+k*65,life:1.0+k*.8,damage:p.damage*(2.4+k*.7),data:{detonateAt:.10}});spawnCombatFx('uniqueSkill',tx,ty,{angle:0,color:def.color,life:1.2,radius:340,cannon});sendUniqueSkill(cannon,'threeFates',{targetX:tx,targetY:ty,radius:340});
+    const[tx,ty]=skillAimPoint(600);for(let k=0;k<3;k++)addSkillZone('threeFates',{x:tx,y:ty,radius:180+k*65,life:1.0+k*.8,damage:p.damage*(2.4+k*.7),data:{detonateAt:.10}});spawnCombatFx('fateCast',tx,ty,{angle:0,color:def.color,life:1.2,radius:340,cannon});sendUniqueSkill(cannon,'threeFates',{targetX:tx,targetY:ty,radius:340});
   }else if(skill2Cannon==='rocket'){
     player.fortressUntil=now+6000;
     player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.12);
@@ -2527,13 +2549,23 @@ function createRocketBurnZone(parent,x,y){
   if(!parent.basicAttack||parent.burnSpawned)return;parent.burnSpawned=true;
   skillZones.push({type:'burn',x,y,radius:105,life:2.4,maxLife:2.4,damage:parent.damage*.13,tick:0,ownerId:onlineSelfId,networkRemote:false});
 }
+function isBoomerangCannon(cannon){return cannon==='ring'||cannon==='mirror'}
 function maybeReturnRingBullet(b){
-  if(!b.basicAttack||!['ring','chrono'].includes(cannonBaseBehavior(b.cannon))||b.returned||b.life>.82)return;
-  const owner=b.networkRemote?remotePlayers.get(b.ownerId):player;if(!owner||owner.alive===false)return;
-  const dx=owner.x-b.x,dy=owner.y-b.y,[nx,ny]=norm(dx,dy),speed=Math.max(280,Math.hypot(b.vx,b.vy));
-  b.vx=nx*speed;b.vy=ny*speed;b.returned=true;b.life+=1.20;b.pierce=Math.max(b.pierce||1,4);b.hitTargets=new Set();b.hitIds=new Set();
-  if(!b.networkRemote)broadcastShotSync(b);
-  spawnCombatFx('ringReturn',b.x,b.y,{angle:Math.atan2(b.vy,b.vx),color:'#dfceff',life:.45,radius:46,cannon:'ring'});
+  // V5.77: only the actual Ring/Mirror boomerang tanks return. Chrono/Frost/Oracle no longer inherit it.
+  if(!b.basicAttack||!isBoomerangCannon(String(b.cannon||'')))return false;
+  const owner=b.networkRemote?remotePlayers.get(b.ownerId):player;if(!owner||owner.alive===false)return false;
+  if(!Number.isFinite(b.boomerangOriginX)){b.boomerangOriginX=b.x;b.boomerangOriginY=b.y}
+  if(!b.returned){
+    const ox=b.x-b.boomerangOriginX,oy=b.y-b.boomerangOriginY;
+    if(ox*ox+oy*oy<720*720)return false;
+    b.returned=true;b.hitTargets=new Set();b.hitIds=new Set();
+    if(!b.networkRemote)broadcastShotSync(b);
+    spawnCombatFx('ringReturn',b.x,b.y,{angle:Math.atan2(owner.y-b.y,owner.x-b.x),color:'#dfceff',life:.48,radius:52,cannon:b.cannon});
+  }
+  const dx=owner.x-b.x,dy=owner.y-b.y,d=Math.hypot(dx,dy)||1;
+  if(d<=(owner.r||27)+22)return true;
+  const speed=Math.max(360,Math.hypot(b.vx,b.vy));b.vx=dx/d*speed;b.vy=dy/d*speed;
+  return false;
 }
 
 
@@ -2801,6 +2833,7 @@ function fire(e){
     b.splitOriginX=b.x;b.splitOriginY=b.y;b.splitBaseDamage=p.damage;b.splitDone=false;
   }
   configureBasicProjectilePhysics(b,cannon,b.special);
+  if(isBoomerangCannon(cannon)&&b.basicAttack){b.boomerangOriginX=b.x;b.boomerangOriginY=b.y}
   if(baseCannon==='sniper'&&b.special==='sniperAP'){
     b.sniperSeekOriginX=b.x;b.sniperSeekOriginY=b.y;
     b.sniperSeekTarget=null;b.sniperSeekNextSearchAt=0;
@@ -3158,6 +3191,11 @@ function applyUniqueProjectileMotion(b,dt){
     let target=null;if(b.targetId)target=remotePlayers.get(String(b.targetId))||null;if(!target&&b.targetShapeId)target=shapes.find(s=>String(s.id||'')===String(b.targetShapeId)&&s.hp>0)||null;if(!target&&b.targetShapeRef&&b.targetShapeRef.hp>0)target=b.targetShapeRef;
     if(target){const desired=Math.atan2(target.y-b.y,target.x-b.x),current=Math.atan2(b.vy,b.vx),diff=angleDifference(desired,current);bendProjectileVelocity(b,clamp(diff,-3.6*dt,3.6*dt));}
   }
+  if(b.cannon==='oracle'&&String(b.special||'')==='oracleSeer'){
+    let target=null;if(b.targetId)target=remotePlayers.get(String(b.targetId))||null;if(target&&!target.alive)target=null;if(!target&&b.targetShapeId)target=shapes.find(v=>String(v.id||'')===String(b.targetShapeId)&&v.hp>0)||null;if(!target&&b.targetShapeRef&&b.targetShapeRef.hp>0)target=b.targetShapeRef;
+    if(target){const desired=Math.atan2(target.y-b.y,target.x-b.x),current=Math.atan2(b.vy,b.vx),turn=clamp(angleDifference(desired,current),-4.2*dt,4.2*dt);bendProjectileVelocity(b,turn);const k=1+.16*dt;b.vx*=k;b.vy*=k}
+    return;
+  }
 
   switch(cannonBaseBehavior(b.cannon)){
     case 'standard': break; // 완전 직선 기준탄
@@ -3299,20 +3337,21 @@ function applyBloodlustLifesteal(b,dealtDamage){
 function updateBullets(dt){
   for(let i=bullets.length-1;i>=0;i--){
     const b=bullets[i];
-    // V5.76: unlimited penetration is Sniper-only; all other tanks use their native pierce count.
+    // V5.77: Sniper alone has unlimited penetration. Basic attacks keep map-wide range,
+    // while non-Sniper skill projectiles still expire at their designed lifetime.
+    const infiniteRange=b.basicAttack===true||cannonBaseBehavior(b.cannon)==='sniper';
     if(!b.networkRemote&&b.team==='player'&&cannonBaseBehavior(b.cannon)==='sniper')b.pierce=1000000000;
-    b.life-=dt;
+    if(!infiniteRange)b.life-=dt;
     applyUniqueProjectileMotion(b,dt);
     b.x+=b.vx*dt;b.y+=b.vy*dt;
-    maybeReturnRingBullet(b);
+    if(maybeReturnRingBullet(b)){if(!b.networkRemote)broadcastShotEnd(b);bullets.splice(i,1);continue}
     if(!b.networkRemote&&Array.isArray(b.splitPattern)&&!b.splitDone){
       const dx=b.x-(b.splitOriginX||b.x),dy=b.y-(b.splitOriginY||b.y);
       if(dx*dx+dy*dy>=b.splitDistance*b.splitDistance){
         splitBasicCarrier(b);broadcastShotEnd(b);bullets.splice(i,1);continue;
       }
     }
-    // V5.72: projectile range is unlimited inside the map; only the world boundary ends flight.
-    if(b.x<0||b.y<0||b.x>WORLD||b.y>WORLD){
+    if((b.life<=0&&!infiniteRange)||b.x<0||b.y<0||b.x>WORLD||b.y>WORLD){
       if(!b.networkRemote)broadcastShotEnd(b);
       bullets.splice(i,1);continue;
     }
@@ -3521,8 +3560,8 @@ function updateSkillZones(dt){
     if(z.type==='polarityCrush'||z.type==='abyssMaw'||z.type==='abyssCollapse'){
       z.tick=(z.tick||0)-dt;if(z.tick<=0){z.tick=.14;for(const s of shapes){const dx=z.x-s.x,dy=z.y-s.y,d=Math.hypot(dx,dy)||1;if(d>z.radius)continue;const force=(1-d/z.radius)*(z.type==='abyssCollapse'?95:65);reportShapeImpulse(s,dx/d*force,dy/d*force);applyShapeDamage(s,z.damage)}for(const e of remotePlayers.values()){if(e.alive&&(e.x-z.x)**2+(e.y-z.y)**2<=z.radius*z.radius)sendDamage(e.id,z.damage*.55)}}continue;
     }
-    if(z.type==='cycloneCut'||z.type==='vortexPrison'){
-      z.x=player.x;z.y=player.y;z.tick=(z.tick||0)-dt;if(z.tick<=0){z.tick=.085;z.data.angle=(z.data.angle||0)+.33;const beams=z.type==='vortexPrison'?4:2;for(let k=0;k<beams;k++){const aa=z.data.angle+k*TAU/beams;damageSkillLine(z.x,z.y,aa,z.radius,20,z.damage,z.type==='vortexPrison'?'#c9d6ff':'#ffb9ff')}}continue;
+    if(z.type==='vortexPrison'){
+      z.x=player.x;z.y=player.y;z.tick=(z.tick||0)-dt;if(z.tick<=0){z.tick=.085;z.data.angle=(z.data.angle||0)+.33;for(let k=0;k<4;k++){const aa=z.data.angle+k*TAU/4;damageSkillLine(z.x,z.y,aa,z.radius,20,z.damage,'#c9d6ff')}}continue;
     }
     if(z.type==='kineticArmor'){z.x=player.x;z.y=player.y;z.tick=(z.tick||0)-dt;if(z.tick<=0){z.tick=.30;skillAreaDamage(z.x,z.y,z.radius,z.damage,'#ffd39a')}continue;}
     if(z.type==='mirrorWorld'){z.x=player.x;z.y=player.y;z.data.next=(z.data.next||0)-dt;if(z.data.next<=0){z.data.next=.42;const target=nearestSkillTarget(player.x,player.y,900);for(let k=0;k<4;k++){const q=k*TAU/4+now*.0012,x=player.x+Math.cos(q)*z.radius,y=player.y+Math.sin(q)*z.radius,aa=target?Math.atan2(target.y-y,target.x-x):player.angle;spawnSkillProjectileAt('mirror',x,y,aa,{damageMul:.60,speedMul:1.18,life:3,pierce:3,r:9,shape:'dimensionRing',special:'mirrorWorldShot'})}}continue;}
@@ -4258,6 +4297,18 @@ function drawSkillZones(){
       ctx.strokeStyle='#72ff43';ctx.lineWidth=3;ctx.strokeRect(-z.radius*.7,-z.radius*.7,z.radius*1.4,z.radius*1.4);ctx.strokeStyle='#ff42df';ctx.strokeRect(-z.radius*.7+Math.sin(t*18)*7,-z.radius*.7-5,z.radius*1.4,z.radius*1.4);ctx.strokeStyle='#42eaff';for(let k=0;k<5;k++){const yy=-z.radius*.6+k*z.radius*.3;ctx.beginPath();ctx.moveTo(-z.radius,yy);ctx.lineTo(z.radius,yy+Math.sin(t*15+k)*8);ctx.stroke()}
     }else if(z.type==='glitchWarpTrail'){
       ctx.rotate(z.angle);ctx.strokeStyle='#ff42df';ctx.lineWidth=5;ctx.setLineDash([18,8]);ctx.beginPath();ctx.moveTo(0,-7);ctx.lineTo(z.length,7);ctx.stroke();ctx.strokeStyle='#42eaff';ctx.beginPath();ctx.moveTo(0,7);ctx.lineTo(z.length,-7);ctx.stroke();ctx.setLineDash([]);
+    }else if(z.type==='vortexPrison'){
+      ctx.strokeStyle='#d8e2ff';ctx.shadowColor='#aebcff';ctx.shadowBlur=18;ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.stroke();for(let k=0;k<4;k++){const aa=t*3.1+k*TAU/4;ctx.beginPath();ctx.moveTo(Math.cos(aa)*38,Math.sin(aa)*38);ctx.lineTo(Math.cos(aa)*z.radius,Math.sin(aa)*z.radius);ctx.stroke()}ctx.shadowBlur=0;
+    }else if(z.type==='kineticArmor'){
+      ctx.rotate(t*.3);ctx.strokeStyle='#ffd39a';ctx.shadowColor='#ffad68';ctx.shadowBlur=16;ctx.lineWidth=4;for(let k=0;k<6;k++){const a=k*TAU/6,b=(k+1)*TAU/6;ctx.beginPath();ctx.moveTo(Math.cos(a)*z.radius,Math.sin(a)*z.radius);ctx.lineTo(Math.cos(b)*z.radius,Math.sin(b)*z.radius);ctx.stroke()}ctx.shadowBlur=0;
+    }else if(z.type==='mirrorWorld'){
+      ctx.strokeStyle='#f3dcff';ctx.shadowColor='#d599ff';ctx.shadowBlur=17;ctx.lineWidth=3;for(let k=0;k<4;k++){const aa=t*1.8+k*TAU/4,ox=Math.cos(aa)*z.radius,oy=Math.sin(aa)*z.radius;ctx.save();ctx.translate(ox,oy);ctx.rotate(aa+t);ctx.strokeRect(-12,-12,24,24);ctx.restore()}ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.stroke();ctx.shadowBlur=0;
+    }else if(z.type==='abyssCollapse'){
+      ctx.fillStyle='rgba(28,8,58,.18)';ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.fill();ctx.strokeStyle='#b58cff';ctx.shadowColor='#7d4cff';ctx.shadowBlur=20;ctx.lineWidth=4;for(let k=0;k<4;k++){ctx.beginPath();ctx.arc(0,0,z.radius*(.22+k*.20)+Math.sin(t*4+k)*9,t*(k%2?-.8:.8),TAU+t*(k%2?-.8:.8));ctx.stroke()}ctx.shadowBlur=0;
+    }else if(z.type==='lastBlood'){
+      ctx.strokeStyle='#ff816c';ctx.shadowColor='#ff3f48';ctx.shadowBlur=18;ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,z.radius*(.92+.05*Math.sin(t*7)),0,TAU);ctx.stroke();for(let k=0;k<10;k++){const aa=k*TAU/10+t*.25;ctx.beginPath();ctx.moveTo(Math.cos(aa)*z.radius*.72,Math.sin(aa)*z.radius*.72);ctx.lineTo(Math.cos(aa)*z.radius*1.08,Math.sin(aa)*z.radius*1.08);ctx.stroke()}ctx.shadowBlur=0;
+    }else if(z.type==='threeFates'){
+      ctx.strokeStyle='#fff2b8';ctx.shadowColor='#ffe27a';ctx.shadowBlur=15;ctx.lineWidth=3;for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(0,0,z.radius*(.35+k*.24),t*(k%2?-.5:.5)+k,TAU+t*(k%2?-.5:.5)+k);ctx.stroke()}ctx.shadowBlur=0;
     }else if(z.type==='dekuSmoke'){
       // Deku Smokescreen: layered, rolling grey-white smoke instead of a flat circle.
       const smokeCount=renderPressure>=2?7:renderPressure>=1?10:15;
@@ -4367,6 +4418,30 @@ function drawCombatEffects(layer='base'){
       ctx.strokeStyle='#fff36f';ctx.lineWidth=5*p+1;ctx.shadowColor='#fff36f';ctx.shadowBlur=18;ctx.beginPath();ctx.moveTo(0,0);for(let k=1;k<=8;k++){const yy=f.radius*k/8,xx=k===8?0:(k%2?14:-13);ctx.lineTo(xx,yy)}ctx.stroke();ctx.shadowBlur=0;
     }else if(f.type==='stellarRevive'){
       ctx.strokeStyle='#ffffff';ctx.lineWidth=6*p+1;ctx.shadowColor='#b9f6ff';ctx.shadowBlur=24;for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(0,0,f.radius*q*(.35+k*.22),0,TAU);ctx.stroke()}ctx.shadowBlur=0;
+    }else if(f.type==='cycloneCrescent'){
+      ctx.strokeStyle='#ffc6ff';ctx.shadowColor='#ff8fff';ctx.shadowBlur=20;ctx.lineWidth=7*p+2;for(const off of [-.24,0,.24]){ctx.save();ctx.rotate(off);ctx.beginPath();ctx.arc(f.radius*q*.48,0,55+45*q,-1.05,1.05);ctx.stroke();ctx.restore()}ctx.shadowBlur=0;
+    }else if(f.type==='vortexCast'){
+      ctx.strokeStyle='#dbe3ff';ctx.shadowColor='#aebcff';ctx.shadowBlur=22;ctx.lineWidth=4;for(let k=0;k<4;k++){const aa=q*5+k*TAU/4;ctx.beginPath();ctx.arc(0,0,f.radius*(.20+.18*k)*q,aa,aa+Math.PI*1.15);ctx.stroke()}ctx.shadowBlur=0;
+    }else if(f.type==='mirrorShatter'){
+      ctx.strokeStyle='#f4ddff';ctx.shadowColor='#df9cff';ctx.shadowBlur=18;ctx.lineWidth=3;for(let k=-3;k<=3;k++){const aa=k*.12;ctx.save();ctx.rotate(aa);ctx.beginPath();ctx.moveTo(15,-8);ctx.lineTo(f.radius*q*.75,0);ctx.lineTo(15,8);ctx.stroke();ctx.restore()}ctx.shadowBlur=0;
+    }else if(f.type==='mirrorWorldCast'){
+      ctx.strokeStyle='#f4ddff';ctx.shadowColor='#d99bff';ctx.shadowBlur=20;ctx.lineWidth=4;for(let k=0;k<4;k++){const aa=q*4+k*TAU/4,rr=f.radius*q*.75;ctx.save();ctx.translate(Math.cos(aa)*rr,Math.sin(aa)*rr);ctx.rotate(aa);ctx.strokeRect(-11,-11,22,22);ctx.restore()}ctx.shadowBlur=0;
+    }else if(f.type==='lancerShot'){
+      ctx.strokeStyle='#f2f8ff';ctx.shadowColor='#a9d8ff';ctx.shadowBlur=22;ctx.lineWidth=9*p+2;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(f.radius*q,0);ctx.stroke();ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(f.radius*q,-14);ctx.lineTo(f.radius*q+34,0);ctx.lineTo(f.radius*q,14);ctx.stroke();ctx.shadowBlur=0;
+    }else if(f.type==='dimensionRift'){
+      ctx.strokeStyle='#d9e8ff';ctx.shadowColor='#8bbcff';ctx.shadowBlur=22;ctx.lineWidth=5;ctx.setLineDash([18,9]);ctx.beginPath();ctx.moveTo(0,-9);ctx.lineTo(f.radius*q,9);ctx.stroke();ctx.beginPath();ctx.moveTo(0,9);ctx.lineTo(f.radius*q,-9);ctx.stroke();ctx.setLineDash([]);ctx.shadowBlur=0;
+    }else if(f.type==='leviathanRoar'){
+      ctx.strokeStyle='#a9efff';ctx.shadowColor='#6cdfff';ctx.shadowBlur=18;ctx.lineWidth=6*p+2;for(let k=0;k<4;k++){ctx.beginPath();ctx.arc(0,0,f.radius*q*(.35+k*.16),-.66,.66);ctx.stroke()}ctx.shadowBlur=0;
+    }else if(f.type==='abyssCast'){
+      ctx.strokeStyle='#b58cff';ctx.shadowColor='#7b45ff';ctx.shadowBlur=24;ctx.lineWidth=5;for(let k=0;k<4;k++){ctx.beginPath();ctx.arc(0,0,f.radius*(1-q)*(.25+k*.18),q*3+k,TAU+q*3+k);ctx.stroke()}ctx.shadowBlur=0;
+    }else if(f.type==='berserkerSlash'){
+      ctx.strokeStyle='#ff8a70';ctx.shadowColor='#ff3e49';ctx.shadowBlur=18;ctx.lineWidth=8*p+2;for(const off of [-.18,0,.18]){ctx.save();ctx.rotate(off);ctx.beginPath();ctx.arc(f.radius*q*.45,0,75,-1.0,1.0);ctx.stroke();ctx.restore()}ctx.shadowBlur=0;
+    }else if(f.type==='lastBloodCast'){
+      ctx.strokeStyle='#ff6b62';ctx.shadowColor='#ff3344';ctx.shadowBlur=22;ctx.lineWidth=5;for(let k=0;k<10;k++){const aa=k*TAU/10;ctx.beginPath();ctx.moveTo(Math.cos(aa)*22,Math.sin(aa)*22);ctx.lineTo(Math.cos(aa)*f.radius*q,Math.sin(aa)*f.radius*q);ctx.stroke()}ctx.shadowBlur=0;
+    }else if(f.type==='oracleEye'){
+      ctx.strokeStyle='#fff1ae';ctx.shadowColor='#ffd66c';ctx.shadowBlur=20;ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(f.radius*q*.22,0,70*q+8,34*q+5,0,0,TAU);ctx.stroke();ctx.fillStyle='#fff7d2';ctx.beginPath();ctx.arc(f.radius*q*.22,0,8+8*q,0,TAU);ctx.fill();ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(f.radius*q,0);ctx.stroke();ctx.shadowBlur=0;
+    }else if(f.type==='fateCast'){
+      ctx.strokeStyle='#fff2bd';ctx.shadowColor='#ffe178';ctx.shadowBlur=20;ctx.lineWidth=4;for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(0,0,f.radius*q*(.35+k*.25),k*.7-q*2,k*.7-q*2+Math.PI*1.5);ctx.stroke()}ctx.shadowBlur=0;
     }else if(f.type==='uniqueSkill'){
       ctx.strokeStyle=f.color;ctx.lineWidth=5*p+1;ctx.shadowColor=f.color;ctx.shadowBlur=18;ctx.beginPath();ctx.arc(0,0,f.radius*q*.45,0,TAU);ctx.stroke();ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(f.radius*q,0);ctx.stroke();ctx.shadowBlur=0;
     }else if(f.type==='lightningLink'){

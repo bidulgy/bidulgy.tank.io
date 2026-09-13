@@ -248,7 +248,7 @@ const CANNONS=Object.freeze({
     id:'cyclone',name:'사이클론',rarity:'mythic',rarityLabel:'신화',chance:.1,
     desc:'빠른 레이저와 회전 공격을 결합한 지속 화력형 탱크입니다.',
     passive:'평타 · 사이클론 레일: 빠른 직선 레이저 · 3번째 탄 강화',
-    skill:'Q 사이클론 컷 · 플레이어 중심 2개의 회전 광선이 전장을 절단',
+    skill:'Q STORM CRESCENT · 전방으로 3개의 초승달 레일날을 고속 발사',
     skill2:'R VORTEX PRISON · 7초 동안 4중 회전 광선 감옥 생성'
   },
   juggernaut:{
@@ -285,14 +285,14 @@ const CANNONS=Object.freeze({
     id:'mirror',name:'미러',rarity:'secret',rarityLabel:'시크릿',chance:.02,
     desc:'되돌아오는 에너지 링과 방어 반격을 사용하는 변칙형 탱크입니다.',
     passive:'평타 · 미러 링: 멀리 날아간 링이 사용자에게 되돌아옴',
-    skill:'Q 프리즘 분신 · 주변 5개 분신이 동시에 목표를 사격',
+    skill:'Q PRISM BREAK · 전방으로 7갈래 거울 파편을 폭발적으로 발사',
     skill2:'R MIRROR WORLD · 7.5초 동안 4개의 회전 분신이 자동 사격'
   },
   lancer:{
     id:'lancer',name:'랜서',rarity:'secret',rarityLabel:'시크릿',chance:.02,
     desc:'초고속 직선 관통탄으로 긴 사거리를 장악하는 돌격 저격형입니다.',
     passive:'평타 · 랜스 코어: 관통할수록 공격력과 탄속이 증가',
-    skill:'Q 페이즈 랜스 · 직선상의 적을 베며 목표 위치까지 순간 돌진',
+    skill:'Q LANCE CANNON · 이동 없이 초장거리 직선 랜스를 즉발 사격',
     skill2:'R DIMENSION IMPALE · 초장거리 차원 돌진 + 관통 일격 + 도착 폭발'
   },
 
@@ -322,7 +322,7 @@ const CANNONS=Object.freeze({
     id:'leviathan',name:'리바이어던',rarity:'galaxy',rarityLabel:'갤럭시',chance:.002,
     desc:'초대형 중포와 공간 제압을 결합한 거대 화력형 탱크입니다.',
     passive:'평타 · 리바이어던 포탄: 초대형 폭발탄 · 주기적으로 2갈래 중포탄 분열',
-    skill:'Q 심해의 아가리 · 목표 지점의 적을 중심으로 끌어당기며 지속 압착',
+    skill:'Q ABYSS ROAR · 전방 넓은 부채꼴을 강타해 적을 멀리 밀어냄',
     skill2:'R ABYSS COLLAPSE · 자신 주변 거대 중력장이 적을 끌어당기며 붕괴 피해'
   },
   valkyrie:{
@@ -360,14 +360,14 @@ const CANNONS=Object.freeze({
     id:'berserker',name:'버서커',rarity:'error',rarityLabel:'ERROR',chance:.001,
     desc:'등급 테마와 무관하게 순수한 초고속 연사와 돌파력에 집중한 탱크입니다.',
     passive:'평타 · 광폭 탄띠: 초고속 연사 · 8번째 탄은 3갈래 가속탄으로 분열',
-    skill:'Q 광전사의 참격 · 체력을 소모해 주변 충격파와 10방향 참격탄 발사',
+    skill:'Q BLOOD CLEAVE · 체력을 소모해 전방 부채꼴을 베고 5개의 참격탄 발사',
     skill2:'R LAST BLOOD · 9초간 잃은 체력이 많을수록 강해지는 광역 혈전장'
   },
   oracle:{
     id:'oracle',name:'오라클',rarity:'error',rarityLabel:'ERROR',chance:.001,
     desc:'등급 테마와 무관하게 시간 제어와 정밀 사격에 특화된 전략형 탱크입니다.',
     passive:'평타 · 예측 코어: 고관통 시간탄이 곡선 궤도로 목표를 압박',
-    skill:'Q 예언 낙인 · 목표 주변 3개의 예언 지점이 시간차로 연속 폭발',
+    skill:'Q FUTURE EYE · 가까운 목표의 미래 위치를 추적하는 고위력 예지탄 발사',
     skill2:'R THREE FATES · 점점 커지는 3개의 운명 원이 순차 붕괴'
   },
   deku:{
@@ -395,8 +395,8 @@ const CANNONS=Object.freeze({
   }
 });
 
-const AUTH_BUILD='V5.76';
-console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · unique skill overhaul`);
+const AUTH_BUILD='V5.77';
+console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · distinct Q/R + boomerang/range fix`);
 const CANNON_DISPLAY_ORDER=Object.freeze([
   'bloodlust','sniper','deku',
   ...Object.keys(CANNONS).filter(id=>!['bloodlust','sniper','deku'].includes(id))
