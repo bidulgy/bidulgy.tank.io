@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.78 · sniper-only infinite range fix');
+console.info('[Sworder VS Tank] game V5.79 · Diep evolution fire + player-only sniper homing');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -2302,46 +2302,20 @@ function sniperAcquireTarget(angle){
   }
   return best;
 }
-// V5.73: sniper basic rounds fly straight first, then acquire the nearest un-hit enemy around the round itself.
-function sniperBulletAcquireNearbyTarget(b,maxRange=1200){
-  if(!b)return null;
-  const ownerId=String(b.ownerId||'');
-  let best=null,bestD2=maxRange*maxRange;
-  const considerPlayer=(obj,id)=>{
-    id=String(id||obj?.id||'');
-    if(!obj||obj.alive===false||!id||id===ownerId||b.hitIds?.has(id))return;
-    const dx=obj.x-b.x,dy=obj.y-b.y,d2=dx*dx+dy*dy;
-    if(d2<bestD2){bestD2=d2;best={kind:'player',id,ref:obj}}
-  };
-  const considerShape=(obj)=>{
-    if(!obj||obj.hp<=0||b.hitTargets?.has(obj))return;
-    const dx=obj.x-b.x,dy=obj.y-b.y,d2=dx*dx+dy*dy;
-    if(d2<bestD2){bestD2=d2;best={kind:'shape',ref:obj}}
-  };
-
-  // Local bullets target every remote player. A remote visual bullet may target us or any other non-owner player.
-  if(b.networkRemote){
-    if(player?.alive&&String(onlineSelfId||'')!==ownerId)considerPlayer(player,onlineSelfId);
-    for(const enemy of remotePlayers.values())considerPlayer(enemy,enemy?.id);
-  }else{
-    for(const enemy of remotePlayers.values())considerPlayer(enemy,enemy?.id);
+// V5.79: Divine Sniper R은 다른 플레이어만 잠근다. 도형/오각형에는 절대 유도되지 않는다.
+function sniperAcquirePlayerTarget(angle,maxRange=3200){
+  let best=null,bestScore=Infinity;
+  for(const enemy of remotePlayers.values()){
+    if(!enemy?.alive)continue;
+    const dx=enemy.x-player.x,dy=enemy.y-player.y,dist=Math.hypot(dx,dy);
+    if(dist<20||dist>maxRange)continue;
+    const diff=Math.abs(angleDifference(Math.atan2(dy,dx),angle));
+    const score=diff*820+dist*.28;
+    if(score<bestScore){bestScore=score;best={kind:'player',target:enemy,x:enemy.x,y:enemy.y,dist,diff}}
   }
-  for(const shape of shapes)considerShape(shape);
   return best;
 }
-function sniperBulletResolveTarget(b){
-  const target=b?.sniperSeekTarget;
-  if(!target)return null;
-  if(target.kind==='player'){
-    const id=String(target.id||'');
-    const obj=id===String(onlineSelfId||'')?player:remotePlayers.get(id);
-    if(!obj||obj.alive===false||id===String(b.ownerId||'')||b.hitIds?.has(id))return null;
-    return obj;
-  }
-  const obj=target.ref;
-  if(!obj||obj.hp<=0||b.hitTargets?.has(obj))return null;
-  return obj;
-}
+// V5.79: sniper basic homing helpers removed; only the R skill can home.
 function activateSkill2(){
   if(!running||paused||!player?.alive)return;
   const cannon=player.cannonType||'standard',skill2Cannon=cannonRBehavior(cannon),def=CANNON_SKILLS_2[cannon];if(!def)return;
@@ -2456,13 +2430,12 @@ function activateSkill2(){
   }else if(skill2Cannon==='zero'){
     addSkillZone('absoluteZero',{x:player.x,y:player.y,radius:560,life:4.3,damage:p.damage*.16,tick:0});sendUniqueSkill(cannon,'absoluteZero',{targetX:player.x,targetY:player.y,radius:560,life:4.3});
   }else if(cannon==='sniper'){
-    const target=sniperAcquireTarget(a);
+    const target=sniperAcquirePlayerTarget(a);
     const missile=spawnSkillProjectileAt(cannon,player.x+Math.cos(a)*(player.r+28),player.y+Math.sin(a)*(player.r+28),a,{
       damageMul:8.0,speedMul:.78,life:5.6,pierce:1000000000,r:11,splashRadius:78,shape:'sniperHomingMissile',special:'sniperHoming',
-      targetId:target?.kind==='player'?target.target.id:'',targetShapeId:target?.kind==='shape'?target.target.id:''
+      targetId:target?.target?.id||''
     });
     missile.homingTurnRate=5.8;missile.homingAccel=.22;
-    if(target?.kind==='shape')missile.targetShapeRef=target.target;
     spawnCombatFx('sniperMissileLaunch',player.x,player.y,{angle:a,color:'#c8f6ff',life:.55,radius:120,cannon:'sniper'});
     shake=Math.max(shake,9);
   }else if(cannon==='deku'){
@@ -2804,53 +2777,48 @@ function fire(e){
     shot={angle:a,side:0,curve:0,damageMul:1,special:''};
   }
 
-  // V5.64: 선택한 진화체의 실제 포신 순서/각도/측면 위치에서 탄환을 생성한다.
-  const evoMuzzle=evolutionMuzzleForShot(evoType,e.r,shotNo);
-  if(evoMuzzle){
-    const originalAngle=Number.isFinite(shot.angle)?shot.angle:a;
-    const localShotOffset=originalAngle-a;
-    shot.angle=a+(evoMuzzle.a||0)+localShotOffset;
-    shot.side=(Number(shot.side)||0)+(Number(evoMuzzle.side)||0);
-    if(evoMuzzle.kind==='rimAuto')shot.evoMuzzleDistance=e.r*1.12;
-    else if(evoMuzzle.kind==='centerAuto')shot.evoMuzzleDistance=e.r*.72;
-    else shot.evoMuzzleDistance=e.r*(.28+.78*(evoMuzzle.len||1)) + 3;
-  }
-
-  const sa=shot.angle,px=-Math.sin(sa)*(shot.side||0),py=Math.cos(sa)*(shot.side||0);
-  const muzzleDistance=Number(shot.evoMuzzleDistance)||e.r+18;
-  const b={
-    x:e.x+Math.cos(sa)*muzzleDistance+px,y:e.y+Math.sin(sa)*muzzleDistance+py,
-    vx:Math.cos(sa)*p.bulletSpeed+e.vx*.18,vy:Math.sin(sa)*p.bulletSpeed+e.vy*.18,
-    r:6,damage:p.damage*(Number(shot.damageMul)||1),life:1.65,
-    owner:e,ownerId:onlineSelfId,team:'player',cannon,shape:projectileShapeForCannon(cannon),
-    pierce:1,splashRadius:0,basicAttack:true,special:shot.special||'',fragment:false,
-    curve:Number(shot.curve)||0,motionSeed:(shotNo*1.731+cannon.length*.713)%TAU,motionAge:0,
-    hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()
-  };
-  if(Array.isArray(shot.splitPattern)&&shot.splitPattern.length){
-    b.splitPattern=shot.splitPattern;
-    b.splitDistance=Math.max(80,Number(shot.splitDistance)||180);
-    b.splitOriginX=b.x;b.splitOriginY=b.y;b.splitBaseDamage=p.damage;b.splitDone=false;
-  }
-  configureBasicProjectilePhysics(b,cannon,b.special);
-  if(isBoomerangCannon(cannon)&&b.basicAttack){b.boomerangOriginX=b.x;b.boomerangOriginY=b.y}
-  if(baseCannon==='sniper'&&b.special==='sniperAP'){
-    b.sniperSeekOriginX=b.x;b.sniperSeekOriginY=b.y;
-    b.sniperSeekTarget=null;b.sniperSeekNextSearchAt=0;
-  }
-
-  if(bullets.length>=MAX_BULLETS)bullets.shift();
-  bullets.push(b);broadcastShot(b);spawnAttackFx(cannon,b.x,b.y,fxAngleFromVector(b.vx,b.vy,sa));
-  if(cannon==='deku'&&String(b.special||'').startsWith('faJin'))spawnCombatFx('dekuFaJinAttack',b.x,b.y,{angle:fxAngleFromVector(b.vx,b.vy,sa),color:'#69f5ee',life:.38,radius:String(b.special||'').includes('Detroit')?105:76,cannon:'deku',variant:'faJin'});
-
-  const recoil={
+  // V5.79: 진화체는 Diep.io의 실제 포신 수/방향/동시 또는 교대 발사 방식으로 발사한다.
+  const volley=evolutionShotsFromBase(evoType,e.r,shotNo,shot,a);
+  const baseRecoil={
     standard:12,scout:7,bastion:24,rapid:5,dual:8,needle:6,
     spread:13,burst:10,crystal:11,piercer:15,laser:10,drill:20,
     plasma:16,thunder:13,inferno:18,rocket:22,titan:30,phantom:9,
     ring:13,chrono:10,void:17,nova:17,comet:10,stellar:16,
     error:27,glitch:18,zero:30,deku:14,sniper:38,bloodlust:16
   }[baseCannon]||12;
-  e.vx-=Math.cos(sa)*recoil;e.vy-=Math.sin(sa)*recoil;
+
+  for(let vi=0;vi<volley.length;vi++){
+    const vs=volley[vi],sa=Number.isFinite(vs.angle)?vs.angle:a;
+    const px=-Math.sin(sa)*(vs.side||0),py=Math.cos(sa)*(vs.side||0);
+    const muzzleDistance=Number(vs.evoMuzzleDistance)||e.r+18;
+    const speedScale=Math.max(.1,Number(vs.evoSpeedScale)||1);
+    const b={
+      x:e.x+Math.cos(sa)*muzzleDistance+px,y:e.y+Math.sin(sa)*muzzleDistance+py,
+      vx:Math.cos(sa)*p.bulletSpeed*speedScale+e.vx*.18,vy:Math.sin(sa)*p.bulletSpeed*speedScale+e.vy*.18,
+      r:6,damage:p.damage*(Number(vs.damageMul)||1)*(Number(vs.evoDamageScale)||1),life:1.65,
+      owner:e,ownerId:onlineSelfId,team:'player',cannon,shape:projectileShapeForCannon(cannon),
+      pierce:1,splashRadius:0,basicAttack:true,special:vs.special||'',fragment:false,
+      curve:Number(vs.curve)||0,motionSeed:(shotNo*1.731+cannon.length*.713+vi*.917)%TAU,motionAge:0,
+      hitTargets:new Set(),hitIds:new Set(),tetherHits:new Map()
+    };
+    if(Array.isArray(vs.splitPattern)&&vs.splitPattern.length){
+      b.splitPattern=vs.splitPattern;
+      b.splitDistance=Math.max(80,Number(vs.splitDistance)||180);
+      b.splitOriginX=b.x;b.splitOriginY=b.y;b.splitBaseDamage=b.damage;b.splitDone=false;
+    }
+    configureBasicProjectilePhysics(b,cannon,b.special);
+    b.life*=Math.max(.15,Number(vs.evoLifeScale)||1);
+    // configureBasicProjectilePhysics may apply cannon-specific speed changes; evolution scale remains multiplicative.
+    if(isBoomerangCannon(cannon)&&b.basicAttack){b.boomerangOriginX=b.x;b.boomerangOriginY=b.y}
+
+    // Sniper basic attack is now always perfectly straight: no target acquisition state is attached.
+    if(bullets.length>=MAX_BULLETS)bullets.shift();
+    bullets.push(b);broadcastShot(b);spawnAttackFx(cannon,b.x,b.y,fxAngleFromVector(b.vx,b.vy,sa));
+    if(cannon==='deku'&&String(b.special||'').startsWith('faJin'))spawnCombatFx('dekuFaJinAttack',b.x,b.y,{angle:fxAngleFromVector(b.vx,b.vy,sa),color:'#69f5ee',life:.38,radius:String(b.special||'').includes('Detroit')?105:76,cannon:'deku',variant:'faJin'});
+
+    const recoil=baseRecoil*(Number(vs.evoRecoilScale)||1);
+    e.vx-=Math.cos(sa)*recoil;e.vy-=Math.sin(sa)*recoil;
+  }
 }
 function burst(x,y,color,count=8){
   if(particles.length>=MAX_PARTICLES)return;
@@ -3289,8 +3257,6 @@ function applyUniqueProjectileMotion(b,dt){
       if(special==='sniperHoming'){
         let target=null;
         if(b.targetId){target=String(b.targetId)===onlineSelfId?player:remotePlayers.get(String(b.targetId));if(target&&!target.alive)target=null}
-        if(!target&&b.targetShapeId)target=shapes.find(s=>String(s.id||'')===String(b.targetShapeId)&&s.hp>0)||null;
-        if(!target&&b.targetShapeRef&&b.targetShapeRef.hp>0)target=b.targetShapeRef;
         if(target){
           const desired=Math.atan2(target.y-b.y,target.x-b.x),current=Math.atan2(b.vy,b.vx);
           const diff=angleDifference(desired,current),turn=clamp(diff,-(b.homingTurnRate||5.8)*dt,(b.homingTurnRate||5.8)*dt);
@@ -3298,28 +3264,7 @@ function applyUniqueProjectileMotion(b,dt){
           const k=1+(b.homingAccel||.22)*dt;b.vx*=k;b.vy*=k;
         }
       }else if(special==='sniperAP'){
-        // Keep the original aim for the first 260 world units, then steer toward the nearest enemy within 1200.
-        if(!Number.isFinite(b.sniperSeekOriginX)){b.sniperSeekOriginX=b.x;b.sniperSeekOriginY=b.y}
-        const travelX=b.x-b.sniperSeekOriginX,travelY=b.y-b.sniperSeekOriginY;
-        if(travelX*travelX+travelY*travelY>=260*260){
-          let target=sniperBulletResolveTarget(b);
-          if(!target){
-            b.sniperSeekTarget=null;
-            if(t>=(b.sniperSeekNextSearchAt||0)){
-              b.sniperSeekTarget=sniperBulletAcquireNearbyTarget(b,1200);
-              b.sniperSeekNextSearchAt=t+.12;
-              target=sniperBulletResolveTarget(b);
-            }
-          }
-          if(target){
-            const targetVx=Number(target.vx)||0,targetVy=Number(target.vy)||0;
-            const dist=Math.hypot(target.x-b.x,target.y-b.y),lead=Math.min(.22,dist/Math.max(1,speed)*.38);
-            const tx=target.x+targetVx*lead,ty=target.y+targetVy*lead;
-            const desired=Math.atan2(ty-b.y,tx-b.x),current=Math.atan2(b.vy,b.vx);
-            const diff=angleDifference(desired,current),turn=clamp(diff,-7.2*dt,7.2*dt);
-            bendProjectileVelocity(b,turn);
-          }
-        }
+        // V5.79: 스나이퍼 평타는 조준한 방향 그대로 직선 비행한다. 유도는 R 스킬에만 존재한다.
       }
       break;
     }
@@ -3371,7 +3316,6 @@ function updateBullets(dt){
       if((b.x-s.x)**2+(b.y-s.y)**2<rr*rr){
         if(Array.isArray(b.splitPattern)&&!b.splitDone){splitBasicCarrier(b);remove=true;break}
         b.hitTargets?.add(s);
-        if(b.basicAttack&&cannonBaseBehavior(b.cannon)==='sniper'&&b.special==='sniperAP'){b.sniperSeekTarget=null;b.sniperSeekNextSearchAt=0}
         const[nx,ny]=norm(b.vx,b.vy);
         const bloodHpBefore=b.cannon==='bloodlust'?Math.max(0,Number(s.hp)||0):0;
         applyShapeDamage(s,b.damage,nx*75,ny*75);
@@ -3409,8 +3353,7 @@ function updateBullets(dt){
         if((b.x-enemy.x)**2+(b.y-enemy.y)**2<rr*rr){
           if(Array.isArray(b.splitPattern)&&!b.splitDone){splitBasicCarrier(b);remove=true;break}
           b.hitIds?.add(enemy.id);
-          if(b.basicAttack&&cannonBaseBehavior(b.cannon)==='sniper'&&b.special==='sniperAP'){b.sniperSeekTarget=null;b.sniperSeekNextSearchAt=0}
-          sendDamage(enemy.id,b.damage);
+            sendDamage(enemy.id,b.damage);
           if(b.cannon==='bloodlust')applyBloodlustLifesteal(b,b.damage);
           burst(b.x,b.y,'#ff8a8a',4);
           if(b.basicAttack&&cannonBaseBehavior(b.cannon)==='spread')spawnSpreadFragments(b,b.x,b.y);
@@ -4032,17 +3975,17 @@ function evolutionBarrelSpecs(type,r){
     case 'shotgun':case 'palletShot':return[b(0,0,.92,1.48)];
     case 'dualBarrel':return[b(0,-7,.98,.86),b(0,7,.98,.86)];
 
-    case 'triAngle':return[b(0,0,.98,.72),b(Math.PI-.62,0,.78,.60),b(Math.PI+.62,0,.78,.60)];
-    // Booster: 전방 1 + 후방 4.
+    case 'triAngle':return[b(0,0,.98,.72),b(Math.PI-Math.PI/6,0,.78,.60),b(Math.PI+Math.PI/6,0,.78,.60)];
+    // Booster: Diep.io 공식 배치와 같은 전방 1 + 후방 4 (135°, 150°, 210°, 225°).
     case 'booster':return[
       b(0,0,.98,.72),
-      b(Math.PI-.40,0,.78,.58),b(Math.PI+.40,0,.78,.58),
-      b(Math.PI-.82,0,.70,.52),b(Math.PI+.82,0,.70,.52)
+      b(Math.PI*3/4,0,.70,.52),b(Math.PI*5/6,0,.78,.58),
+      b(Math.PI*7/6,0,.78,.58),b(Math.PI*5/4,0,.70,.52)
     ];
-    // Fighter: 전방/후방 계열 + 좌우 측면 포신.
+    // Fighter: Diep.io 공식 배치와 같은 전방 1 + 좌우 2 + 후방 2 (90°,150°,210°,270°).
     case 'fighter':return[
-      b(0,0,.98,.72),b(Math.PI-.62,0,.76,.58),b(Math.PI+.62,0,.76,.58),
-      b(-Math.PI/2,0,.70,.52),b(Math.PI/2,0,.70,.52)
+      b(0,0,.98,.72),b(Math.PI/2,0,.70,.52),b(Math.PI*5/6,0,.76,.58),
+      b(Math.PI*7/6,0,.76,.58),b(-Math.PI/2,0,.70,.52)
     ];
     case 'auto3':return[0,TAU/3,TAU*2/3].map(a=>b(a,0,.70,.54,'rimAuto'));
 
@@ -4069,8 +4012,127 @@ function evolutionMuzzleForShot(type,r,shotNo){
   if(!type||type==='basic')return null;
   const specs=evolutionBarrelSpecs(type,r);
   if(!specs.length)return null;
-  // V5.64: 이전 "한 번에 한 탄" 규칙을 유지하면서 포신을 순서대로 사용.
   return specs[Math.max(0,(Math.floor(shotNo||1)-1)%specs.length)];
+}
+
+// V5.79: Diep.io와 같은 '포신 단위 발사' 계획.
+// - Twin/Triplet/Gunner/Streamliner 계열은 여러 포신이 순차적으로 불을 뿜는다.
+// - Penta/Spread 및 방사형/추진형 계열은 실제 게임처럼 한 발사 주기에 여러 포신이 함께 발사된다.
+// - rear/side 포신은 Diep.io처럼 추진/보조 화력이라 피해와 수명이 낮다.
+function evolutionVolleySpecs(type,r,shotNo){
+  if(!type||type==='basic')return[null];
+  const specs=evolutionBarrelSpecs(type,r);
+  if(!specs.length)return[];
+  const n=Math.max(0,(Math.floor(shotNo||1)-1));
+  const wrap=(spec,damageScale=1,lifeScale=1,speedScale=1,recoilScale=1)=>({
+    ...spec,damageScale,lifeScale,speedScale,recoilScale
+  });
+  const all=(damageScale=1,lifeScale=1,speedScale=1,recoilScale=1)=>specs.map(s=>wrap(s,damageScale,lifeScale,speedScale,recoilScale));
+
+  switch(type){
+    case 'twin':
+      return[wrap(specs[n%2],.72,1,1,.62)];
+    case 'sniperClass':case 'machineGun':case 'assassin':case 'ranger':case 'stalker':
+    case 'destroyer':case 'annihilator':case 'skimmer':case 'glider':case 'rocketeer':
+    case 'trapper':case 'megaTrapper':case 'shotgun':case 'palletShot':
+      return[wrap(specs[0],1,1,1,1)];
+
+    case 'flankGuard':
+      return[wrap(specs[0],.86,1,1,.58),wrap(specs[1],.48,.72,1,.78)];
+    case 'tripleShot':
+      return all(.48,1,1,.42);
+    case 'quadTank':
+      return all(.36,1,1,.32);
+    case 'twinFlank': {
+      const side=n%2;
+      return[wrap(specs[side],.58,1,1,.38),wrap(specs[2+side],.58,1,1,.38)];
+    }
+
+    // Hunter/Predator: 겹친 포신들이 같은 조준선으로 연속탄 묶음을 만든다.
+    case 'hunter':
+      return[wrap(specs[0],.70,1,1,.34),wrap(specs[1],.62,1,.985,.28)];
+    case 'predator':
+      return[wrap(specs[0],.58,1,1,.26),wrap(specs[1],.50,1,.99,.23),wrap(specs[2],.44,1,.98,.20)];
+    // Streamliner: 겹친 5포신을 차례로 사용해 한 줄의 고속 탄막을 만든다.
+    case 'streamliner':
+      return[wrap(specs[n%specs.length],.58,1,1,.18)];
+
+    case 'triTrapper':
+      return all(.45,1,1,.34);
+    case 'gunnerTrapper': {
+      const front=n%2;
+      return[wrap(specs[front],.52,1,1,.24),wrap(specs[2],.62,.86,.92,.42)];
+    }
+    case 'autoTrapper':
+      return[wrap(specs[0],.78,1,1,.50)];
+
+    case 'gunner':case 'autoGunner':
+      return[wrap(specs[n%specs.length],.58,1,1,.18)];
+    case 'sprayer':
+      return[wrap(specs[n%specs.length],n%2===0?.70:.46,1,1,.22)];
+    case 'dualBarrel':
+      return all(.56,1,1,.34);
+
+    // 추진형: 앞포는 주 화력, 측/후방포는 약하고 짧게 살아 Diep.io의 추진탄 역할을 한다.
+    case 'triAngle':
+      return[wrap(specs[0],.78,1,1,.46),wrap(specs[1],.18,.46,1,.78),wrap(specs[2],.18,.46,1,.78)];
+    case 'booster':
+      return[wrap(specs[0],.70,1,1,.38),...specs.slice(1).map(s=>wrap(s,.14,.44,1,.64))];
+    case 'fighter':
+      return[
+        wrap(specs[0],.70,1,1,.38),
+        wrap(specs[1],.38,.64,1,.42),wrap(specs[4],.38,.64,1,.42),
+        wrap(specs[2],.16,.46,1,.62),wrap(specs[3],.16,.46,1,.62)
+      ];
+
+    case 'auto3':
+      return all(.42,1,1,.28);
+    case 'triplet':
+      return[wrap(specs[n%3],.66,1,1,.25)];
+    // 2020 이후 Diep.io와 같이 Penta/Spread는 모든 포신을 동시에 발사.
+    case 'pentaShot':
+      return all(.31,1,1,.18);
+    case 'spreadShot':
+      return specs.map((s,i)=>{
+        const center=1-Math.abs(i-(specs.length-1)/2)/((specs.length-1)/2);
+        return wrap(s,.12+.18*center,1,1,.10);
+      });
+    case 'octoTank':
+      return all(.25,1,1,.16);
+    case 'auto5':
+      return all(.30,1,1,.18);
+    case 'tripleTwin': {
+      const side=n%2;
+      return[wrap(specs[side],.46,1,1,.22),wrap(specs[2+side],.46,1,1,.22),wrap(specs[4+side],.46,1,1,.22)];
+    }
+
+    case 'autoTank':case 'autoSmasher':
+      return[wrap(specs[0],.70,1,1,.30)];
+    default:
+      return[wrap(specs[n%specs.length],1,1,1,1)];
+  }
+}
+
+function evolutionShotsFromBase(type,r,shotNo,baseShot,baseAngle){
+  const volley=evolutionVolleySpecs(type,r,shotNo);
+  if(!volley.length)return[];
+  if(volley.length===1&&volley[0]===null)return[{...baseShot}];
+  const originalAngle=Number.isFinite(baseShot.angle)?baseShot.angle:baseAngle;
+  const localShotOffset=originalAngle-baseAngle;
+  return volley.map((m)=>{
+    const shot={...baseShot};
+    if(Array.isArray(baseShot.splitPattern))shot.splitPattern=baseShot.splitPattern.map(v=>({...v}));
+    shot.angle=baseAngle+(m.a||0)+localShotOffset;
+    shot.side=(Number(baseShot.side)||0)+(Number(m.side)||0);
+    if(m.kind==='rimAuto')shot.evoMuzzleDistance=r*1.12;
+    else if(m.kind==='centerAuto')shot.evoMuzzleDistance=r*.72;
+    else shot.evoMuzzleDistance=r*(.28+.78*(m.len||1))+3;
+    shot.evoDamageScale=Number(m.damageScale)||1;
+    shot.evoLifeScale=Number(m.lifeScale)||1;
+    shot.evoSpeedScale=Number(m.speedScale)||1;
+    shot.evoRecoilScale=Number(m.recoilScale)||1;
+    return shot;
+  });
 }
 function drawEvolutionChassis(e,r){
   const type=e.classType||'basic';if(type==='basic')return;
@@ -4174,12 +4236,13 @@ function drawTank(e){
     ctx.strokeStyle='rgba(205,255,255,.74)';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,0,r+15+Math.sin(t*10)*3,(r+15)*.45,t*1.8,0,TAU);ctx.stroke();ctx.shadowBlur=0;ctx.restore();
   }
 
-  // Diep.io evolution barrels/chassis are drawn behind the equipped cannon skin.
+  // Diep.io evolution barrels/chassis are drawn as the evolved weapon geometry.
   drawEvolutionChassis(e,r);
 
-  // V5.76: 진화체를 골라도 장착 탱크의 고유 대포는 항상 유지한다.
+  // V5.79: 진화 후에는 Diep.io 진화체 포신만 표시해 포신 수가 하나 더 생기는 문제를 제거한다.
+  // 장착 대포의 캐릭터 바디/색/탄환 능력은 유지되며, ERROR 검 모드는 별도 무기라 계속 표시한다.
   if(swordModeActive)drawErrorSword(e,r,t);
-  else drawPlayerCannon(cannon,r);
+  else if((e.classType||'basic')==='basic')drawPlayerCannon(cannon,r);
 
   drawUniqueTankBody(cannon,r,t,theme);
   // Auto 3/5 및 Auto 계열 터릿 캡은 차체 위에 그려 Diep.io처럼 보이게 한다.
