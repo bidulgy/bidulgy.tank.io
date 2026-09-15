@@ -94,158 +94,248 @@ const CANNONS=Object.freeze({
     skill:'Q 방벽 전개 · 5초간 적 탄환을 막는 에너지 벽'
   },
 
-  // 일반 61.5% / 3캐릭터
+  // 일반 61.4999% / 5캐릭터
   rapid:{
-    id:'rapid',name:'기관포',rarity:'common',rarityLabel:'일반',chance:20.499966,
+    id:'rapid',name:'기관포',rarity:'common',rarityLabel:'일반',chance:12.29998,
     desc:'작은 탄환을 매우 빠르게 연속 발사합니다.',
     passive:'평타 · 가속 탄띠: 8번째 단일 모탄이 비행 후 3갈래 가속탄으로 분열',
     skill:'Q 오버드라이브 · 2.8초간 자동 초고속 난사'
   },
   dual:{
-    id:'dual',name:'듀얼 캐논',rarity:'common',rarityLabel:'일반',chance:20.499967,
+    id:'dual',name:'듀얼 캐논',rarity:'common',rarityLabel:'일반',chance:12.29998,
     desc:'양쪽 포신에서 두 발을 동시에 발사합니다.',
     passive:'평타 · 트윈 링크: 단일 모탄이 2갈래로 분열 · 7번째는 4갈래',
     skill:'Q 트윈 드론 · 6초간 회전 드론 2기가 자동 사격'
   },
   needle:{
-    id:'needle',name:'니들러',rarity:'common',rarityLabel:'일반',chance:20.499967,
+    id:'needle',name:'니들러',rarity:'common',rarityLabel:'일반',chance:12.29998,
     desc:'작고 매우 빠른 침형 탄환을 사용합니다.',
     passive:'평타 · 니들 코어: 6번째 탄이 강화되어 4회 관통',
     skill:'Q 하푼 스파이크 · 820거리 초장침으로 적을 꿰고 자신 쪽으로 강하게 끌어당김'
   },
+  blaster:{
+    id:'blaster',name:'블래스터',rarity:'common',rarityLabel:'일반',chance:12.29998,
+    desc:'균형형 대구경 에너지 포로 묵직한 단발 화력을 냅니다.',
+    passive:'평타 · 파워 코어: 5번째 탄이 1.7배 피해 + 2회 관통',
+    skill:'Q 코어 캐논 · 초대형 에너지탄을 직접 발사해 넓게 폭발'
+  },
+  ranger:{
+    id:'ranger',name:'레인저',rarity:'common',rarityLabel:'일반',chance:12.29998,
+    desc:'빠른 이동과 긴 사거리의 경량 정찰포입니다.',
+    passive:'평타 · 레인저 더블: 4번째 탄이 전진 후 2갈래로 분열',
+    skill:'Q 헌터 스텝 · 3단 잔상을 남기며 목표 지점까지 관통 돌진'
+  },
 
-  // 희귀 25.63% / 3캐릭터
+  // 희귀 25.63% / 5캐릭터
   spread:{
-    id:'spread',name:'산탄포',rarity:'rare',rarityLabel:'희귀',chance:8.543333,
+    id:'spread',name:'산탄포',rarity:'rare',rarityLabel:'희귀',chance:5.126,
     desc:'한 발의 산탄 모탄이 전진한 뒤 5개의 파편으로 넓게 터집니다.',
     passive:'평타 · 파편 확산: 단일 산탄 모탄이 전진 후 5방향 파편으로 폭발',
     skill:'Q 충격 산탄 · 전방 대형 산탄 폭풍 + 적을 밀고 자신도 강하게 뒤로 반동'
   },
   burst:{
-    id:'burst',name:'버스트 캐논',rarity:'rare',rarityLabel:'희귀',chance:8.543333,
+    id:'burst',name:'버스트 캐논',rarity:'rare',rarityLabel:'희귀',chance:5.126,
     desc:'좁은 범위에 3연발 탄막을 집중합니다.',
     passive:'평타 · 버스트 코어: 단일 모탄이 3갈래로 분열 · 5번째는 5갈래',
     skill:'Q 리바운드 코어 · 목표 지점에 시한 코어를 던져 폭발 후 원반탄 16발 방사'
   },
   crystal:{
-    id:'crystal',name:'크리스탈 샷',rarity:'rare',rarityLabel:'희귀',chance:8.543334,
+    id:'crystal',name:'크리스탈 샷',rarity:'rare',rarityLabel:'희귀',chance:5.126,
     desc:'결정 파편처럼 넓게 갈라지는 탄환을 사용합니다.',
     passive:'평타 · 결정 분산: 단일 결정탄이 3갈래로 분열 · 4번째는 7갈래',
     skill:'Q 프리즘 게이트 · 7초간 게이트를 통과한 내 크리스탈탄을 3갈래로 굴절·복제'
   },
+  ricochet:{
+    id:'ricochet',name:'리코셰',rarity:'rare',rarityLabel:'희귀',chance:5.126,
+    desc:'휘어지는 원반탄과 분열탄으로 움직이는 목표를 압박합니다.',
+    passive:'평타 · 리코셰 코어: 단일 모탄이 3갈래로 분열 · 5번째는 5갈래',
+    skill:'Q 핀볼 코어 · 서로 다른 각도로 휘는 고관통 원반탄 5발 동시 발사'
+  },
+  mortar:{
+    id:'mortar',name:'박격포',rarity:'rare',rarityLabel:'희귀',chance:5.126,
+    desc:'느리지만 넓은 폭발 범위를 가진 중형 포탄을 사용합니다.',
+    passive:'평타 · 중량탄: 묵직한 폭발탄 · 6번째 탄은 강화 코어',
+    skill:'Q 융단 박격 · 조준선 위 5개 지점이 순차 폭발'
+  },
 
-  // 에픽 10.255% / 3캐릭터
+  // 에픽 10.255% / 5캐릭터
   piercer:{
-    id:'piercer',name:'관통포',rarity:'epic',rarityLabel:'에픽',chance:3.418333,
+    id:'piercer',name:'관통포',rarity:'epic',rarityLabel:'에픽',chance:2.051,
     desc:'길쭉한 철갑탄이 여러 적을 연속 관통합니다.',
     passive:'평타 · 관통 가속: 관통할수록 공격력 8%·탄속 4% 증가',
     skill:'Q 레일 스나이프 · 화면을 가르는 즉발 초장거리 관통선'
   },
   laser:{
-    id:'laser',name:'레이저 랜서',rarity:'epic',rarityLabel:'에픽',chance:3.418333,
+    id:'laser',name:'레이저 랜서',rarity:'epic',rarityLabel:'에픽',chance:2.051,
     desc:'초고속 레일 레이저로 일직선을 압박합니다.',
     passive:'평타 · 삼중 증폭: 3번째 레일탄이 1.75배 강화',
     skill:'Q 레이저 스윕 · 2초 동안 전방을 훑는 회전 레이저'
   },
   drill:{
-    id:'drill',name:'드릴 캐논',rarity:'epic',rarityLabel:'에픽',chance:3.418334,
+    id:'drill',name:'드릴 캐논',rarity:'epic',rarityLabel:'에픽',chance:2.051,
     desc:'느리지만 강력한 드릴탄이 적을 깊게 관통합니다.',
     passive:'평타 · 회전 드릴: 기본 8회 관통, 4번째 탄은 초대형 드릴',
     skill:'Q 터널 브레이커 · 오래 남아 모든 것을 관통하는 거대 드릴'
   },
+  shredder:{
+    id:'shredder',name:'슈레더',rarity:'epic',rarityLabel:'에픽',chance:2.051,
+    desc:'회전하는 절삭탄으로 적을 여러 번 관통하는 공격형 탱크입니다.',
+    passive:'평타 · 절삭 드릴: 관통력이 높고 4번째 탄은 대형 슈레더 코어',
+    skill:'Q 톱날 폭풍 · 3개의 대형 회전 절삭탄이 부채꼴로 전진'
+  },
+  seeker:{
+    id:'seeker',name:'시커',rarity:'epic',rarityLabel:'에픽',chance:2.051,
+    desc:'직선 고속탄으로 멀리 있는 목표를 빠르게 제거합니다.',
+    passive:'평타 · 추적 조준: 고속 관통탄이 명중할수록 더 강해짐',
+    skill:'Q 추적 레일 · 가장 가까운 목표를 휘어 추적하는 고속 관통 레일탄'
+  },
 
-  // 전설 2% / 3캐릭터
+  // 전설 2% / 5캐릭터
   plasma:{
-    id:'plasma',name:'플라즈마포',rarity:'legendary',rarityLabel:'전설',chance:.666667,
+    id:'plasma',name:'플라즈마포',rarity:'legendary',rarityLabel:'전설',chance:.4,
     desc:'플라즈마 구체와 전기 연결선으로 공격합니다.',
     passive:'평타 · 연쇄 방전: 명중 시 주변 최대 2명에게 45% 번개 피해',
     skill:'Q 플라즈마 케이지 · 전기 육각 감옥의 테두리가 지속 감전'
   },
   thunder:{
-    id:'thunder',name:'썬더 코어',rarity:'legendary',rarityLabel:'전설',chance:.666667,
+    id:'thunder',name:'썬더 코어',rarity:'legendary',rarityLabel:'전설',chance:.4,
     desc:'강한 전류가 담긴 플라즈마 코어를 발사합니다.',
     passive:'평타 · 번개 분열: 단일 코어가 2갈래로 분열 · 4번째는 3갈래 + 최대 3연쇄',
     skill:'Q 뇌운 폭격 · 목표 영역에 5초간 뇌운 생성, 계속 위치를 바꾸며 번개 낙하'
   },
   inferno:{
-    id:'inferno',name:'인페르노',rarity:'legendary',rarityLabel:'전설',chance:.666666,
+    id:'inferno',name:'인페르노',rarity:'legendary',rarityLabel:'전설',chance:.4,
     desc:'고열 화염탄이 폭발하고 불길을 남깁니다.',
     passive:'평타 · 화염 포화: 5번째 단일 화염탄이 전진 후 3갈래 소이탄으로 분열',
     skill:'Q 화염 장벽 · 5초간 긴 불의 벽 생성'
   },
+  frost:{
+    id:'frost',name:'프로스트',rarity:'legendary',rarityLabel:'전설',chance:.4,
+    desc:'차가운 시간탄으로 적의 움직임을 억제하는 제어형 탱크입니다.',
+    passive:'평타 · 서리 코어: 곡선 궤도의 고관통 냉각탄',
+    skill:'Q 빙결 감옥 · 영역 안 적을 지속 피해와 강한 감속으로 가둠'
+  },
+  magnet:{
+    id:'magnet',name:'마그넷',rarity:'legendary',rarityLabel:'전설',chance:.4,
+    desc:'중력성 탄환으로 주변 적과 도형의 움직임을 끌어당깁니다.',
+    passive:'평타 · 자력 코어: 비행 중 주변 도형을 끌어당기는 중력탄',
+    skill:'Q 극성 붕괴 · 목표 지점으로 적을 끌어모으며 지속 피해'
+  },
 
-  // 신화 .5% / 3캐릭터
+  // 신화 .5% / 5캐릭터
   rocket:{
-    id:'rocket',name:'로켓포',rarity:'mythic',rarityLabel:'신화',chance:.166667,
+    id:'rocket',name:'로켓포',rarity:'mythic',rarityLabel:'신화',chance:.1,
     desc:'중장갑 로켓이 넓은 폭발 피해를 줍니다.',
     passive:'평타 · 소이 폭발: 폭발 지점에 2.4초 화염 지대',
     skill:'Q 미사일 레인 · 넓은 목표 지역에 5초간 경고표시 후 미사일이 연속 낙하',
     skill2:'R IRON DOME · 6초 중장갑 돔 + 피해 70% 감소 + 체력 12% 회복'
   },
   titan:{
-    id:'titan',name:'타이탄',rarity:'mythic',rarityLabel:'신화',chance:.166667,
+    id:'titan',name:'타이탄',rarity:'mythic',rarityLabel:'신화',chance:.1,
     desc:'거대한 중포와 높은 방어력을 가진 중전차입니다.',
     passive:'평타 · 중포 코어: 대형 단일 폭발탄 · 4번째 모탄은 전진 후 2갈래 중포탄으로 분열',
     skill:'Q 대지 절단 · 전방 760거리를 따라 6개의 지면 균열이 순차 폭발',
     skill2:'R 공성 변환 · 8초 포대 변신, 공격력/연사 강화 + 자동 중포 사격'
   },
   phantom:{
-    id:'phantom',name:'팬텀',rarity:'mythic',rarityLabel:'신화',chance:.166666,
+    id:'phantom',name:'팬텀',rarity:'mythic',rarityLabel:'신화',chance:.1,
     desc:'순간 이동과 고속 레일탄을 사용하는 암살형 탱크입니다.',
     passive:'평타 · 팬텀 레일: 5번째 단일 위상탄이 전진 후 3갈래 레일탄으로 분열',
     skill:'Q 암살 표식 · 조준 지점으로 순간이동하고 출발/도착 위치에 5초 표식 생성 · 5초 안에 Q 재사용 시 출발 표식으로 귀환하며 두 표식 동시 폭발',
     skill2:'R SPECTER CLOAK · 5초 은신 · 다른 플레이어 화면과 미니맵에서 사라짐 · 무적 효과 없음'
   },
+  cyclone:{
+    id:'cyclone',name:'사이클론',rarity:'mythic',rarityLabel:'신화',chance:.1,
+    desc:'빠른 레이저와 회전 공격을 결합한 지속 화력형 탱크입니다.',
+    passive:'평타 · 사이클론 레일: 빠른 직선 레이저 · 3번째 탄 강화',
+    skill:'Q STORM CRESCENT · 전방으로 3개의 초승달 레일날을 고속 발사',
+    skill2:'R VORTEX PRISON · 7초 동안 4중 회전 광선 감옥 생성'
+  },
+  juggernaut:{
+    id:'juggernaut',name:'저거너트',rarity:'mythic',rarityLabel:'신화',chance:.1,
+    desc:'느리지만 매우 강한 중포와 생존력을 가진 돌파형 탱크입니다.',
+    passive:'평타 · 저거너트 포탄: 대형 폭발탄 · 4번째는 2갈래 중포탄으로 분열',
+    skill:'Q 저거너트 러시 · 중장갑 돌진으로 경로와 도착 지점을 강타',
+    skill2:'R KINETIC REVENGE · 체력 회복 후 7초간 근접 충격장을 유지'
+  },
 
-  // 시크릿 .1% / 3캐릭터
+  // 시크릿 .1% / 5캐릭터
   ring:{
-    id:'ring',name:'링 캐논',rarity:'secret',rarityLabel:'시크릿',chance:.033334,
+    id:'ring',name:'링 캐논',rarity:'secret',rarityLabel:'시크릿',chance:.02,
     desc:'차원 에너지 링이 적들을 연속 관통합니다.',
     passive:'평타 · 회귀 링: 멀리 날아간 링이 사용자에게 되돌아옴',
     skill:'Q 게이트 리피터 · 6초간 포탈 생성, 내가 쏜 링 평타를 포탈에서도 한 번 더 복제',
     skill2:'R RING PARRY · 5.8초 회전 방어링, 적 탄환을 반격 링으로 되돌림'
   },
   chrono:{
-    id:'chrono',name:'크로노',rarity:'secret',rarityLabel:'시크릿',chance:.033333,
+    id:'chrono',name:'크로노',rarity:'secret',rarityLabel:'시크릿',chance:.02,
     desc:'시간 링을 겹쳐 쏘며 빠르게 위치를 바꿉니다.',
     passive:'평타 · 타임 듀오: 단일 시간 코어가 2갈래로 분열 · 3번째는 3갈래',
     skill:'Q 시간 정지 · 영역 안 적/탄환을 4.5초간 극도로 감속',
     skill2:'R REWIND 4s · 약 4초 전 위치/체력/속도로 되감기 + 시간 잔상'
   },
   void:{
-    id:'void',name:'보이드',rarity:'secret',rarityLabel:'시크릿',chance:.033333,
+    id:'void',name:'보이드',rarity:'secret',rarityLabel:'시크릿',chance:.02,
     desc:'공간을 압축하는 보이드 탄환과 중력장을 사용합니다.',
     passive:'평타 · 보이드 펄스: 기본은 단일 보이드탄 · 4번째는 강화 폭발성 펄스',
     skill:'Q 보이드 싱크 · 지속 중력장으로 적을 중심에 끌어당김',
     skill2:'R ANTI-MATTER · 6.6초 자신 주변 반중력장, 적/도형/탄환을 바깥으로 밀어냄'
   },
+  mirror:{
+    id:'mirror',name:'미러',rarity:'secret',rarityLabel:'시크릿',chance:.02,
+    desc:'되돌아오는 에너지 링과 방어 반격을 사용하는 변칙형 탱크입니다.',
+    passive:'평타 · 미러 링: 멀리 날아간 링이 사용자에게 되돌아옴',
+    skill:'Q PRISM BREAK · 전방으로 7갈래 거울 파편을 폭발적으로 발사',
+    skill2:'R MIRROR WORLD · 7.5초 동안 4개의 회전 분신이 자동 사격'
+  },
+  lancer:{
+    id:'lancer',name:'랜서',rarity:'secret',rarityLabel:'시크릿',chance:.02,
+    desc:'초고속 직선 관통탄으로 긴 사거리를 장악하는 돌격 저격형입니다.',
+    passive:'평타 · 랜스 코어: 관통할수록 공격력과 탄속이 증가',
+    skill:'Q LANCE CANNON · 이동 없이 초장거리 직선 랜스를 즉발 사격',
+    skill2:'R DIMENSION IMPALE · 초장거리 차원 돌진 + 관통 일격 + 도착 폭발'
+  },
 
-  // 갤럭시 .01% / 3캐릭터
+  // 갤럭시 .01% / 5캐릭터
   nova:{
-    id:'nova',name:'노바 캐논',rarity:'galaxy',rarityLabel:'갤럭시',chance:.003334,
+    id:'nova',name:'노바 캐논',rarity:'galaxy',rarityLabel:'갤럭시',chance:.002,
     desc:'별 모양 노바탄이 관통과 폭발을 동시에 일으킵니다.',
     passive:'평타 · 성운 분열: 단일 성운 코어가 전진 후 3갈래 별탄으로 분열',
     skill:'Q 초신성 핵 · 2.3초 충전 뒤 초대형 폭발',
     skill2:'R ORBITAL FIVE · 7초간 공격 위성 5기가 플레이어 주위를 공전'
   },
   comet:{
-    id:'comet',name:'코멧',rarity:'galaxy',rarityLabel:'갤럭시',chance:.003333,
+    id:'comet',name:'코멧',rarity:'galaxy',rarityLabel:'갤럭시',chance:.002,
     desc:'고속 혜성탄으로 전장을 가로지르는 기동형 탱크입니다.',
     passive:'평타 · 혜성 꼬리: 5번째 단일 혜성탄이 전진 후 3갈래 노바탄으로 분열',
     skill:'Q 혜성 돌파 · 장거리 돌진하며 피해 궤적을 남김',
     skill2:'R METEOR SHOWER · 이동하지 않고 지정 지역에 6.2초간 혜성 연속 낙하'
   },
   stellar:{
-    id:'stellar',name:'스텔라',rarity:'galaxy',rarityLabel:'갤럭시',chance:.003333,
+    id:'stellar',name:'스텔라',rarity:'galaxy',rarityLabel:'갤럭시',chance:.002,
     desc:'별빛을 폭발시키는 광역 제압형 탱크입니다.',
     passive:'평타 · 쌍성: 단일 별 코어가 2갈래로 분열 · 6번째는 5갈래',
     skill:'Q 별자리 결계 · 8초 대형 삼각 결계 · 즉시 15% 회복 + 내부 지속 회복 강화 + 적 지속 피해 강화',
     skill2:'R SECOND STAR · 12초 동안 죽음 1회 예약 · 시전 즉시 30% 회복 · 사망 시 체력 75% 부활 + 4초 무적 + 부활 충격파'
   },
+  leviathan:{
+    id:'leviathan',name:'리바이어던',rarity:'galaxy',rarityLabel:'갤럭시',chance:.002,
+    desc:'초대형 중포와 공간 제압을 결합한 거대 화력형 탱크입니다.',
+    passive:'평타 · 리바이어던 포탄: 초대형 폭발탄 · 주기적으로 2갈래 중포탄 분열',
+    skill:'Q ABYSS ROAR · 전방 넓은 부채꼴을 강타해 적을 멀리 밀어냄',
+    skill2:'R ABYSS COLLAPSE · 자신 주변 거대 중력장이 적을 끌어당기며 붕괴 피해'
+  },
+  valkyrie:{
+    id:'valkyrie',name:'발키리',rarity:'galaxy',rarityLabel:'갤럭시',chance:.002,
+    desc:'고속 이동과 연속 가속탄을 사용하는 기동전 특화 탱크입니다.',
+    passive:'평타 · 발키리 코어: 비행할수록 빨라지는 고속 관통탄',
+    skill:'Q 천익 돌파 · 장거리 돌진 후 후방으로 5개의 날개창 발사',
+    skill2:'R EINHERJAR RAIN · 지정 지역에 18회의 빛의 창 낙하'
+  },
 
-  // ERROR .005% / 3캐릭터
+  // ERROR .005% / 5캐릭터
   error:{
-    id:'error',name:'ERROR 캐논',rarity:'error',rarityLabel:'ERROR',chance:.001667,
+    id:'error',name:'ERROR 캐논',rarity:'error',rarityLabel:'ERROR',chance:.001,
     desc:'불안정한 글리치 에너지와 ERROR 검을 사용하는 최고 등급 탱크입니다.',
     passive:'평타 · T 검 모드에서는 검만 휘두름 · R 버프 중에만 평타마다 ERROR 검기 추가',
     skill:'Q 이중 스킬 · 검 모드 OFF: SYSTEM CRASH 24발 · 검 모드 ON: 최대 5초 차징 ERROR 검기',
@@ -253,21 +343,35 @@ const CANNONS=Object.freeze({
     skill3:'T GLITCH BLADE · 7초 쿨 · 돌진하며 ERROR 검을 휘두르고 검 모드 ON/OFF'
   },
   glitch:{
-    id:'glitch',name:'GLITCH-13',rarity:'error',rarityLabel:'ERROR',chance:.001667,
+    id:'glitch',name:'GLITCH-13',rarity:'error',rarityLabel:'ERROR',chance:.001,
     desc:'분열되는 글리치탄으로 화면을 뒤덮는 ERROR 개체입니다.',
     passive:'평타 · 패킷 분열: 단일 패킷이 2갈래로 분열 · 6번째는 7갈래',
     skill:'Q MIRROR ERROR · 6개 분신 위치에서 동시에 패킷탄 발사',
     skill2:'R DATA WARP · 900거리 순간 전송 + 이동 경로에 6개의 지연 글리치 폭발'
   },
   zero:{
-    id:'zero',name:'ZERO',rarity:'error',rarityLabel:'ERROR',chance:.001666,
+    id:'zero',name:'ZERO',rarity:'error',rarityLabel:'ERROR',chance:.001,
     desc:'극단적인 단발 화력과 공간 삭제 능력을 가진 ERROR 개체입니다.',
     passive:'평타 · ZERO CORE: 강한 단일 관통탄 · 4번째 모탄은 비행 후 3중 NULL 탄으로 분열',
     skill:'Q ZERO LINE · 초장거리 즉발 삭제 광선 + 적 탄환 제거',
     skill2:'R ABSOLUTE ZERO · 4초간 대영역 적/탄환을 거의 정지'
   },
+  berserker:{
+    id:'berserker',name:'버서커',rarity:'error',rarityLabel:'ERROR',chance:.001,
+    desc:'등급 테마와 무관하게 순수한 초고속 연사와 돌파력에 집중한 탱크입니다.',
+    passive:'평타 · 광폭 탄띠: 초고속 연사 · 8번째 탄은 3갈래 가속탄으로 분열',
+    skill:'Q BLOOD CLEAVE · 체력을 소모해 전방 부채꼴을 베고 5개의 참격탄 발사',
+    skill2:'R LAST BLOOD · 9초간 잃은 체력이 많을수록 강해지는 광역 혈전장'
+  },
+  oracle:{
+    id:'oracle',name:'오라클',rarity:'error',rarityLabel:'ERROR',chance:.001,
+    desc:'등급 테마와 무관하게 시간 제어와 정밀 사격에 특화된 전략형 탱크입니다.',
+    passive:'평타 · 예측 코어: 고관통 시간탄이 곡선 궤도로 목표를 압박',
+    skill:'Q FUTURE EYE · 가까운 목표의 미래 위치를 추적하는 고위력 예지탄 발사',
+    skill2:'R THREE FATES · 점점 커지는 3개의 운명 원이 순차 붕괴'
+  },
   deku:{
-    id:'deku',name:'데쿠',rarity:'divine',rarityLabel:'디바인',chance:.00005,
+    id:'deku',name:'데쿠',rarity:'divine',rarityLabel:'디바인',chance:.000033333,
     desc:'원 포 올의 여러 능력을 사용하는 초희귀 디바인 탱크입니다.',
     passive:'평타 · AIR FORCE: 공압탄 · 5번째 평타는 DETROIT AIR SMASH 강화탄',
     skill:'Q 연막 · 5초 동안 대형 연막 전개 · 상대 화면/미니맵에서 몸체 은폐',
@@ -276,20 +380,38 @@ const CANNONS=Object.freeze({
     skill4:'Y 변속 · 7초 동안 공격력/탄속/연사/이동속도 강화'
   },
   sniper:{
-    id:'sniper',name:'스나이퍼',rarity:'divine',rarityLabel:'디바인',chance:.00005,
+    id:'sniper',name:'스나이퍼',rarity:'divine',rarityLabel:'디바인',chance:.000033333,
     desc:'전장을 멀리 내려다보며 한 발에 큰 피해를 주는 초장거리 디바인 저격 탱크입니다.',
     passive:'평타 · 초고속 철갑 저격탄: 매우 강하고 7회 관통하지만 다음 사격까지 재장전 시간이 매우 김',
     skill:'Q 3× 전술 조준경 · 10초 동안 실제 보이는 거리가 3배로 증가',
     skill2:'R 스나이퍼 유도탄 · 적 플레이어만 추적하는 고속 유도탄 발사'
+  },
+  bloodlust:{
+    id:'bloodlust',name:'블러드러스트',rarity:'divine',rarityLabel:'디바인',chance:.000033334,
+    desc:'적에게 준 피해를 자신의 체력으로 흡수하며 오래 싸울수록 강해지는 흡혈형 디바인 탱크입니다.',
+    passive:'평타 · 혈식 탄환: 기본 명중 피해의 22% 흡혈 · 5번째 혈아탄은 1.9배 피해와 38% 흡혈',
+    skill:'Q 피의 광란 · 8초간 공격력·연사·이동속도 강화 + 흡혈률 60% 이상으로 증가 + 즉시 체력 12% 회복',
+    skill2:'R 핏빛 수확 · 주변 520 범위의 모든 적을 흡수 공격하고 누적 피해의 60%를 회복'
   }
 });
 
-const AUTH_BUILD='V5.79';
-console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · Diep evolution + player-only Sniper homing build`);
+const AUTH_BUILD='V5.81';
+console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · forced 46-cannon registry + sniper player-only homing`);
 const CANNON_DISPLAY_ORDER=Object.freeze([
-  'sniper','deku',
-  ...Object.keys(CANNONS).filter(id=>id!=='sniper'&&id!=='deku')
+  'standard','scout','bastion',
+  'rapid','dual','needle','blaster','ranger',
+  'spread','burst','crystal','ricochet','mortar',
+  'piercer','laser','drill','shredder','seeker',
+  'plasma','thunder','inferno','frost','magnet',
+  'rocket','titan','phantom','cyclone','juggernaut',
+  'ring','chrono','void','mirror','lancer',
+  'nova','comet','stellar','leviathan','valkyrie',
+  'error','glitch','zero','berserker','oracle',
+  'deku','sniper','bloodlust'
 ]);
+const MISSING_CANNONS=CANNON_DISPLAY_ORDER.filter(id=>!CANNONS[id]);
+if(MISSING_CANNONS.length)console.error('[Sworder VS Tank] missing cannon definitions:',MISSING_CANNONS);
+if(Object.keys(CANNONS).length!==46)console.warn('[Sworder VS Tank] expected 46 cannons, got',Object.keys(CANNONS).length);
 function displayCannons(){return CANNON_DISPLAY_ORDER.map(id=>CANNONS[id]).filter(Boolean)}
 
 window.IronCellCannons=CANNONS;
@@ -1132,15 +1254,14 @@ function showMenu(){showLobby()}
 
 function pullResultSummary(data){
   const counts=data?.counts||{};
-  const order=['sniper','deku','error','nova','ring','rocket','plasma','piercer','spread','rapid'];
-  const parts=[];
-  for(const id of order){
-    const n=Number(counts[id]||0);
-    if(n>0){
-      const c=CANNONS[id];
-      parts.push(`${c?.rarityLabel||id} ${n.toLocaleString()}개`);
-    }
+  const rarityOrder=['divine','error','galaxy','secret','mythic','legendary','epic','rare','common'];
+  const rarityLabels={divine:'디바인',error:'ERROR',galaxy:'갤럭시',secret:'시크릿',mythic:'신화',legendary:'전설',epic:'에픽',rare:'희귀',common:'일반'};
+  const rarityCounts=Object.fromEntries(rarityOrder.map(r=>[r,0]));
+  for(const [id,raw] of Object.entries(counts)){
+    const c=CANNONS[id];
+    if(c&&rarityCounts[c.rarity]!==undefined)rarityCounts[c.rarity]+=Number(raw||0);
   }
+  const parts=rarityOrder.filter(r=>rarityCounts[r]>0).map(r=>`${rarityLabels[r]} ${rarityCounts[r].toLocaleString()}개`);
   const newIds=Array.isArray(data?.new_cannons)?data.new_cannons:[];
   const newText=newIds.length
     ? ` · 신규 ${newIds.map(id=>CANNONS[id]?.name||id).join(', ')}`
