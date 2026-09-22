@@ -21,6 +21,7 @@ vm.runInContext([
   section('function drawVariantProjectile(', 'function drawUniqueProjectile('),
   section('function skillAimSpec(', 'function aimPal('),
   section('function aimPal(', 'function drawAimGuides('),
+  section('function skillRuneColor(', 'function drawSkillZones('),
   section('function centralPentagonPoint(', 'function minDistanceToActiveAnchors(')
 ].join('\n'), context);
 context.player = {errorSwordMode:false,overclockUntil:0};
@@ -79,6 +80,16 @@ for (const id of data.evolutions) {
   }
 }
 assert(source.includes("drawCannonSignature(b.cannon,time+(b.motionSeed||0)"));
+assert(source.includes('drawSkillRune(z,t,p)'), 'active zones should draw runes');
+assert(source.includes('const glow=TANK_THEMES[b.cannon]?.glow'), 'bullets should use equipped cannon trail color');
+const runeTrace=[];
+context.ctx=new Proxy({globalAlpha:1},{get:(target,key)=>key in target?target[key]:(...args)=>runeTrace.push([key,...args]),set:(target,key,value)=>(target[key]=value,true)});
+context.renderPressure=0;
+vm.runInContext("drawSkillRune({type:'thunderStorm',radius:300},1,1)",context);
+assert(runeTrace.filter(entry=>entry[0]==='arc').length>=3,'area rune needs concentric marks');
+runeTrace.length=0;
+vm.runInContext("drawSkillRune({type:'dekuSmoke',radius:300},1,1)",context);
+assert.equal(runeTrace.length,0,'smoke must not receive a circular overlay');
 assert(source.includes("drawCannonSignature(f.cannon,t+q*2"));
 const twinContext = vm.createContext({TAU:Math.PI*2, TANK_THEMES:{standard:{glow:'#fff'}}, drawPlayerCannon:(cannon,r)=>twinDraws.push([cannon,r]), twinDraws:[]});
 const twinDraws = twinContext.twinDraws;

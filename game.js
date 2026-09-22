@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.86 · skill defeats and Oracle aim preview');
+console.info('[Sworder VS Tank] game V5.87 · projectile trails and skill runes');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -4416,6 +4416,38 @@ function drawPlasmaTethers(){
 }
 
 
+function skillRuneColor(z){
+  const name=String(z.type||'');
+  if(/blood|burn|flame|missile|mortar|quake|siege|kinetic/i.test(name))return '#ffad78';
+  if(/void|gravity|abyss|phantom|ring|mirror|vortex/i.test(name))return '#c9a8ff';
+  if(/frost|zero|crystal|star|sanctuary|time|thunder/i.test(name))return '#c9f5ff';
+  if(/error|deku|needle|rapid|mine/i.test(name))return '#baff8e';
+  return '#80eaff';
+}
+function drawSkillRune(z,t,p){
+  const r=Number(z.radius)||0;
+  if(r<70||r>760||z.type==='dekuSmoke'||z.type==='glitchWarpTrail'||z.type==='earthFissure'||z.type==='flameWall'||z.type==='cometTrail')return;
+  const color=skillRuneColor(z), detail=renderPressure>=2?6:12;
+  ctx.save();ctx.globalAlpha*=Math.min(.82,p*.95);ctx.strokeStyle=color;ctx.lineWidth=1.8;
+  ctx.setLineDash([Math.max(8,r*.075),Math.max(7,r*.035)]);
+  ctx.beginPath();ctx.arc(0,0,r*.90,t*.24,t*.24+TAU);ctx.stroke();ctx.setLineDash([]);
+  ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(0,0,r*.68,0,TAU);ctx.stroke();
+  ctx.rotate(t*(z.networkRemote?-.22:.22));
+  for(let k=0;k<detail;k++){
+    const a=k*TAU/detail,ca=Math.cos(a),sa=Math.sin(a);
+    ctx.beginPath();ctx.moveTo(ca*r*.72,sa*r*.72);ctx.lineTo(ca*r*.84,sa*r*.84);ctx.stroke();
+  }
+  if(renderPressure<2){
+    ctx.rotate(-t*.45);ctx.beginPath();
+    for(let k=0;k<6;k++){
+      const a=k*TAU/6,px=Math.cos(a)*r*.43,py=Math.sin(a)*r*.43;
+      k?ctx.lineTo(px,py):ctx.moveTo(px,py);
+    }
+    ctx.closePath();ctx.stroke();
+    ctx.beginPath();ctx.arc(0,0,r*.15,0,TAU);ctx.stroke();
+  }
+  ctx.restore();
+}
 function drawSkillZones(){
   const t=performance.now()*.001;
   for(const z of skillZones){
@@ -4526,6 +4558,7 @@ function drawSkillZones(){
     }else if(z.type==='burn'){
       ctx.fillStyle='rgba(255,90,25,.13)';ctx.beginPath();ctx.arc(0,0,z.radius,0,TAU);ctx.fill();ctx.strokeStyle='rgba(255,155,58,.70)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,z.radius*(.92+.04*Math.sin(t*7)),0,TAU);ctx.stroke();
     }
+    drawSkillRune(z,t,p);
     ctx.restore();
   }
 }
@@ -5145,6 +5178,16 @@ function drawBullets(){
     const a=fxAngleFromVector(b.vx,b.vy,0);
     const phase=b.x*.013+b.y*.017+time*5;
     ctx.save();ctx.translate(x,y);ctx.rotate(a);
+    if(renderPressure<2){
+      const glow=TANK_THEMES[b.cannon]?.glow||(b.team==='player'?'#8bdfff':'#ff8794');
+      const tail=Math.min(48,Math.max(15,b.r*3.2));
+      ctx.save();ctx.globalAlpha=b.networkRemote?.34:.52;ctx.strokeStyle=glow;
+      ctx.lineWidth=Math.max(1.5,b.r*.34);ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(-tail,0);ctx.lineTo(-b.r*.25,0);ctx.stroke();
+      ctx.globalAlpha*=.65;ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(-tail*.72,-b.r*.7);ctx.lineTo(-b.r*.2,-b.r*.45);
+      ctx.moveTo(-tail*.72,b.r*.7);ctx.lineTo(-b.r*.2,b.r*.45);ctx.stroke();ctx.restore();
+    }
     if(renderPressure<2&&b.basicAttack&&CANNON_VISUAL_INDEX[b.cannon]!==undefined){
       drawCannonSignature(b.cannon,time+(b.motionSeed||0),b.r,'projectile');
     }
