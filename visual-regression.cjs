@@ -19,6 +19,7 @@ vm.runInContext([
   section('function evolutionBarrelSpecs(', 'function evolutionHasNoBasicGun('),
   section('function evolutionVolleySpecs(', 'function evolutionShotsFromBase('),
   section('function drawVariantProjectile(', 'function drawUniqueProjectile('),
+  section('function drawProjectileEnergy(', 'function drawBullets('),
   section('function skillAimSpec(', 'function aimPal('),
   section('function aimPal(', 'function drawAimGuides('),
   section('function skillRuneColor(', 'function drawSkillZones('),
@@ -82,6 +83,15 @@ for (const id of data.evolutions) {
 assert(source.includes("drawCannonSignature(b.cannon,time+(b.motionSeed||0)"));
 assert(source.includes('drawSkillRune(z,t,p)'), 'active zones should draw runes');
 assert(source.includes('const glow=TANK_THEMES[b.cannon]?.glow'), 'bullets should use equipped cannon trail color');
+assert(source.includes('drawProjectileEnergy(b,time)'), 'all visible bullets should receive their energy detail');
+const energyTrace=[];
+context.ctx=new Proxy({globalAlpha:1},{get:(target,key)=>key in target?target[key]:(...args)=>energyTrace.push([key,...args]),set:(target,key,value)=>(target[key]=value,true)});
+context.renderPressure=0;
+vm.runInContext("drawProjectileEnergy({cannon:'stellar',r:10,team:'player'},1)",context);
+assert(energyTrace.some(entry=>entry[0]==='arc'||entry[0]==='lineTo'),'projectile detail should draw themed geometry');
+energyTrace.length=0;context.renderPressure=2;
+vm.runInContext("drawProjectileEnergy({cannon:'stellar',r:10,team:'player'},1)",context);
+assert.equal(energyTrace.length,0,'dense battles should skip projectile detail');
 const runeTrace=[];
 context.ctx=new Proxy({globalAlpha:1},{get:(target,key)=>key in target?target[key]:(...args)=>runeTrace.push([key,...args]),set:(target,key,value)=>(target[key]=value,true)});
 context.renderPressure=0;

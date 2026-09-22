@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.88 · layered arcane skill circles');
+console.info('[Sworder VS Tank] game V5.89 · projectile energy details');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -5195,6 +5195,46 @@ function drawUniqueProjectile(b,time,phase){
   return false;
 }
 
+function drawProjectileEnergy(b,time){
+  if(renderPressure>=2)return;
+  const theme=TANK_THEMES[b.cannon],color=theme?.glow||(b.team==='remote'?'#ff8999':'#9bdfff');
+  const identity=CANNON_VISUAL_INDEX[b.cannon]??0,r=Math.max(6,Number(b.r)||8);
+  const pulse=1+Math.sin(time*11+(b.motionSeed||0))*.09;
+  ctx.save();ctx.strokeStyle=color;ctx.fillStyle=color;
+  ctx.globalAlpha*=b.networkRemote?.48:.72;
+  ctx.lineWidth=1.4;ctx.shadowColor=color;ctx.shadowBlur=renderPressure?0:10;
+  const reach=Math.min(28,r*1.5+7);
+  if(identity%4===0){
+    // Paired energy fins, kept behind the equipped projectile silhouette.
+    for(const side of [-1,1]){
+      ctx.beginPath();ctx.moveTo(-r*.35,side*r*.72);
+      ctx.lineTo(-reach,side*r*1.22);ctx.lineTo(-reach*.65,side*r*.48);ctx.stroke();
+    }
+  }else if(identity%4===1){
+    ctx.beginPath();ctx.arc(-r*.12,0,r*1.28*pulse,-.98,.98);ctx.stroke();
+    ctx.beginPath();ctx.arc(-r*.12,0,r*1.55*pulse,Math.PI-.75,Math.PI+.75);ctx.stroke();
+  }else if(identity%4===2){
+    for(const side of [-1,1]){
+      ctx.beginPath();ctx.moveTo(-reach,side*r*.9);
+      ctx.lineTo(-r*.8,side*r*.9);ctx.lineTo(-r*.25,side*r*1.3);ctx.stroke();
+    }
+  }else{
+    for(const side of [-1,1]){
+      ctx.beginPath();ctx.moveTo(-reach*.9,side*r*.38);
+      ctx.lineTo(-reach*.45,side*r*.84);ctx.lineTo(-r*.5,side*r*.84);ctx.stroke();
+    }
+  }
+  if(renderPressure===0){
+    const sparks=2+identity%3;
+    ctx.shadowBlur=0;
+    for(let k=0;k<sparks;k++){
+      const drift=(k+1)/(sparks+1),side=k%2?1:-1;
+      ctx.globalAlpha=.28+.16*Math.sin(time*13+k+identity);
+      ctx.fillRect(-reach*(.65+drift*.65),side*r*(.75+drift*.8),2.3,2.3);
+    }
+  }
+  ctx.restore();
+}
 function drawBullets(){
   const time=performance.now()*.001;
   let remoteVisualIndex=0;
@@ -5206,6 +5246,7 @@ function drawBullets(){
     const a=fxAngleFromVector(b.vx,b.vy,0);
     const phase=b.x*.013+b.y*.017+time*5;
     ctx.save();ctx.translate(x,y);ctx.rotate(a);
+    drawProjectileEnergy(b,time);
     if(renderPressure<2){
       const glow=TANK_THEMES[b.cannon]?.glow||(b.team==='player'?'#8bdfff':'#ff8794');
       const tail=Math.min(48,Math.max(15,b.r*3.2));
@@ -5420,6 +5461,12 @@ function drawBullets(){
     }
     else if(b.special==='novaFragment'){ctx.globalAlpha=.8;ctx.strokeStyle='#bffcff';ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(0,0,8,0,TAU);ctx.stroke()}
     else if(b.special==='shrapnel'){ctx.globalAlpha=.8;ctx.fillStyle='#eaffff';ctx.beginPath();ctx.arc(0,0,2,0,TAU);ctx.fill()}
+    if(renderPressure===0&&b.r>=6){
+      ctx.save();ctx.globalAlpha=.38+.13*Math.sin(time*12+(b.motionSeed||0));
+      ctx.fillStyle='#ffffff';ctx.shadowColor=TANK_THEMES[b.cannon]?.glow||'#ffffff';ctx.shadowBlur=7;
+      ctx.beginPath();ctx.ellipse(Math.min(b.r*.45,7),-Math.min(b.r*.28,4),Math.max(1.5,b.r*.17),Math.max(1,b.r*.10),-.25,0,TAU);ctx.fill();
+      ctx.restore();
+    }
     ctx.restore();
   }
 }
