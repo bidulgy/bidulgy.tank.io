@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.91 · Gojo attack effects and level gate');
+console.info('[Sworder VS Tank] game V5.92 · basic tank level 45 unlock');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -1426,6 +1426,10 @@ function receiveRemoteSkill(payload){
       spawnCombatFx('gojoPurple',x,y,{angle:travelAngle,color:'#b184ff',life:1.05,radius:Math.min(1200,safeRemoteNumber(payload.length,980)),cannon:'gojo'});
       return;
     }
+    if(cannon==='gojo'&&skillType==='gojoAka'){
+      const sx=x+Math.cos(travelAngle)*68,sy=y+Math.sin(travelAngle)*68;
+      spawnCombatFx('gojoAkaFlight',sx,sy,{angle:travelAngle,color:'#ff718b',life:.22,radius:Math.hypot(tx-sx,ty-sy),cannon:'gojo'});
+    }
     if(cannon==='deku'){
       if(skillType==='dekuSmoke'){skillZones.push({type:'dekuSmoke',x:tx,y:ty,radius,life,maxLife:life,damage:0,tick:0,angle:0,length:0,width:0,ownerId:String(payload.ownerId||''),networkRemote:true,pulses:0,interval:.4,data:{}});return}
       if(skillType==='dekuBlackwhip'){
@@ -1981,8 +1985,10 @@ function releaseHeldSkillAim(slot=heldSkillAim.slot){
   if(!heldSkillAim.active||heldSkillAim.slot!==slot)return false;
   const cannon=player?.cannonType||'standard';
   const phantomTarget=(slot===1&&cannon==='phantom'&&!phantomMarkCanReturn())?phantomAimTarget():null;
+  const gojoTarget=cannon==='gojo'?gojoAimPoint(slot===1?480:540):null;
   if(player&&Number.isFinite(heldSkillAim.angle))player.angle=heldSkillAim.angle;
   heldSkillAim.active=false;heldSkillAim.slot=0;heldSkillAim.source='';heldSkillAim.pointerId=null;heldSkillAim.angle=null;heldSkillAim.distance=null;heldSkillAim.moved=false;
+  if(cannon==='gojo'&&slot<=2)return castGojoSkill(slot===1?'ao':'aka',gojoTarget);
   if(slot===1){if(cannon==='error'&&player?.errorSwordMode&&player?.errorQCharging)return releaseErrorQCharge();activateSkill(0,phantomTarget);return true}
   if(slot===2){activateSkill2();return true}
   if(slot===3){activateSkill3();return true}
@@ -1995,6 +2001,14 @@ function skillAimPoint(distance=520){
     clamp(player.x+Math.cos(a)*distance,80,WORLD-80),
     clamp(player.y+Math.sin(a)*distance,80,WORLD-80)
   ];
+}
+function gojoAimPoint(distance){
+  if(heldSkillAim.source==='button'&&heldSkillAim.moved)return skillAimPoint(distance);
+  const wx=camera.x+input.mouseX,wy=camera.y+input.mouseY;
+  const dx=wx-player.x,dy=wy-player.y,d=Math.hypot(dx,dy);
+  if(d<8)return skillAimPoint(distance);
+  const reach=Math.min(distance,d);
+  return[clamp(player.x+dx/d*reach,80,WORLD-80),clamp(player.y+dy/d*reach,80,WORLD-80)];
 }
 function pointToLineInfo(px,py,x1,y1,x2,y2){
   const vx=x2-x1,vy=y2-y1,l2=vx*vx+vy*vy||1;
@@ -2111,7 +2125,7 @@ function sendUniqueSkill(cannon,skillType,extra={}){
   sendOnline('skill',{ownerId:onlineSelfId,cannon,x:player.x,y:player.y,angle:player.angle,skillType,...extra});
 }
 
-function castGojoSkill(kind){
+function castGojoSkill(kind,target=null){
   if(!running||paused||!player?.alive||player.cannonType!=='gojo')return false;
   refreshRealTimeSkillCooldowns();
   if((kind==='ao'||kind==='purple')&&player.skillCd>0)return false;
@@ -2130,7 +2144,11 @@ function castGojoSkill(kind){
     shake=Math.max(shake,16);
   }else{
     const distance=kind==='ao'?480:540,radius=kind==='ao'?210:225;
-    const [tx,ty]=skillAimPoint(distance),color=kind==='ao'?'#62b8ff':'#ff7083';
+    const [tx,ty]=target||gojoAimPoint(distance),color=kind==='ao'?'#62b8ff':'#ff7083';
+    if(kind==='aka'){
+      const sx=player.x+Math.cos(a)*(player.r+41),sy=player.y+Math.sin(a)*(player.r+41);
+      spawnCombatFx('gojoAkaFlight',sx,sy,{angle:Math.atan2(ty-sy,tx-sx),color:'#ff718b',life:.22,radius:Math.hypot(tx-sx,ty-sy),cannon:'gojo'});
+    }
     skillAreaDamage(tx,ty,radius,p.damage*(kind==='ao'?3.2:4.3),color);
     for(const s of shapes){
       const dx=s.x-tx,dy=s.y-ty,d=Math.hypot(dx,dy)||1;
@@ -2138,9 +2156,9 @@ function castGojoSkill(kind){
       const force=(1-d/radius)*(kind==='ao'?-270:340);
       reportShapeImpulse(s,dx/d*force,dy/d*force);
     }
-    addSkillZone(kind==='ao'?'gojoAo':'gojoAka',{x:tx,y:ty,radius,life:.95,damage:0});
+    addSkillZone(kind==='ao'?'gojoAo':'gojoAka',{x:tx,y:ty,radius,life:kind==='ao'?1.55:.95,damage:0});
     burst(tx,ty,color,kind==='ao'?24:32);
-    sendUniqueSkill('gojo',kind==='ao'?'gojoAo':'gojoAka',{targetX:tx,targetY:ty,radius,life:.95});
+    sendUniqueSkill('gojo',kind==='ao'?'gojoAo':'gojoAka',{targetX:tx,targetY:ty,radius,life:kind==='ao'?1.55:.95});
     shake=Math.max(shake,kind==='ao'?7:11);
   }
   updateSkillHud();return true;
@@ -3112,7 +3130,8 @@ function currentRunSnapshot(){
     pilotName:player.name,
     level:player.level,
     score:player.score,
-    kills:player.kills
+    kills:player.kills,
+    basicTank45:player.level>=45&&player.cannonType==='standard'&&player.classType==='basic'&&(player.evolutionTier||0)===0
   };
 }
 async function saveCurrentRun(finish=false){
@@ -3521,6 +3540,15 @@ function updateSkillZones(dt){
     if(z.life<=0){skillZones.splice(zi,1);continue}
     if(z.networkRemote)continue;
     const elapsed=z.maxLife-z.life;
+
+    if(z.type==='gojoAo'){
+      z.tick=(z.tick||0)+dt;
+      if(z.tick>=.055){
+        z.tick=0;
+        for(const s of shapes){const dx=z.x-s.x,dy=z.y-s.y,d=Math.hypot(dx,dy)||1;if(d<z.radius*1.15)reportShapeImpulse(s,dx/d*85,dy/d*85)}
+      }
+      continue;
+    }
 
     if(z.type==='artillery'){
       if(!z.triggered&&z.life<.15){z.triggered=true;skillAreaDamage(z.x,z.y,z.radius,z.damage,'#8fd5ff');burst(z.x,z.y,'#dff7ff',40);shake=Math.max(shake,15)}
@@ -4698,6 +4726,13 @@ function drawCombatEffects(layer='base'){
       for(let k=0;k<9;k++){const xx=length*(k+.5)/9,rr=(16+13*Math.sin(t*19+k*2))*p;ctx.strokeStyle=k%2?'#75c7ff':'#ff718e';ctx.lineWidth=3*p;ctx.beginPath();ctx.arc(xx,0,Math.abs(rr)+7,0,TAU);ctx.stroke()}
       ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(length,0,Math.max(5,28*p),0,TAU);ctx.fill();
       ctx.shadowBlur=0;
+    }else if(f.type==='gojoAkaFlight'){
+      const travel=f.radius*q;ctx.shadowColor='#ff547a';ctx.shadowBlur=32;
+      const tail=ctx.createLinearGradient(Math.max(0,travel-130),0,travel,0);
+      tail.addColorStop(0,'rgba(255,68,104,0)');tail.addColorStop(1,'rgba(255,136,152,.85)');
+      ctx.strokeStyle=tail;ctx.lineWidth=20*p+6;ctx.beginPath();ctx.moveTo(Math.max(0,travel-130),0);ctx.lineTo(travel,0);ctx.stroke();
+      ctx.fillStyle='#ff557a';ctx.beginPath();ctx.arc(travel,0,25+4*Math.sin(t*42),0,TAU);ctx.fill();
+      ctx.fillStyle='#fff1f4';ctx.beginPath();ctx.arc(travel-3,-4,11,0,TAU);ctx.fill();ctx.shadowBlur=0;
     }else if(f.type==='gojoInfinityShot'){
       ctx.shadowColor='#a780ff';ctx.shadowBlur=28;ctx.lineWidth=4*p;
       for(let k=0;k<3;k++){ctx.strokeStyle=k%2?'#ff8ca6':'#7bcaff';ctx.beginPath();ctx.arc(0,0,(10+k*9)+f.radius*q*.35,-q*5+k*TAU/3,-q*5+k*TAU/3+Math.PI*1.35);ctx.stroke()}
@@ -5643,6 +5678,23 @@ function aimBarrage(px,py,a,s,pal){
 function drawBasicAimGuide(){if(!running||!player?.alive||heldSkillAim.active||!(input.mobileAimActive||input.firing||input.keys.has('Space')))return;const[px,py]=worldToScreen(player.x,player.y),s=basicAimSpec(player.cannonType||'standard'),p=aimPal(0);ctx.save();s.type==='cone'?aimCone(px,py,player.angle,s.range,s.half,p):aimLane(px,py,player.angle,s.range,s.width,p);ctx.restore()}
 function drawSkillAimGuide(){
   if(!running||!player?.alive||!heldSkillAim.active)return;const cannon=player.cannonType||'standard',[px,py]=worldToScreen(player.x,player.y),a=Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:player.angle,p=aimPal(heldSkillAim.slot);
+  if(cannon==='gojo'){
+    const t=performance.now()*.001,red=heldSkillAim.slot===2;
+    ctx.save();ctx.shadowColor=red?'#ff547b':'#5bb9ff';ctx.shadowBlur=25;
+    if(red){
+      const ox=px+Math.cos(a)*(player.r+41),oy=py+Math.sin(a)*(player.r+41);
+      ctx.fillStyle='#ff5578';ctx.beginPath();ctx.arc(ox,oy,22+Math.sin(t*13)*3,0,TAU);ctx.fill();
+      ctx.fillStyle='#fff1f5';ctx.beginPath();ctx.arc(ox-4,oy-5,9,0,TAU);ctx.fill();
+      for(let k=0;k<8;k++){const aa=t*4+k*TAU/8;ctx.strokeStyle='rgba(255,165,177,.75)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(ox+Math.cos(aa)*31,oy+Math.sin(aa)*31);ctx.lineTo(ox+Math.cos(aa)*48,oy+Math.sin(aa)*48);ctx.stroke()}
+    }else{
+      const [wx,wy]=gojoAimPoint(480),[tx,ty]=worldToScreen(wx,wy),r=210;
+      ctx.strokeStyle='#80d8ff';ctx.lineWidth=4;ctx.beginPath();ctx.arc(tx,ty,r,0,TAU);ctx.stroke();
+      ctx.fillStyle='rgba(45,137,255,.14)';ctx.beginPath();ctx.arc(tx,ty,r,0,TAU);ctx.fill();
+      for(let k=0;k<18;k++){const aa=t*1.8+k*TAU/18,rr=r*(.55+.12*Math.sin(t*3+k));ctx.strokeStyle='rgba(170,226,255,.8)';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(tx+Math.cos(aa)*rr,ty+Math.sin(aa)*rr,18,aa-.8,aa+.9);ctx.stroke()}
+      ctx.fillStyle='#e8faff';ctx.beginPath();ctx.arc(tx,ty,14+Math.sin(t*9)*3,0,TAU);ctx.fill();
+    }
+    ctx.restore();return;
+  }
   if(cannon==='phantom'&&heldSkillAim.slot===1&&phantomMarkCanReturn()){
     const[ox,oy]=worldToScreen(player.phantomMarkOriginX,player.phantomMarkOriginY),[dx,dy]=worldToScreen(player.phantomMarkDestX,player.phantomMarkDestY);ctx.save();ctx.fillStyle=p[0];ctx.strokeStyle=p[1];ctx.lineWidth=3;ctx.setLineDash([8,8]);ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(ox,oy);ctx.stroke();ctx.setLineDash([]);for(const pt of [[ox,oy],[dx,dy]]){ctx.beginPath();ctx.arc(pt[0],pt[1],150,0,TAU);ctx.fill();ctx.stroke()}ctx.restore();return;
   }
