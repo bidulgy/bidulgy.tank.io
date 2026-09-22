@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.89 · projectile energy details');
+console.info('[Sworder VS Tank] game V5.90 · Gojo Singularity and simultaneous Twin volley');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -57,13 +57,13 @@ const CANNON_FAMILY=Object.freeze({
   blaster:'standard',ranger:'standard',ricochet:'spread',mortar:'standard',
   shredder:'piercer',seeker:'piercer',frost:'ring',magnet:'nova',
   cyclone:'piercer',juggernaut:'rocket',mirror:'ring',lancer:'piercer',
-  leviathan:'rocket',valkyrie:'nova',berserker:'rapid',oracle:'ring'
+  leviathan:'rocket',valkyrie:'nova',berserker:'rapid',oracle:'ring',gojo:'ring'
 });
 const CANNON_BASE_BEHAVIOR=Object.freeze({
   blaster:'standard',ranger:'scout',ricochet:'burst',mortar:'bastion',
   shredder:'drill',seeker:'piercer',frost:'chrono',magnet:'void',
   cyclone:'laser',juggernaut:'titan',mirror:'ring',lancer:'piercer',
-  leviathan:'titan',valkyrie:'comet',berserker:'rapid',oracle:'chrono'
+  leviathan:'titan',valkyrie:'comet',berserker:'rapid',oracle:'chrono',gojo:'chrono'
 });
 const CANNON_Q_BEHAVIOR=Object.freeze({
   blaster:'blaster',ranger:'ranger',ricochet:'ricochet',mortar:'mortar',
@@ -83,7 +83,7 @@ const CANNON_STAT_MODS=Object.freeze({
   cyclone:{damage:1.18,reload:.82,move:1.04},juggernaut:{damage:1.22,reload:1.12,move:.92},
   mirror:{damage:1.15,bulletSpeed:1.08},lancer:{damage:1.25,bulletSpeed:1.18,reload:1.15},
   leviathan:{damage:1.20,reload:1.12,move:.92},valkyrie:{damage:1.10,reload:.82,move:1.14},
-  berserker:{damage:1.20,reload:.68,move:1.08},oracle:{damage:1.32,bulletSpeed:1.12,reload:1.12}
+  berserker:{damage:1.20,reload:.68,move:1.08},oracle:{damage:1.32,bulletSpeed:1.12,reload:1.12},gojo:{damage:1.26,bulletSpeed:1.08,reload:1.08}
 });
 function cannonBaseBehavior(id){return CANNON_BASE_BEHAVIOR[id]||id}
 function cannonQBehavior(id){return CANNON_Q_BEHAVIOR[id]||id}
@@ -103,7 +103,7 @@ const PROJECTILE_SHAPE=Object.freeze({
   blaster:'standardSlug',ranger:'scoutArrow',ricochet:'burstDisc',mortar:'bastionShell',
   shredder:'drillBit',seeker:'piercerLance',frost:'chronoRing',magnet:'voidOrb',
   cyclone:'laserRay',juggernaut:'titanShell',mirror:'dimensionRing',lancer:'piercerLance',
-  leviathan:'titanShell',valkyrie:'cometCore',berserker:'rapidTracer',oracle:'chronoRing'
+  leviathan:'titanShell',valkyrie:'cometCore',berserker:'rapidTracer',oracle:'chronoRing',gojo:'chronoRing'
 });
 function projectileShapeForCannon(cannon){return PROJECTILE_SHAPE[cannon]||'standardSlug'}
 
@@ -155,7 +155,8 @@ const CANNON_SKILLS=Object.freeze({
   leviathan:{name:'ABYSS ROAR',cooldown:24,color:'#9deeff'},
   valkyrie:{name:'천익 돌파',cooldown:21,color:'#8deaff'},
   berserker:{name:'BLOOD CLEAVE',cooldown:18,color:'#ff8a70'},
-  oracle:{name:'FUTURE EYE',cooldown:21,color:'#f4e9a8'}
+  oracle:{name:'FUTURE EYE',cooldown:21,color:'#f4e9a8'},
+  gojo:{name:'아오',cooldown:15,color:'#54aaff'}
 });
 const CANNON_SKILLS_2=Object.freeze({
   rocket:{name:'IRON DOME',cooldown:28,color:'#ffc06a',kind:'fortress'},
@@ -180,7 +181,8 @@ const CANNON_SKILLS_2=Object.freeze({
   leviathan:{name:'ABYSS COLLAPSE',cooldown:31,color:'#b58cff',kind:'abyss'},
   valkyrie:{name:'EINHERJAR RAIN',cooldown:29,color:'#b9ecff',kind:'spearRain'},
   berserker:{name:'LAST BLOOD',cooldown:30,color:'#ffaf7a',kind:'lastBlood'},
-  oracle:{name:'THREE FATES',cooldown:30,color:'#fff2c2',kind:'threeFates'}
+  oracle:{name:'THREE FATES',cooldown:30,color:'#fff2c2',kind:'threeFates'},
+  gojo:{name:'아카',cooldown:18,color:'#ff667d',kind:'repulse'}
 });
 const ERROR_T_SKILL=Object.freeze({name:'GLITCH BLADE',cooldown:7,color:'#73ff45'});
 const DEKU_T_SKILL=Object.freeze({name:'발경',cooldown:20,color:'#baff70'});
@@ -231,7 +233,8 @@ const TANK_THEMES=Object.freeze({
   cyclone:{body:'#884f9d',edge:'#4d2b5b',glow:'#f2b9ff'},juggernaut:{body:'#8d5f48',edge:'#4e3327',glow:'#ffd09c'},
   mirror:{body:'#8065a8',edge:'#443661',glow:'#f0d0ff'},lancer:{body:'#667ca7',edge:'#354563',glow:'#dae7ff'},
   leviathan:{body:'#385f77',edge:'#1d3648',glow:'#9feaff'},valkyrie:{body:'#477d8f',edge:'#27505e',glow:'#a2f2ff'},
-  berserker:{body:'#8d3e34',edge:'#4e201b',glow:'#ff9a78'},oracle:{body:'#8a8151',edge:'#4d472b',glow:'#fff2ae'}
+  berserker:{body:'#8d3e34',edge:'#4e201b',glow:'#ff9a78'},oracle:{body:'#8a8151',edge:'#4d472b',glow:'#fff2ae'},
+  gojo:{body:'#eaf3ff',edge:'#5571a8',glow:'#a596ff'}
 });
 // Every equipped cannon has its own compact visual grammar. Existing projectile
 // silhouettes stay intact; this adds a readable signature even for shared shapes.
@@ -1415,6 +1418,10 @@ function receiveRemoteSkill(payload){
     const tx=safeRemoteNumber(payload.targetX,x),ty=safeRemoteNumber(payload.targetY,y);
     const radius=Math.max(20,safeRemoteNumber(payload.radius,180));
     const life=Math.max(.2,safeRemoteNumber(payload.life,2));
+    if(cannon==='gojo'&&skillType==='gojoPurple'){
+      spawnCombatFx('gojoPurple',x,y,{angle:travelAngle,color:'#b184ff',life:1.05,radius:Math.min(1200,safeRemoteNumber(payload.length,980)),cannon:'gojo'});
+      return;
+    }
     if(cannon==='deku'){
       if(skillType==='dekuSmoke'){skillZones.push({type:'dekuSmoke',x:tx,y:ty,radius,life,maxLife:life,damage:0,tick:0,angle:0,length:0,width:0,ownerId:String(payload.ownerId||''),networkRemote:true,pulses:0,interval:.4,data:{}});return}
       if(skillType==='dekuBlackwhip'){
@@ -1454,7 +1461,7 @@ function receiveRemoteSkill(payload){
       spawnCombatFx('phantomMarkBurst',ox,oy,{angle:0,color:'#cabdff',life:.72,radius:190,cannon:'phantom'});spawnCombatFx('phantomMarkBurst',dx,dy,{angle:0,color:'#cabdff',life:.72,radius:190,cannon:'phantom'});
       const remote=remotePlayers.get(ownerId);if(remote){remote.x=remote.tx=ox;remote.y=remote.ty=oy}return;
     }
-    const zoneTypes=new Set(['artillery','barrier','rapidOverdrive','twinDrones','burstBomb','crystalPrism','laserSweep','plasmaCage','thunderStorm','flameWall','missileRain','earthFissure','ringGate','timeField','gravity','supernovaCore','cometTrail','constellation','secondStar','starOrbit','absoluteZero','ironDome','siegeAura','ringParry','rewindEcho','antiMatter','cometShower','glitchDriveAura','glitchWarpTrail','vortexPrison','mirrorWorld','abyssCollapse','lastBlood','threeFates','kineticArmor']);
+    const zoneTypes=new Set(['artillery','barrier','rapidOverdrive','twinDrones','burstBomb','crystalPrism','laserSweep','plasmaCage','thunderStorm','flameWall','missileRain','earthFissure','ringGate','timeField','gravity','supernovaCore','cometTrail','constellation','secondStar','starOrbit','absoluteZero','ironDome','siegeAura','ringParry','rewindEcho','antiMatter','cometShower','glitchDriveAura','glitchWarpTrail','vortexPrison','mirrorWorld','abyssCollapse','lastBlood','threeFates','kineticArmor','gojoAo','gojoAka']);
     if(zoneTypes.has(skillType)){
       skillZones.push({type:skillType,x:tx,y:ty,radius,life,maxLife:life,damage:0,tick:0,angle:fxAngleToTarget(x,y,tx,ty,safeRemoteNumber(payload.zoneAngle,angle)),length:safeRemoteNumber(payload.length,0),width:safeRemoteNumber(payload.width,0),ownerId:String(payload.ownerId||''),networkRemote:true,pulses:0,interval:.4,data:{}});
     }else{
@@ -1634,6 +1641,8 @@ function updateSkillHud(){
   const visible=!!(running&&player?.alive&&def);
   ui.skillHud?.classList.toggle('hidden',!visible);
   if(!visible)return;
+  const secondKey=ui.skill2Btn?.querySelector('.skill-key');
+  if(secondKey)secondKey.textContent=cannon==='gojo'?'E':'R';
 
   // V5.68: mobile HUD hard guard. Deku always owns Q/R/T/Y and all four must remain in the DOM/layout.
   if(ui.skillHud){
@@ -1709,6 +1718,7 @@ function updateSkillHud(){
       if(ui.skill2Cooldown){
         ui.skill2Cooldown.textContent=whipChainActive
           ? `채찍 ${player.dekuWhipChainRemaining}회`
+          : cannon==='gojo'&&ready2&&ready?'Q+E · 무라사키'
           : (cannon==='deku'
               ? (ready2?'채찍 · READY':`채찍 · ${cd2.toFixed(1)}s`)
               : (ready2?'READY':`${cd2.toFixed(1)}s`));
@@ -1942,6 +1952,7 @@ function phantomPreviewDistance(){
   return phantomAimTarget().distance;
 }
 function beginHeldSkillAim(slot,source='keyboard',event=null){
+  if(heldSkillAim.active&&player?.cannonType==='gojo'&&slot<=2&&heldSkillAim.slot<=2&&heldSkillAim.slot!==slot)return tryGojoPurple();
   if(heldSkillAim.active||!skillSlotReady(slot))return false;
   heldSkillAim.active=true;heldSkillAim.slot=slot;heldSkillAim.source=source;
   heldSkillAim.pointerId=event?.pointerId??null;heldSkillAim.startX=Number(event?.clientX)||0;heldSkillAim.startY=Number(event?.clientY)||0;
@@ -2096,6 +2107,45 @@ function sendUniqueSkill(cannon,skillType,extra={}){
   sendOnline('skill',{ownerId:onlineSelfId,cannon,x:player.x,y:player.y,angle:player.angle,skillType,...extra});
 }
 
+function castGojoSkill(kind){
+  if(!running||paused||!player?.alive||player.cannonType!=='gojo')return false;
+  refreshRealTimeSkillCooldowns();
+  if((kind==='ao'||kind==='purple')&&player.skillCd>0)return false;
+  if((kind==='aka'||kind==='purple')&&player.skill2Cd>0)return false;
+  const wall=Date.now(),p=playerParams(),a=player.angle;
+  const qCd=kind==='purple'?30:CANNON_SKILLS.gojo.cooldown;
+  const eCd=kind==='purple'?30:CANNON_SKILLS_2.gojo.cooldown;
+  if(kind!=='aka'){player.skillCd=player.skillMax=qCd;player.skillReadyAt=wall+qCd*1000}
+  if(kind!=='ao'){player.skill2Cd=player.skill2Max=eCd;player.skill2ReadyAt=wall+eCd*1000}
+  if(kind==='purple'){
+    const length=980;
+    damageSkillLine(player.x,player.y,a,length,78,p.damage*13,'#c38aff',140);
+    spawnCombatFx('gojoPurple',player.x,player.y,{angle:a,color:'#b184ff',life:1.05,radius:length,cannon:'gojo'});
+    burst(player.x+Math.cos(a)*length*.65,player.y+Math.sin(a)*length*.65,'#d9adff',40);
+    sendUniqueSkill('gojo','gojoPurple',{length,radius:78,targetX:player.x+Math.cos(a)*length,targetY:player.y+Math.sin(a)*length});
+    shake=Math.max(shake,16);
+  }else{
+    const distance=kind==='ao'?480:540,radius=kind==='ao'?210:225;
+    const [tx,ty]=skillAimPoint(distance),color=kind==='ao'?'#62b8ff':'#ff7083';
+    skillAreaDamage(tx,ty,radius,p.damage*(kind==='ao'?3.2:4.3),color);
+    for(const s of shapes){
+      const dx=s.x-tx,dy=s.y-ty,d=Math.hypot(dx,dy)||1;
+      if(d>radius)continue;
+      const force=(1-d/radius)*(kind==='ao'?-270:340);
+      reportShapeImpulse(s,dx/d*force,dy/d*force);
+    }
+    addSkillZone(kind==='ao'?'gojoAo':'gojoAka',{x:tx,y:ty,radius,life:.95,damage:0});
+    burst(tx,ty,color,kind==='ao'?24:32);
+    sendUniqueSkill('gojo',kind==='ao'?'gojoAo':'gojoAka',{targetX:tx,targetY:ty,radius,life:.95});
+    shake=Math.max(shake,kind==='ao'?7:11);
+  }
+  updateSkillHud();return true;
+}
+function tryGojoPurple(){
+  if(player?.cannonType!=='gojo'||!skillSlotReady(1)||!skillSlotReady(2))return false;
+  cancelHeldSkillAim();return castGojoSkill('purple');
+}
+
 function startErrorQCharge(){
   if(!running||paused||!player?.alive||player.cannonType!=='error'||!player.errorSwordMode)return false;
   refreshRealTimeSkillCooldowns();
@@ -2149,6 +2199,7 @@ function detonatePhantomMarks(){
 
 function activateSkill(errorChargeRatio=0,aimOverride=null){
   if(!running||paused||!player?.alive)return;
+  if(player.cannonType==='gojo'){castGojoSkill('ao');return}
   const cannon=player.cannonType||'standard',skillCannon=cannonQBehavior(cannon),def=CANNON_SKILLS[cannon];
   if(cannon==='phantom'&&phantomMarkCanReturn()){detonatePhantomMarks();return;}
   refreshRealTimeSkillCooldowns();if(!def||player.skillCd>0)return;
@@ -2393,6 +2444,7 @@ function sniperAcquirePlayerTarget(angle,maxRange=3200){
 // V5.79: sniper basic homing helpers removed; only the R skill can home.
 function activateSkill2(){
   if(!running||paused||!player?.alive)return;
+  if(player.cannonType==='gojo'){castGojoSkill('aka');return}
   const cannon=player.cannonType||'standard',skill2Cannon=cannonRBehavior(cannon),def=CANNON_SKILLS_2[cannon];if(!def)return;
   refreshRealTimeSkillCooldowns();const now=performance.now(),wallNow=Date.now(),a=player.angle,p=playerParams();
 
@@ -4091,7 +4143,7 @@ function evolutionMuzzleForShot(type,r,shotNo){
 }
 
 // V5.79: Diep.io와 같은 '포신 단위 발사' 계획.
-// - Twin/Triplet/Gunner/Streamliner 계열은 여러 포신이 순차적으로 불을 뿜는다.
+// - Twin fires both equipped cannon barrels in the same volley.
 // - Penta/Spread 및 방사형/추진형 계열은 실제 게임처럼 한 발사 주기에 여러 포신이 함께 발사된다.
 // - rear/side 포신은 Diep.io처럼 추진/보조 화력이라 피해와 수명이 낮다.
 function evolutionVolleySpecs(type,r,shotNo){
@@ -4106,7 +4158,7 @@ function evolutionVolleySpecs(type,r,shotNo){
 
   switch(type){
     case 'twin':
-      return[wrap(specs[n%2],.72,1,1,.62)];
+      return all(.72,1,1,.62);
     case 'sniperClass':case 'machineGun':case 'assassin':case 'ranger':case 'stalker':
     case 'destroyer':case 'annihilator':case 'skimmer':case 'glider':case 'rocketeer':
     case 'trapper':case 'megaTrapper':case 'shotgun':case 'palletShot':
@@ -4327,6 +4379,13 @@ function drawTank(e){
     for(let k=-3;k<=3;k++){const yy=k*9+Math.sin(t*13+k)*3;ctx.beginPath();ctx.moveTo(-r-50-Math.abs(k)*8,yy);ctx.lineTo(-r-9,yy*.55);ctx.stroke()}
     ctx.strokeStyle='rgba(205,255,255,.74)';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,0,r+15+Math.sin(t*10)*3,(r+15)*.45,t*1.8,0,TAU);ctx.stroke();ctx.shadowBlur=0;ctx.restore();
   }
+  if(cannon==='gojo'){
+    ctx.save();ctx.rotate(-e.angle);ctx.shadowColor='#a596ff';ctx.shadowBlur=16;
+    ctx.strokeStyle='rgba(158,142,255,.86)';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.arc(0,0,r+13,0,TAU);ctx.stroke();
+    for(let k=0;k<4;k++){const aa=t*.55+k*TAU/4;ctx.fillStyle=k%2?'#ff8da5':'#75c9ff';ctx.beginPath();ctx.arc(Math.cos(aa)*(r+13),Math.sin(aa)*(r+13),3,0,TAU);ctx.fill()}
+    ctx.restore();
+  }
 
   // Diep.io evolution barrels/chassis are drawn as the evolved weapon geometry.
   drawEvolutionChassis(e,r);
@@ -4418,6 +4477,8 @@ function drawPlasmaTethers(){
 
 function skillRuneColor(z){
   const name=String(z.type||'');
+  if(name==='gojoAo')return '#70bfff';
+  if(name==='gojoAka')return '#ff8193';
   if(/blood|burn|flame|missile|mortar|quake|siege|kinetic/i.test(name))return '#ffad78';
   if(/void|gravity|abyss|phantom|ring|mirror|vortex/i.test(name))return '#c9a8ff';
   if(/frost|zero|crystal|star|sanctuary|time|thunder/i.test(name))return '#c9f5ff';
@@ -4482,7 +4543,12 @@ function drawSkillZones(){
     const extent=Math.max(100,Number(z.radius)||0,Number(z.length)||0);
     if(!screenVisibleWorld(z.x,z.y,Math.min(1400,extent+100)))continue;
     const[x,y]=worldToScreen(z.x,z.y),p=clamp(z.life/z.maxLife,0,1),q=1-p;ctx.save();ctx.translate(x,y);ctx.globalAlpha=Math.min(1,p*1.3);
-    if(z.type==='burstBomb'){
+    if(z.type==='gojoAo'||z.type==='gojoAka'){
+      const blue=z.type==='gojoAo',color=blue?'#75c7ff':'#ff8395';
+      ctx.strokeStyle=color;ctx.shadowColor=color;ctx.shadowBlur=20;ctx.lineWidth=4;
+      for(let k=0;k<3;k++){const rr=z.radius*(blue?.24+k*.21:.42+k*.20)*(blue?1-.14*q:1+.18*q);ctx.beginPath();ctx.arc(0,0,rr,0,TAU);ctx.stroke()}
+      ctx.fillStyle=blue?'rgba(74,155,255,.14)':'rgba(255,75,105,.14)';ctx.beginPath();ctx.arc(0,0,z.radius*.42,0,TAU);ctx.fill();ctx.shadowBlur=0;
+    }else if(z.type==='burstBomb'){
       const pulse=.75+.25*Math.sin(t*12);ctx.shadowColor='#65ecff';ctx.shadowBlur=20;ctx.strokeStyle='#8df6ff';ctx.lineWidth=5;ctx.beginPath();ctx.arc(0,0,z.radius*(.35+.1*pulse),0,TAU);ctx.stroke();for(let k=0;k<8;k++){const aa=k*TAU/8+t*2;ctx.beginPath();ctx.moveTo(Math.cos(aa)*28,Math.sin(aa)*28);ctx.lineTo(Math.cos(aa)*z.radius*.55,Math.sin(aa)*z.radius*.55);ctx.stroke()}ctx.shadowBlur=0;
     }else if(z.type==='crystalPrism'){
       ctx.rotate(t*.6);ctx.shadowColor='#c8fbff';ctx.shadowBlur=20;ctx.strokeStyle='#dfffff';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(0,-z.radius);ctx.lineTo(z.radius*.866,z.radius*.5);ctx.lineTo(-z.radius*.866,z.radius*.5);ctx.closePath();ctx.stroke();ctx.globalAlpha*=.35;ctx.fillStyle='#72d9ff';ctx.fill();ctx.globalAlpha=1;ctx.shadowBlur=0;
@@ -4604,7 +4670,14 @@ function drawCombatEffects(layer='base'){
     }
     const[x,y]=worldToScreen(f.x,f.y),p=clamp(f.life/f.maxLife,0,1),q=1-p;
     ctx.save();ctx.translate(x,y);ctx.rotate(f.angle);ctx.globalAlpha=Math.min(1,p*1.35);
-    if(f.type==='cannonSignature'){
+    if(f.type==='gojoPurple'){
+      const length=f.radius,flare=1+.12*Math.sin(t*25);
+      ctx.lineCap='round';ctx.shadowColor='#a46cff';ctx.shadowBlur=32;
+      ctx.strokeStyle='rgba(121,79,255,.48)';ctx.lineWidth=148*p*flare;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(length,0);ctx.stroke();
+      ctx.strokeStyle='rgba(206,139,255,.86)';ctx.lineWidth=77*p;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(length,0);ctx.stroke();
+      ctx.strokeStyle='#fff3ff';ctx.lineWidth=21*p;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(length,0);ctx.stroke();
+      ctx.shadowBlur=0;
+    }else if(f.type==='cannonSignature'){
       drawCannonSignature(f.cannon,t,f.radius,'muzzle');
     }else if(f.type==='phantomTeleportTrace'){
       ctx.strokeStyle='#d4c8ff';ctx.shadowColor='#aa91ff';ctx.shadowBlur=16;ctx.lineWidth=5*p+1;ctx.setLineDash([12,8]);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(f.radius*q,0);ctx.stroke();ctx.setLineDash([]);ctx.shadowBlur=0;
@@ -5060,6 +5133,10 @@ function drawVariantProjectile(b,time){
     case 'oracle':
       ctx.fillStyle='#fff2b5';ctx.ellipse(0,0,17,9,0,0,TAU);ctx.fill();ctx.stroke();
       ctx.fillStyle='#9b7937';ctx.beginPath();ctx.arc(2,0,6,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(3,-2,2,0,TAU);ctx.fill();break;
+    case 'gojo':
+      ctx.strokeStyle='#7abaff';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,0,17,10,time*2,0,TAU);ctx.stroke();
+      ctx.strokeStyle='#ff829d';ctx.beginPath();ctx.ellipse(0,0,10,17,-time*2.3,0,TAU);ctx.stroke();
+      ctx.fillStyle='#e9d7ff';ctx.beginPath();ctx.arc(0,0,7,0,TAU);ctx.fill();break;
     default:return false;
   }
   ctx.shadowBlur=0;return true;
@@ -5512,12 +5589,12 @@ function skillAimSpec(cannon,slot){
       blaster:{type:'target',distance:760,radius:185},ranger:{type:'dash',distance:720,width:72,end:72},ricochet:{type:'cone',distance:500,half:.30},mortar:{type:'barrage',distance:650,radius:125,spacing:105,count:5},
       shredder:{type:'cone',distance:700,half:.20},seeker:{type:'line',distance:900,width:25},frost:{type:'target',distance:470,radius:280},magnet:{type:'target',distance:500,radius:330},
       cyclone:{type:'cone',distance:720,half:.24},juggernaut:{type:'dash',distance:580,width:72,end:150},mirror:{type:'cone',distance:520,half:.34},lancer:{type:'line',distance:1180,width:28},
-      leviathan:{type:'cone',distance:650,half:.66},valkyrie:{type:'dash',distance:700,width:58,end:105},berserker:{type:'cone',distance:520,half:.50},oracle:{type:'autoTarget',distance:1350,radius:90}
+      leviathan:{type:'cone',distance:650,half:.66},valkyrie:{type:'dash',distance:700,width:58,end:105},berserker:{type:'cone',distance:520,half:.50},oracle:{type:'autoTarget',distance:1350,radius:90},gojo:{type:'target',distance:480,radius:210}
     }[cannon]||null;
   }
   if(slot===2){
     if(cannon==='error'&&performance.now()<(player.overclockUntil||0))return{type:'dash',distance:460,width:55,end:92};
-    return{rocket:{type:'self',radius:148},titan:{type:'self',radius:132},phantom:{type:'self',radius:105},ring:{type:'self',radius:175},chrono:{type:'self',radius:185},void:{type:'self',radius:430},nova:{type:'self',radius:185},comet:{type:'target',distance:620,radius:370},stellar:{type:'self',radius:145},error:{type:'self',radius:125},glitch:{type:'dash',distance:900,width:96,end:96},zero:{type:'self',radius:560},deku:{type:'line',distance:800,width:58},sniper:{type:'cone',distance:1800,half:.48},bloodlust:{type:'self',radius:520},cyclone:{type:'self',radius:260},juggernaut:{type:'self',radius:150},mirror:{type:'self',radius:190},lancer:{type:'dash',distance:980,width:58,end:130},leviathan:{type:'self',radius:520},valkyrie:{type:'target',distance:560,radius:360},berserker:{type:'self',radius:190},oracle:{type:'target',distance:600,radius:340}}[cannon]||null;
+    return{rocket:{type:'self',radius:148},titan:{type:'self',radius:132},phantom:{type:'self',radius:105},ring:{type:'self',radius:175},chrono:{type:'self',radius:185},void:{type:'self',radius:430},nova:{type:'self',radius:185},comet:{type:'target',distance:620,radius:370},stellar:{type:'self',radius:145},error:{type:'self',radius:125},glitch:{type:'dash',distance:900,width:96,end:96},zero:{type:'self',radius:560},deku:{type:'line',distance:800,width:58},sniper:{type:'cone',distance:1800,half:.48},bloodlust:{type:'self',radius:520},cyclone:{type:'self',radius:260},juggernaut:{type:'self',radius:150},mirror:{type:'self',radius:190},lancer:{type:'dash',distance:980,width:58,end:130},leviathan:{type:'self',radius:520},valkyrie:{type:'target',distance:560,radius:360},berserker:{type:'self',radius:190},oracle:{type:'target',distance:600,radius:340},gojo:{type:'target',distance:540,radius:225}}[cannon]||null;
   }
   if(slot===3){if(cannon==='error')return{type:'dash',distance:360,width:80,end:235};if(cannon==='deku')return{type:'self',radius:140}}
   if(slot===4&&cannon==='deku')return{type:'self',radius:170};
@@ -5705,7 +5782,8 @@ function isEditableInputTarget(target){
 addEventListener('keydown',e=>{
   if(isEditableInputTarget(e.target))return;input.keys.add(e.code);
   if(e.code==='KeyQ'&&!e.repeat){beginHeldSkillAim(1,'keyboard');e.preventDefault()}
-  if(e.code==='KeyR'&&!e.repeat){beginHeldSkillAim(2,'keyboard');e.preventDefault()}
+  if(e.code==='KeyE'&&player?.cannonType==='gojo'&&!e.repeat){beginHeldSkillAim(2,'keyboard');e.preventDefault()}
+  if(e.code==='KeyR'&&player?.cannonType!=='gojo'&&!e.repeat){beginHeldSkillAim(2,'keyboard');e.preventDefault()}
   if(e.code==='KeyT'&&!e.repeat){beginHeldSkillAim(3,'keyboard');e.preventDefault()}
   if(e.code==='KeyY'&&!e.repeat){beginHeldSkillAim(4,'keyboard');e.preventDefault()}
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()
@@ -5713,7 +5791,8 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>{
   if(isEditableInputTarget(e.target))return;input.keys.delete(e.code);
   if(e.code==='KeyQ'){if(heldSkillAim.active&&heldSkillAim.slot===1)releaseHeldSkillAim(1);else if(player?.errorQCharging)releaseErrorQCharge();e.preventDefault()}
-  if(e.code==='KeyR'){if(heldSkillAim.active&&heldSkillAim.slot===2)releaseHeldSkillAim(2);e.preventDefault()}
+  if(e.code==='KeyE'&&player?.cannonType==='gojo'){if(heldSkillAim.active&&heldSkillAim.slot===2)releaseHeldSkillAim(2);e.preventDefault()}
+  if(e.code==='KeyR'&&player?.cannonType!=='gojo'){if(heldSkillAim.active&&heldSkillAim.slot===2)releaseHeldSkillAim(2);e.preventDefault()}
   if(e.code==='KeyT'){if(heldSkillAim.active&&heldSkillAim.slot===3)releaseHeldSkillAim(3);e.preventDefault()}
   if(e.code==='KeyY'){if(heldSkillAim.active&&heldSkillAim.slot===4)releaseHeldSkillAim(4);e.preventDefault()}
 });addEventListener('mousemove',e=>{input.mouseX=e.clientX;input.mouseY=e.clientY});addEventListener('mousedown',e=>{if(e.button===0)input.firing=true});addEventListener('mouseup',e=>{if(e.button===0)input.firing=false});addEventListener('blur',()=>{input.firing=false;input.mobileAimActive=false;input.keys.clear();cancelHeldSkillAim();if(player?.errorQCharging)cancelErrorQCharge()});

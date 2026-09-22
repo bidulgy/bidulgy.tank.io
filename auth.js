@@ -379,6 +379,13 @@ const CANNONS=Object.freeze({
     skill3:'T 발경 · 7초 동안 이동속도 대폭 증가',
     skill4:'Y 변속 · 7초 동안 공격력/탄속/연사/이동속도 강화'
   },
+  gojo:{
+    id:'gojo',name:'고죠',rarity:'singularity',rarityLabel:'SINGULARITY',chance:0,
+    desc:'최고 레벨 45 달성 시 영구 해금. 푸른 인력과 붉은 척력을 합성해 전장을 제어합니다.',
+    passive:'평타 · 무한 코어: 고속 회전 에너지탄',
+    skill:'Q 아오 · 지정 지점에 푸른 인력장 전개',
+    skill2:'E 아카 · 지정 지점에 붉은 척력 폭발 · Q+E 무라사키 합성 광선'
+  },
   sniper:{
     id:'sniper',name:'스나이퍼',rarity:'divine',rarityLabel:'디바인',chance:.000033333,
     desc:'전장을 멀리 내려다보며 한 발에 큰 피해를 주는 초장거리 디바인 저격 탱크입니다.',
@@ -395,8 +402,8 @@ const CANNONS=Object.freeze({
   }
 });
 
-const AUTH_BUILD='V5.81';
-console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · forced 46-cannon registry + sniper player-only homing`);
+const AUTH_BUILD='V5.90';
+console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · 47-cannon registry`);
 const CANNON_DISPLAY_ORDER=Object.freeze([
   'standard','scout','bastion',
   'rapid','dual','needle','blaster','ranger',
@@ -407,11 +414,11 @@ const CANNON_DISPLAY_ORDER=Object.freeze([
   'ring','chrono','void','mirror','lancer',
   'nova','comet','stellar','leviathan','valkyrie',
   'error','glitch','zero','berserker','oracle',
-  'deku','sniper','bloodlust'
+  'deku','gojo','sniper','bloodlust'
 ]);
 const MISSING_CANNONS=CANNON_DISPLAY_ORDER.filter(id=>!CANNONS[id]);
 if(MISSING_CANNONS.length)console.error('[Sworder VS Tank] missing cannon definitions:',MISSING_CANNONS);
-if(Object.keys(CANNONS).length!==46)console.warn('[Sworder VS Tank] expected 46 cannons, got',Object.keys(CANNONS).length);
+if(Object.keys(CANNONS).length!==47)console.warn('[Sworder VS Tank] expected 47 cannons, got',Object.keys(CANNONS).length);
 function displayCannons(){return CANNON_DISPLAY_ORDER.map(id=>CANNONS[id]).filter(Boolean)}
 
 window.IronCellCannons=CANNONS;
@@ -624,12 +631,14 @@ function renderCannonGarage(){
   if(els.collection){
     els.collection.innerHTML=displayCannons().map(c=>{
       const own=owned.has(c.id),eq=equipped.id===c.id;
-      const chance=c.id==='standard'?'기본 지급':`뽑기 ${c.chance}%`;
-      return `<button type="button" class="cannon-card rarity-card-${c.rarity} ${own?'':'locked'} ${eq?'equipped':''}" data-cannon="${c.id}" ${own?'':'disabled'}>
+      const claimable=c.id==='gojo'&&Number(profile.best_level||1)>=45;
+      const available=own||claimable;
+      const chance=c.id==='standard'?'기본 지급':c.id==='gojo'?'LV 45 해금 · 뽑기 제외':`뽑기 ${c.chance}%`;
+      return `<button type="button" class="cannon-card rarity-card-${c.rarity} ${available?'':'locked'} ${eq?'equipped':''}" data-cannon="${c.id}" ${available?'':'disabled'}>
         <div class="cannon-card-head"><strong>${c.name}${c.id==='sniper'?' · NEW':''}</strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span></div>
         <small class="cannon-chance">${chance}</small>
-        <p>${own?c.desc:'아직 획득하지 않은 대포입니다.'}</p>${own&&c.passive?`<div class="cannon-passive-line">● ${c.passive}</div>`:''}${own&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}${own&&c.skill2?`<div class="cannon-skill-line second">◆ ${c.skill2}</div>`:''}${own&&c.skill3?`<div class="cannon-skill-line third">✦ ${c.skill3}</div>`:''}${own&&c.skill4?`<div class="cannon-skill-line fourth">◆ ${c.skill4}</div>`:''}
-        <div class="equip-label">${eq?'장착 중':own?'눌러서 장착':'미보유'}</div>
+        <p>${available?c.desc:c.id==='gojo'?'최고 레벨 45를 달성하면 해금됩니다.':'아직 획득하지 않은 대포입니다.'}</p>${available&&c.passive?`<div class="cannon-passive-line">● ${c.passive}</div>`:''}${available&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}${available&&c.skill2?`<div class="cannon-skill-line second">◆ ${c.skill2}</div>`:''}${available&&c.skill3?`<div class="cannon-skill-line third">✦ ${c.skill3}</div>`:''}${available&&c.skill4?`<div class="cannon-skill-line fourth">◆ ${c.skill4}</div>`:''}
+        <div class="equip-label">${eq?'장착 중':own?'눌러서 장착':claimable?'눌러서 해금·장착':c.id==='gojo'?'LV 45 필요':'미보유'}</div>
       </button>`;
     }).join('');
     els.collection.querySelectorAll('.cannon-card:not(.locked)').forEach(b=>b.addEventListener('click',()=>void equipCannon(b.dataset.cannon)));
@@ -1331,7 +1340,15 @@ async function pullCannons(count=1){
 }
 async function equipCannon(cannonId){
   if(authBusy||!currentUser)return;const cannon=CANNONS[cannonId];if(!cannon)return;
-  try{const {data,error}=await client.rpc('iron_cell_equip_cannon_v1',{p_cannon:cannonId});if(error)throw error;profile=data||profile;renderProfile();setGachaMessage(`${cannon.name} 장착 완료`,'good')}
+  try{
+    if(cannonId==='gojo'&&!ownedCannons().includes('gojo')){
+      const claim=await client.rpc('iron_cell_claim_singularity_v1');
+      if(claim.error)throw claim.error;
+      profile=claim.data||profile;
+    }
+    const {data,error}=await client.rpc('iron_cell_equip_cannon_v1',{p_cannon:cannonId});
+    if(error)throw error;profile=data||profile;renderProfile();setGachaMessage(`${cannon.name} 장착 완료`,'good')
+  }
   catch(error){console.error(error);setGachaMessage('대포 장착에 실패했습니다.','error')}
 }
 
@@ -1525,6 +1542,10 @@ async function saveRun(run, finish=false){
 
     const result = data || {};
     if(result.profile) profile = result.profile;
+    if(Number(profile?.best_level||1)>=45&&!ownedCannons().includes('gojo')){
+      const claim=await client.rpc('iron_cell_claim_singularity_v1');
+      if(!claim.error&&claim.data)profile=claim.data;
+    }
     renderProfile();
     return result;
   }catch(error){

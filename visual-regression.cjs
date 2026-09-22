@@ -3,6 +3,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(__dirname + '/game.js', 'utf8');
+const authSource = fs.readFileSync(__dirname + '/auth.js', 'utf8');
+const unlockSql = fs.readFileSync(__dirname + '/singularity_unlock.sql', 'utf8');
 const section = (start, end) => {
   const a = source.indexOf(start);
   const b = source.indexOf(end, a + start.length);
@@ -37,10 +39,21 @@ const data = vm.runInContext(`({
   evolutions: Object.keys(DIEP_EVOLUTION_INFO),
   barrels: Object.fromEntries(Object.keys(DIEP_EVOLUTION_INFO).map(id => [id, evolutionBarrelSpecs(id, 27)]))
 })`, context);
-assert.equal(data.themes.length, 46, 'all 46 cannon themes must remain');
+assert.equal(data.themes.length, 47, 'all 47 cannon themes must remain');
+assert(data.themes.includes('gojo'),'Gojo needs a dedicated tank theme');
+assert(authSource.includes("id:'gojo',name:'고죠',rarity:'singularity'"),'Gojo must be Singularity');
+assert(authSource.includes("c.id==='gojo'?'LV 45 해금 · 뽑기 제외'"),'Gojo must not appear as a gacha drop');
+assert(unlockSql.includes('coalesce(v_row.best_level,1)<45'),'server must enforce level 45');
+assert(unlockSql.includes("'deku','sniper','bloodlust','gojo'"),'equipping Gojo must be server supported');
 assert.equal(vm.runInContext("DIEP_EVOLUTION_INFO.quadTank.mods.damage ?? 1",context),1,'Quad evolution must not lower base damage');
 assert.equal(vm.runInContext("evolutionVolleySpecs('quadTank',27,1).length",context),4,'Quad must keep four firing directions');
 assert.equal(vm.runInContext("evolutionVolleySpecs('quadTank',27,1).every(shot => shot.damageScale === 1)",context),true,'Quad bullets must retain full damage');
+assert.equal(vm.runInContext("evolutionVolleySpecs('twin',27,1).length",context),2,'Twin must fire both barrels together');
+assert.equal(vm.runInContext("evolutionVolleySpecs('twin',27,1).map(shot => shot.side).join(',')",context),'-10,10','Twin shots must originate from opposite barrels');
+assert(source.includes("e.code==='KeyE'&&player?.cannonType==='gojo'"),'Gojo Aka must use E');
+assert(source.includes('return tryGojoPurple()'),'simultaneous Q+E must trigger Purple');
+assert.equal(vm.runInContext("skillAimSpec('gojo',1).type",context),'target','Ao needs an area preview');
+assert.equal(vm.runInContext("skillAimSpec('gojo',2).type",context),'target','Aka needs an area preview');
 const traces = new Set();
 const variantTraces = new Set();
 for (const id of data.themes) {

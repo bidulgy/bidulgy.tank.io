@@ -867,6 +867,11 @@
 .mini-cannon.cannon-mirror{background:#8065a8;border-color:#f0d0ff}.mini-cannon.cannon-lancer{background:#667ca7;border-color:#dae7ff}
 .mini-cannon.cannon-leviathan{background:#385f77;border-color:#9feaff}.mini-cannon.cannon-valkyrie{background:#477d8f;border-color:#a2f2ff}
 .mini-cannon.cannon-berserker{background:#8d3e34;border-color:#ff9a78}.mini-cannon.cannon-oracle{background:#8a8151;border-color:#fff2ae}
+.rarity.singularity{background:linear-gradient(120deg,#62b9ff,#d6b7ff 55%,#ff728f);color:#101b38;border:1px solid #eadcff;box-shadow:0 0 14px rgba(168,127,255,.45)}
+.rarity-card-singularity{background:linear-gradient(145deg,rgba(38,70,129,.7),rgba(75,33,112,.68));box-shadow:inset 0 0 0 1px rgba(192,163,255,.58),0 0 22px rgba(130,104,255,.16)}
+.mini-cannon.cannon-gojo{background:#eaf3ff;border-color:#9b84ff;box-shadow:0 0 12px #6caeff,0 0 21px rgba(255,108,147,.42)}
+.skill-button.cannon-gojo .skill-fill{background:linear-gradient(90deg,#579bff,#ae9bff)}
+.skill2-button.cannon-gojo .skill-fill{background:linear-gradient(90deg,#ff5576,#ffa1b2)}
 
 /* ===== V5.70 MOBILE CONTROL OPTIMIZATION ===== */
 @media (max-width:760px),(pointer:coarse){
