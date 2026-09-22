@@ -3,10 +3,12 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.79 · Diep evolution fire + player-only sniper homing');
+console.info('[Sworder VS Tank] game V5.83 · complete skill previews + central pentagon swarm');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
+const CENTER_PENTAGON_TARGET=200;
+const CENTER_PENTAGON_REFILL_BATCH=8;
 const WORLD_SNAPSHOT_INTERVAL=650;
 
 const INITIAL_NORMAL_SHAPES=110;
@@ -24,7 +26,7 @@ const LOCAL_REBALANCE_INTERVAL=.28;
 const LOCAL_REBALANCE_BATCH=4;
 let running=false,paused=false,last=performance.now(),camera={x:0,y:0},shapes=[],bullets=[],particles=[],combatFx=[],skillZones=[],shake=0,classUpgradeShown=false,player,playerHistory=[];
 const remotePlayers=new Map();
-let onlineChannel=null,onlineReady=false,onlineSelfId='',lastStateSend=0,networkSerial=0,lastRunAutosave=0,runSaveBusy=false,normalSpawnTimer=0;
+let onlineChannel=null,onlineReady=false,onlineSelfId='',lastStateSend=0,networkSerial=0,lastRunAutosave=0,runSaveBusy=false,normalSpawnTimer=0,centerPentagonTimer=0;
 let onlinePresenceIds=new Set(),onlinePingTimer=0,onlineLatencyMs=0;
 let onlineReconnectTimer=0,onlineReconnectBusy=false,lastNetworkStateReceive=0;
 let localStateSeq=0,lastSkillHudFrameUpdate=0;
@@ -231,6 +233,48 @@ const TANK_THEMES=Object.freeze({
   leviathan:{body:'#385f77',edge:'#1d3648',glow:'#9feaff'},valkyrie:{body:'#477d8f',edge:'#27505e',glow:'#a2f2ff'},
   berserker:{body:'#8d3e34',edge:'#4e201b',glow:'#ff9a78'},oracle:{body:'#8a8151',edge:'#4d472b',glow:'#fff2ae'}
 });
+// Every equipped cannon has its own compact visual grammar. Existing projectile
+// silhouettes stay intact; this adds a readable signature even for shared shapes.
+const CANNON_VISUAL_IDS=Object.freeze(Object.keys(TANK_THEMES));
+const CANNON_VISUAL_INDEX=Object.freeze(Object.fromEntries(CANNON_VISUAL_IDS.map((id,i)=>[id,i])));
+function drawCannonSignature(cannon,age,extent,mode='projectile'){
+  const index=CANNON_VISUAL_INDEX[cannon];
+  if(index===undefined)return;
+  const theme=TANK_THEMES[cannon],symbol=index%4,count=3+index%8;
+  const twist=(Math.floor(index/8)*.21+age*(symbol%2?1:-1));
+  const outer=mode==='projectile'?Math.min(20,extent*.48+8):Math.min(125,extent*.72);
+  const alpha=mode==='projectile'?.60:mode==='muzzle'?.72:.58;
+  ctx.save();ctx.globalAlpha*=alpha;ctx.strokeStyle=theme.glow;ctx.fillStyle=theme.glow;
+  ctx.lineWidth=mode==='projectile'?1.5:2.5;
+  if(!renderPressure){ctx.shadowColor=theme.glow;ctx.shadowBlur=mode==='projectile'?8:16}
+  ctx.rotate(twist);
+  if(symbol===0){
+    // A segmented halo with an individual spoke count and phase.
+    for(let k=0;k<count;k++){const a=k*TAU/count;ctx.beginPath();ctx.arc(0,0,outer,a+.08,a+TAU/count*.62);ctx.stroke()}
+  }else if(symbol===1){
+    // Paired chevrons read as forward energy even on shared bullet meshes.
+    for(let k=0;k<count;k++){const a=k*TAU/count;ctx.save();ctx.rotate(a);ctx.beginPath();ctx.moveTo(outer*.55,-outer*.16);ctx.lineTo(outer,0);ctx.lineTo(outer*.55,outer*.16);ctx.stroke();ctx.restore()}
+  }else if(symbol===2){
+    // Broken crystal facets keep each cannon's count and color visible.
+    for(let k=0;k<count;k++){const a=k*TAU/count;ctx.beginPath();ctx.moveTo(Math.cos(a)*outer*.52,Math.sin(a)*outer*.52);ctx.lineTo(Math.cos(a+.13)*outer,Math.sin(a+.13)*outer);ctx.lineTo(Math.cos(a+.28)*outer*.66,Math.sin(a+.28)*outer*.66);ctx.stroke()}
+  }else{
+    // Circuit ticks make the digital and precision families visually distinct.
+    for(let k=0;k<count;k++){const a=k*TAU/count;ctx.save();ctx.rotate(a);ctx.strokeRect(outer*.64,-2,outer*.25,4);ctx.restore()}
+  }
+  // Six radial marks encode the full cannon identity, including variants that
+  // share a projectile mesh. Their lengths are unique for all 46 cannons.
+  for(let bit=0;bit<6;bit++){
+    const a=bit*TAU/6,lit=(index+1)&(1<<bit);
+    const from=outer*(lit?.22:.32),to=outer*(lit?.48:.40);
+    ctx.beginPath();ctx.moveTo(Math.cos(a)*from,Math.sin(a)*from);
+    ctx.lineTo(Math.cos(a)*to,Math.sin(a)*to);ctx.stroke();
+  }
+  if(mode!=='projectile'){
+    ctx.globalAlpha*=.55;ctx.lineWidth=1.5;ctx.beginPath();
+    ctx.arc(0,0,outer*.40,twist,twist+Math.PI*1.35);ctx.stroke();
+  }
+  ctx.restore();
+}
 
 // V5.61: Diep.io-style evolution tree. Drone/summoner branches are intentionally excluded.
 const DIEP_EVOLUTION_INFO=Object.freeze({
@@ -379,6 +423,18 @@ function spawnShape(type=null,preferLocal=true,forcedAnchor=null){
   shapes.push(shape);
   return shape;
 }
+function centralPentagonPoint(slot){
+  const angle=slot*2.399963229728653;
+  const radius=42*Math.sqrt(slot+.5);
+  return{x:WORLD/2+Math.cos(angle)*radius,y:WORLD/2+Math.sin(angle)*radius};
+}
+function spawnCentralPentagon(slot){
+  const shape=spawnShape('pentagon',false);
+  const pos=centralPentagonPoint(slot);
+  shape.x=pos.x;shape.y=pos.y;
+  shape.centralCluster=true;shape.centralSlot=slot;
+  return shape;
+}
 
 function minDistanceToActiveAnchors(shape,anchors){
   let best=Infinity;
@@ -391,6 +447,7 @@ function minDistanceToActiveAnchors(shape,anchors){
 function recycleFarNormalShape(anchor,anchors){
   let candidate=null,bestDistance=LOCAL_SHAPE_RECYCLE_DISTANCE;
   for(const s of shapes){
+    if(s.centralCluster)continue;
     const d=minDistanceToActiveAnchors(s,anchors);
     if(d>bestDistance){
       bestDistance=d;
@@ -414,12 +471,13 @@ function ensureLocalShapeDensity(){
   const anchors=activeShapeSpawnAnchors();
   if(!anchors.length)return;
 
-  let normalCount=shapes.length;
+  let normalCount=shapes.filter(s=>!s.centralCluster).length;
 
   const radius2=LOCAL_SHAPE_RADIUS*LOCAL_SHAPE_RADIUS;
   for(const anchor of anchors){
     let nearby=0;
     for(const s of shapes){
+      if(s.centralCluster)continue;
       const dx=s.x-anchor.x,dy=s.y-anchor.y;
       if(dx*dx+dy*dy<=radius2)nearby++;
     }
@@ -443,12 +501,12 @@ function ensureLocalShapeDensity(){
 function populate(){
   shapes=[];bullets=[];particles=[];combatFx=[];skillZones=[];playerHistory=[];
   normalSpawnTimer=0;
+  centerPentagonTimer=0;
   localRebalanceTimer=0;
   normalSpawnAnchorCursor=0;
 
-  // V5.44: 중앙 전용 오각형 군집 없음.
-  // 삼각형/사각형/오각형 모두 동일한 일반 스폰 규칙을 사용한다.
   for(let i=0;i<INITIAL_NORMAL_SHAPES;i++)spawnShape(null,i%2===0);
+  for(let i=0;i<CENTER_PENTAGON_TARGET;i++)spawnCentralPentagon(i);
 }
 
 function setNetworkStatus(state,text){
@@ -530,8 +588,8 @@ function serializeShape(s){
     x:s.x,y:s.y,vx:s.vx||0,vy:s.vy||0,
     r:s.r,hp:s.hp,maxHp:s.maxHp,xp:s.xp,sides:s.sides,
     angle:s.angle,spin:s.spin,
-    // V5.44 compatibility field: central clusters were removed.
-    centralCluster:false,
+    centralCluster:s.centralCluster===true,
+    centralSlot:s.centralCluster===true?s.centralSlot:-1,
     spawnAge:s.spawnAge||0
   };
 }
@@ -573,8 +631,8 @@ function applyWorldSnapshot(payload){
     s.sides=Math.max(3,Math.floor(safeRemoteNumber(raw.sides,s.sides||4)));
     s.angle=safeRemoteNumber(raw.angle,s.angle||0);
     s.spin=safeRemoteNumber(raw.spin,s.spin||0);
-    // Older clients may still send this field, but V5.44 never keeps a central cluster.
-    s.centralCluster=false;
+    s.centralCluster=raw.centralCluster===true&&s.type==='pentagon';
+    s.centralSlot=s.centralCluster?clamp(Math.floor(safeRemoteNumber(raw.centralSlot,-1)),0,CENTER_PENTAGON_TARGET-1):-1;
     s.spawnAge=Math.max(0,safeRemoteNumber(raw.spawnAge,s.spawnAge||0));
     next.push(s);
   }
@@ -1323,7 +1381,11 @@ function spawnAttackFx(cannon,x,y,angle,remote=false){
 
   // V5.47: 예외 없이 +X 방향 = 실제 공격 진행 방향.
   // 로켓도 사용자가 보는 공격 이펙트 방향을 탄환 방향과 동일하게 맞춘다.
-  spawnCombatFx(f[0],x,y,{angle:fxAngle,color:f[1],life:f[2],radius:f[3],cannon});
+  const signature=CANNON_VISUAL_INDEX[cannon];
+  spawnCombatFx(f[0],x,y,{angle:fxAngle,color:TANK_THEMES[cannon]?.glow||f[1],life:f[2],radius:f[3],cannon});
+  if(signature!==undefined&&renderPressure<2){
+    spawnCombatFx('cannonSignature',x,y,{angle:fxAngle,color:TANK_THEMES[cannon].glow,life:.20,radius:28+signature%5*4,cannon});
+  }
 }
 function receiveRemoteSkill(payload){
   if(!payload||String(payload.ownerId||'')===onlineSelfId)return;
@@ -2936,25 +2998,19 @@ function updateShapes(dt){
     s.y=clamp(s.y+s.vy*dt,s.r,WORLD-s.r);
     s.vx*=Math.pow(.05,dt);
     s.vy*=Math.pow(.05,dt);
-
-    // V5.44: 이전 버전에서 넘겨받은 중앙 군집 표시가 있으면
-    // 새 호스트가 한 번만 일반 월드 위치로 풀어준다.
     if(host&&s.centralCluster){
-      const pos=chooseNormalSpawnPoint(false);
-      s.x=pos.x;
-      s.y=pos.y;
-      s.vx=0;
-      s.vy=0;
-      s.centralCluster=false;
-      s.spawnAge=0;
+      const home=centralPentagonPoint(s.centralSlot);
+      s.vx+=(home.x-s.x)*dt*1.6;
+      s.vy+=(home.y-s.y)*dt*1.6;
     }
   }
 
   if(!host)return;
 
-  const normalCount=shapes.length;
+  const normalCount=shapes.reduce((n,s)=>n+(s.centralCluster?0:1),0);
 
   normalSpawnTimer-=dt;
+  centerPentagonTimer-=dt;
   localRebalanceTimer-=dt;
 
   if(normalCount<NORMAL_SHAPE_TARGET&&normalSpawnTimer<=0){
@@ -2962,9 +3018,15 @@ function updateShapes(dt){
     for(let i=0;i<amount;i++)spawnShape();
     normalSpawnTimer=NORMAL_SPAWN_INTERVAL;
   }
-
-  // 중앙도 다른 지역과 동일하다.
-  // 플레이어 위치 주변 밀도 보정 외에는 특정 좌표에 별도 스폰을 하지 않는다.
+  if(centerPentagonTimer<=0){
+    const occupied=new Set(shapes.filter(s=>s.centralCluster).map(s=>s.centralSlot));
+    let added=0;
+    for(let slot=0;slot<CENTER_PENTAGON_TARGET&&added<CENTER_PENTAGON_REFILL_BATCH;slot++){
+      if(occupied.has(slot))continue;
+      spawnCentralPentagon(slot);added++;
+    }
+    centerPentagonTimer=.18;
+  }
   if(localRebalanceTimer<=0){
     ensureLocalShapeDensity();
     localRebalanceTimer=LOCAL_REBALANCE_INTERVAL;
@@ -3688,7 +3750,7 @@ function segmentMayTouchScreen(x1,y1,x2,y2,pad=120){
   if(ay>b.bottom&&by>b.bottom)return false;
   return true;
 }
-function drawShape(s){const[x,y]=worldToScreen(s.x,s.y),vb=viewScreenBounds(80);if(x<vb.left||y<vb.top||x>vb.right||y>vb.bottom)return;const spawnP=clamp((s.spawnAge||0)/.34,0,1),ease=1-Math.pow(1-spawnP,3),rr=s.r*(.35+.65*ease);ctx.save();ctx.globalAlpha=.28+.72*ease;ctx.shadowColor='rgba(0,0,0,.25)';ctx.shadowBlur=renderPressure?0:10;ctx.shadowOffsetY=renderPressure?0:4;polygon(x,y,rr,s.sides,s.angle);ctx.fillStyle=colorForShape(s.type);ctx.fill();ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.strokeStyle=edgeForShape(s.type);ctx.lineWidth=5;ctx.stroke();if(s.hp<s.maxHp){const w=s.r*1.6;ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(x-w/2,y+s.r+8,w,4);ctx.fillStyle='#7ee787';ctx.fillRect(x-w/2,y+s.r+8,w*(s.hp/s.maxHp),4)}ctx.restore()}
+function drawShape(s){const[x,y]=worldToScreen(s.x,s.y),vb=viewScreenBounds(80);if(x<vb.left||y<vb.top||x>vb.right||y>vb.bottom)return;const spawnP=clamp((s.spawnAge||0)/.34,0,1),ease=1-Math.pow(1-spawnP,3),rr=s.r*(.35+.65*ease);ctx.save();ctx.globalAlpha=.28+.72*ease;ctx.shadowColor='rgba(0,0,0,.25)';ctx.shadowBlur=renderPressure||s.centralCluster?0:10;ctx.shadowOffsetY=renderPressure||s.centralCluster?0:4;polygon(x,y,rr,s.sides,s.angle);ctx.fillStyle=colorForShape(s.type);ctx.fill();ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.strokeStyle=edgeForShape(s.type);ctx.lineWidth=5;ctx.stroke();if(s.hp<s.maxHp){const w=s.r*1.6;ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(x-w/2,y+s.r+8,w,4);ctx.fillStyle='#7ee787';ctx.fillRect(x-w/2,y+s.r+8,w*(s.hp/s.maxHp),4)}ctx.restore()}
 function drawCharacterMark(cannon,r){
   const marks={
     scout:['chevron','#bdf7ff'],bastion:['shield','#d8ecff'],
@@ -4126,7 +4188,7 @@ function evolutionShotsFromBase(type,r,shotNo,baseShot,baseAngle){
     shot.side=(Number(baseShot.side)||0)+(Number(m.side)||0);
     if(m.kind==='rimAuto')shot.evoMuzzleDistance=r*1.12;
     else if(m.kind==='centerAuto')shot.evoMuzzleDistance=r*.72;
-    else shot.evoMuzzleDistance=r*(.28+.78*(m.len||1))+3;
+    else shot.evoMuzzleDistance=r*(1.02+.78*(m.len||1))+3;
     shot.evoDamageScale=Number(m.damageScale)||1;
     shot.evoLifeScale=Number(m.lifeScale)||1;
     shot.evoSpeedScale=Number(m.speedScale)||1;
@@ -4137,6 +4199,7 @@ function evolutionShotsFromBase(type,r,shotNo,baseShot,baseAngle){
 function drawEvolutionChassis(e,r){
   const type=e.classType||'basic';if(type==='basic')return;
   const smasher=['smasher','landmine','autoSmasher','spike'].includes(type);
+  const glow=(TANK_THEMES[e.cannonType||'standard']||TANK_THEMES.standard).glow;
   ctx.save();
   if(smasher){
     const spikes=type==='spike'?12:type==='landmine'?8:6;
@@ -4147,7 +4210,9 @@ function drawEvolutionChassis(e,r){
 
   const drawBarrel=(spec)=>{
     ctx.save();ctx.rotate(spec.a||0);ctx.translate(0,spec.side||0);
-    const len=r*(.78*(spec.len||1)),w=Math.max(5,r*.32*(spec.w||1));
+    // The body is painted after the barrels. Keep the visible section outside
+    // its radius and use the same muzzle distance as the projectile spawn.
+    const len=r*(.74+.78*(spec.len||1))+3,w=Math.max(5,r*.32*(spec.w||1));
     ctx.fillStyle='rgba(177,190,201,.96)';ctx.strokeStyle='rgba(66,80,94,.98)';ctx.lineWidth=2;
     // Machine-gun style wide barrels taper slightly, otherwise rectangular Diep-style cannon.
     if(['machineGun','sprayer','shotgun','palletShot'].includes(type)&&spec.kind==='barrel'){
@@ -4155,6 +4220,10 @@ function drawEvolutionChassis(e,r){
     }else{
       ctx.fillRect(r*.28,-w/2,len,w);ctx.strokeRect(r*.28,-w/2,len,w);
     }
+    const barrelAlpha=ctx.globalAlpha;ctx.fillStyle=glow;ctx.globalAlpha=barrelAlpha*.70;
+    ctx.fillRect(r*.40,-w*.33,Math.max(5,len-r*.28-5),Math.max(1.5,w*.12));
+    ctx.fillRect(r*.28+len-3,-w*.38,3,w*.76);
+    ctx.globalAlpha=barrelAlpha;
     ctx.restore();
   };
   const drawRimAuto=(spec)=>{
@@ -4163,6 +4232,7 @@ function drawEvolutionChassis(e,r){
     ctx.fillStyle='#cfd9e1';ctx.strokeStyle='#536273';ctx.lineWidth=2;
     ctx.beginPath();ctx.arc(0,0,7.5,0,TAU);ctx.fill();ctx.stroke();
     ctx.fillRect(2,-3,r*.52,6);ctx.strokeRect(2,-3,r*.52,6);
+    ctx.fillStyle=glow;ctx.fillRect(r*.46,-2,4,4);
     ctx.restore();
   };
   const drawCenterAuto=(a=0)=>{
@@ -4170,6 +4240,7 @@ function drawEvolutionChassis(e,r){
     ctx.fillStyle='#d8e1e8';ctx.strokeStyle='#526171';ctx.lineWidth=2;
     ctx.beginPath();ctx.arc(0,0,8,0,TAU);ctx.fill();ctx.stroke();
     ctx.fillRect(2,-3,r*.64,6);ctx.strokeRect(2,-3,r*.64,6);
+    ctx.fillStyle=glow;ctx.fillRect(r*.55,-2,4,4);
     ctx.restore();
   };
 
@@ -4451,7 +4522,9 @@ function drawCombatEffects(layer='base'){
     }
     const[x,y]=worldToScreen(f.x,f.y),p=clamp(f.life/f.maxLife,0,1),q=1-p;
     ctx.save();ctx.translate(x,y);ctx.rotate(f.angle);ctx.globalAlpha=Math.min(1,p*1.35);
-    if(f.type==='phantomTeleportTrace'){
+    if(f.type==='cannonSignature'){
+      drawCannonSignature(f.cannon,t,f.radius,'muzzle');
+    }else if(f.type==='phantomTeleportTrace'){
       ctx.strokeStyle='#d4c8ff';ctx.shadowColor='#aa91ff';ctx.shadowBlur=16;ctx.lineWidth=5*p+1;ctx.setLineDash([12,8]);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(f.radius*q,0);ctx.stroke();ctx.setLineDash([]);ctx.shadowBlur=0;
     }else if(f.type==='phantomMarkBurst'){
       ctx.strokeStyle='#e0d6ff';ctx.shadowColor='#a88cff';ctx.shadowBlur=22;ctx.lineWidth=5*p+1;for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(0,0,f.radius*q*(.45+k*.24),0,TAU);ctx.stroke()}ctx.shadowBlur=0;
@@ -4842,11 +4915,73 @@ function drawCombatEffects(layer='base'){
         ctx.strokeStyle='#ff3fe2';ctx.strokeRect(-f.radius*q*.48+6,-f.radius*q*.52,f.radius*q*.96,f.radius*q*1.04);
       }
     }
+    if(f.cannon&&f.type!=='cannonSignature'&&f.maxLife>.5&&f.radius>70&&renderPressure<2){
+      drawCannonSignature(f.cannon,t+q*2,f.radius*q,'skill');
+    }
     ctx.restore();
   }
 }
 function tickerAngle(){return performance.now()*.003}
 
+// The sixteen late-game cannons used to borrow projectile meshes from older
+// weapons. Give each a silhouette of its own while retaining its physics.
+function drawVariantProjectile(b,time){
+  const id=b.cannon;
+  if((CANNON_VISUAL_INDEX[id]??-1)<30)return false;
+  const glow=TANK_THEMES[id].glow,spin=time*(id==='shredder'||id==='cyclone'?7:2)+(b.motionSeed||0);
+  ctx.shadowColor=glow;ctx.shadowBlur=renderPressure?5:17;
+  ctx.strokeStyle=glow;ctx.fillStyle='#f5fcff';ctx.lineWidth=2;
+  ctx.beginPath();
+  switch(id){
+    case 'blaster':
+      ctx.arc(0,0,10,0,TAU);ctx.fill();ctx.stroke();ctx.strokeStyle='#4c8cca';ctx.beginPath();ctx.arc(0,0,5,0,TAU);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(-28,-5);ctx.lineTo(-9,-5);ctx.moveTo(-28,5);ctx.lineTo(-9,5);ctx.stroke();break;
+    case 'ranger':
+      ctx.moveTo(19,0);ctx.lineTo(-13,-5);ctx.lineTo(-7,0);ctx.lineTo(-13,5);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.beginPath();ctx.moveTo(-14,-9);ctx.lineTo(-5,0);ctx.lineTo(-14,9);ctx.stroke();break;
+    case 'ricochet':
+      ctx.moveTo(15,-8);ctx.lineTo(0,-2);ctx.lineTo(15,7);ctx.lineTo(5,11);ctx.lineTo(-15,0);ctx.lineTo(5,-12);ctx.closePath();ctx.fill();ctx.stroke();break;
+    case 'mortar':
+      ctx.fillStyle='#605747';ctx.roundRect(-12,-11,24,22,6);ctx.fill();ctx.stroke();
+      ctx.fillStyle=glow;ctx.fillRect(3,-7,8,14);ctx.beginPath();ctx.moveTo(-13,-7);ctx.lineTo(-27,0);ctx.lineTo(-13,7);ctx.fill();break;
+    case 'shredder':
+      ctx.rotate(spin);for(let k=0;k<10;k++){const a=k*TAU/10,rr=k%2?10:16;ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr)}ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.fillStyle='#523174';ctx.beginPath();ctx.arc(0,0,5,0,TAU);ctx.fill();break;
+    case 'seeker':
+      ctx.moveTo(20,0);ctx.lineTo(4,-9);ctx.lineTo(-12,-7);ctx.lineTo(-17,0);ctx.lineTo(-12,7);ctx.lineTo(4,9);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.fillStyle='#5066a0';ctx.beginPath();ctx.arc(3,0,4,0,TAU);ctx.fill();ctx.beginPath();ctx.moveTo(-16,-4);ctx.lineTo(-29,0);ctx.lineTo(-16,4);ctx.fill();break;
+    case 'frost':
+      ctx.moveTo(18,0);ctx.lineTo(0,-10);ctx.lineTo(-16,0);ctx.lineTo(0,10);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.beginPath();for(let k=0;k<6;k++){const a=k*TAU/6;ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*18,Math.sin(a)*18)}ctx.stroke();break;
+    case 'magnet':
+      ctx.lineWidth=5;ctx.arc(0,0,12,-2.25,2.25);ctx.stroke();ctx.fillStyle='#ae75e8';
+      ctx.fillRect(-10,-12,7,5);ctx.fillRect(-10,7,7,5);ctx.beginPath();ctx.arc(5,0,4,0,TAU);ctx.fill();break;
+    case 'cyclone':
+      for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(-4+k*4,0,12+k*3,spin+k,spin+k+Math.PI*1.3);ctx.stroke()}
+      ctx.beginPath();ctx.moveTo(17,0);ctx.lineTo(-10,-4);ctx.lineTo(-4,0);ctx.lineTo(-10,4);ctx.closePath();ctx.fill();break;
+    case 'juggernaut':
+      ctx.fillStyle='#665041';ctx.moveTo(15,-11);ctx.lineTo(17,9);ctx.lineTo(-11,11);ctx.lineTo(-16,-8);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.strokeStyle='#ffe3b9';ctx.beginPath();ctx.moveTo(4,-9);ctx.lineTo(9,9);ctx.moveTo(-7,-7);ctx.lineTo(-4,8);ctx.stroke();break;
+    case 'mirror':
+      ctx.moveTo(11,-11);ctx.lineTo(18,0);ctx.lineTo(11,11);ctx.lineTo(-9,11);ctx.lineTo(-17,0);ctx.lineTo(-9,-11);ctx.closePath();ctx.fill();ctx.stroke();
+      {const alpha=ctx.globalAlpha;ctx.globalAlpha=alpha*.55;ctx.strokeRect(-23,-8,12,16);ctx.globalAlpha=alpha}break;
+    case 'lancer':
+      ctx.moveTo(25,0);ctx.lineTo(0,-6);ctx.lineTo(-21,-3);ctx.lineTo(-26,0);ctx.lineTo(-21,3);ctx.lineTo(0,6);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.beginPath();ctx.moveTo(-48,0);ctx.lineTo(12,0);ctx.stroke();break;
+    case 'leviathan':
+      ctx.moveTo(19,0);ctx.quadraticCurveTo(2,-13,-12,-8);ctx.lineTo(-6,0);ctx.lineTo(-12,8);ctx.quadraticCurveTo(2,13,19,0);ctx.fill();ctx.stroke();
+      ctx.beginPath();ctx.arc(-3,0,5,-.8,.8);ctx.stroke();break;
+    case 'valkyrie':
+      ctx.moveTo(20,0);ctx.lineTo(-6,-5);ctx.lineTo(-21,-17);ctx.lineTo(-15,-2);ctx.lineTo(-18,0);ctx.lineTo(-15,2);ctx.lineTo(-21,17);ctx.lineTo(-6,5);ctx.closePath();ctx.fill();ctx.stroke();break;
+    case 'berserker':
+      ctx.fillStyle='#ff8a70';ctx.moveTo(21,0);ctx.lineTo(4,-5);ctx.lineTo(9,-12);ctx.lineTo(-6,-4);ctx.lineTo(-21,-9);ctx.lineTo(-12,0);ctx.lineTo(-21,9);ctx.lineTo(-6,4);ctx.lineTo(9,12);ctx.lineTo(4,5);ctx.closePath();ctx.fill();ctx.stroke();break;
+    case 'oracle':
+      ctx.fillStyle='#fff2b5';ctx.ellipse(0,0,17,9,0,0,TAU);ctx.fill();ctx.stroke();
+      ctx.fillStyle='#9b7937';ctx.beginPath();ctx.arc(2,0,6,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(3,-2,2,0,TAU);ctx.fill();break;
+    default:return false;
+  }
+  ctx.shadowBlur=0;return true;
+}
 
 function drawUniqueProjectile(b,time,phase){
   const shape=b.shape;
@@ -4989,9 +5124,12 @@ function drawBullets(){
     const a=fxAngleFromVector(b.vx,b.vy,0);
     const phase=b.x*.013+b.y*.017+time*5;
     ctx.save();ctx.translate(x,y);ctx.rotate(a);
+    if(renderPressure<2&&b.basicAttack&&CANNON_VISUAL_INDEX[b.cannon]!==undefined){
+      drawCannonSignature(b.cannon,time+(b.motionSeed||0),b.r,'projectile');
+    }
 
-    if(drawUniqueProjectile(b,time,phase)){
-      // 27개 캐릭터의 고유 탄환은 위 전용 렌더러에서 처리.
+    if(drawVariantProjectile(b,time)||drawUniqueProjectile(b,time,phase)){
+      // All 46 equipped cannons now have a dedicated projectile silhouette.
     }
 
     // Legacy/passive projectile fallback
@@ -5208,6 +5346,8 @@ function drawMinimap(){
   const size=108,pad=15,x=innerWidth-size-pad,y=innerHeight-size-pad;
   ctx.fillStyle='rgba(5,12,22,.56)';ctx.fillRect(x,y,size,size);
   ctx.strokeStyle='rgba(255,255,255,.13)';ctx.strokeRect(x,y,size,size);
+  ctx.fillStyle='#95aaff';ctx.strokeStyle='#dce5ff';ctx.lineWidth=1;
+  polygon(x+size/2,y+size/2,5,5,-Math.PI/2);ctx.fill();ctx.stroke();
   ctx.fillStyle='#5baaff';ctx.beginPath();ctx.arc(x+player.x/WORLD*size,y+player.y/WORLD*size,3,0,TAU);ctx.fill();
   ctx.fillStyle='rgba(255,110,110,.88)';
   for(const r of remotePlayers.values()){
@@ -5229,12 +5369,16 @@ function skillAimSpec(cannon,slot){
       return{type:'self',radius:245};
     }
     return{
-      standard:{type:'target',distance:650,radius:310},scout:{type:'dash',distance:650,width:28,end:80},bastion:{type:'wall',distance:220,length:330,width:34},rapid:{type:'self',radius:80},dual:{type:'self',radius:115},needle:{type:'line',distance:820,width:24},spread:{type:'cone',distance:500,half:.78},burst:{type:'target',distance:520,radius:170},crystal:{type:'target',distance:360,radius:118},piercer:{type:'line',distance:1050,width:34},laser:{type:'cone',distance:720,half:.85},drill:{type:'line',distance:1050,width:58},plasma:{type:'target',distance:430,radius:245},thunder:{type:'target',distance:520,radius:300},inferno:{type:'wall',distance:360,length:560,width:92},rocket:{type:'target',distance:540,radius:330},titan:{type:'line',distance:760,width:110},phantom:{type:'dash',distance:phantomPreviewDistance(),width:42,end:150},ring:{type:'target',distance:460,radius:92},chrono:{type:'target',distance:440,radius:310},void:{type:'target',distance:500,radius:300},nova:{type:'target',distance:520,radius:420},comet:{type:'dash',distance:850,width:100,end:150},stellar:{type:'triangle',distance:360,radius:340},deku:{type:'self',radius:330},sniper:{type:'self',radius:125},glitch:{type:'target',distance:560,radius:150},zero:{type:'line',distance:1250,width:72}
+      standard:{type:'target',distance:650,radius:310},scout:{type:'dash',distance:650,width:28,end:80},bastion:{type:'wall',distance:220,length:330,width:34},rapid:{type:'self',radius:80},dual:{type:'self',radius:115},needle:{type:'line',distance:820,width:24},spread:{type:'cone',distance:500,half:.78},burst:{type:'target',distance:520,radius:170},crystal:{type:'target',distance:360,radius:118},piercer:{type:'line',distance:1050,width:34},laser:{type:'cone',distance:720,half:.85},drill:{type:'line',distance:1050,width:58},plasma:{type:'target',distance:430,radius:245},thunder:{type:'target',distance:520,radius:300},inferno:{type:'wall',distance:360,length:560,width:92},rocket:{type:'target',distance:540,radius:330},titan:{type:'line',distance:760,width:110},phantom:{type:'dash',distance:phantomPreviewDistance(),width:42,end:150},ring:{type:'target',distance:460,radius:92},chrono:{type:'target',distance:440,radius:310},void:{type:'target',distance:500,radius:300},nova:{type:'target',distance:520,radius:420},comet:{type:'dash',distance:850,width:100,end:150},stellar:{type:'triangle',distance:360,radius:340},deku:{type:'self',radius:330},sniper:{type:'self',radius:125},glitch:{type:'target',distance:560,radius:150},zero:{type:'line',distance:1250,width:72},bloodlust:{type:'self',radius:155},
+      blaster:{type:'target',distance:760,radius:185},ranger:{type:'dash',distance:720,width:72,end:72},ricochet:{type:'cone',distance:500,half:.30},mortar:{type:'barrage',distance:650,radius:125,spacing:105,count:5},
+      shredder:{type:'cone',distance:700,half:.20},seeker:{type:'line',distance:900,width:25},frost:{type:'target',distance:470,radius:280},magnet:{type:'target',distance:500,radius:330},
+      cyclone:{type:'cone',distance:720,half:.24},juggernaut:{type:'dash',distance:580,width:72,end:150},mirror:{type:'cone',distance:520,half:.34},lancer:{type:'line',distance:1180,width:28},
+      leviathan:{type:'cone',distance:650,half:.66},valkyrie:{type:'dash',distance:700,width:58,end:105},berserker:{type:'cone',distance:520,half:.50},oracle:{type:'autoTarget',distance:1350,radius:90}
     }[cannon]||null;
   }
   if(slot===2){
     if(cannon==='error'&&performance.now()<(player.overclockUntil||0))return{type:'dash',distance:460,width:55,end:92};
-    return{rocket:{type:'self',radius:148},titan:{type:'self',radius:132},phantom:{type:'self',radius:105},ring:{type:'self',radius:175},chrono:{type:'self',radius:185},void:{type:'self',radius:430},nova:{type:'self',radius:185},comet:{type:'target',distance:620,radius:370},stellar:{type:'self',radius:145},error:{type:'self',radius:125},glitch:{type:'dash',distance:900,width:96,end:96},zero:{type:'self',radius:560},deku:{type:'line',distance:800,width:58},sniper:{type:'cone',distance:1800,half:.48}}[cannon]||null;
+    return{rocket:{type:'self',radius:148},titan:{type:'self',radius:132},phantom:{type:'self',radius:105},ring:{type:'self',radius:175},chrono:{type:'self',radius:185},void:{type:'self',radius:430},nova:{type:'self',radius:185},comet:{type:'target',distance:620,radius:370},stellar:{type:'self',radius:145},error:{type:'self',radius:125},glitch:{type:'dash',distance:900,width:96,end:96},zero:{type:'self',radius:560},deku:{type:'line',distance:800,width:58},sniper:{type:'cone',distance:1800,half:.48},bloodlust:{type:'self',radius:520},cyclone:{type:'self',radius:260},juggernaut:{type:'self',radius:150},mirror:{type:'self',radius:190},lancer:{type:'dash',distance:980,width:58,end:130},leviathan:{type:'self',radius:520},valkyrie:{type:'target',distance:560,radius:360},berserker:{type:'self',radius:190},oracle:{type:'target',distance:600,radius:340}}[cannon]||null;
   }
   if(slot===3){if(cannon==='error')return{type:'dash',distance:360,width:80,end:235};if(cannon==='deku')return{type:'self',radius:140}}
   if(slot===4&&cannon==='deku')return{type:'self',radius:170};
@@ -5244,6 +5388,15 @@ function aimPal(slot){return slot===1?['rgba(90,235,175,.16)','rgba(185,255,224,
 function aimLane(px,py,a,d,w,pal){const sx=px+Math.cos(a)*(player.r+20),sy=py+Math.sin(a)*(player.r+20),ex=px+Math.cos(a)*d,ey=py+Math.sin(a)*d,nx=-Math.sin(a),ny=Math.cos(a);ctx.fillStyle=pal[0];ctx.strokeStyle=pal[1];ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(sx+nx*w*.55,sy+ny*w*.55);ctx.lineTo(ex+nx*w,ey+ny*w);ctx.arc(ex,ey,w,a+Math.PI/2,a-Math.PI/2,false);ctx.lineTo(sx-nx*w*.55,sy-ny*w*.55);ctx.closePath();ctx.fill();ctx.stroke()}
 function aimCone(px,py,a,d,h,pal){ctx.fillStyle=pal[0];ctx.strokeStyle=pal[1];ctx.lineWidth=2.2;ctx.beginPath();ctx.moveTo(px,py);ctx.arc(px,py,d,a-h,a+h);ctx.closePath();ctx.fill();ctx.stroke()}
 function aimTarget(px,py,a,d,r,pal){const x=px+Math.cos(a)*d,y=py+Math.sin(a)*d;ctx.fillStyle=pal[0];ctx.strokeStyle=pal[1];ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fill();ctx.stroke();ctx.setLineDash([8,8]);ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(x,y);ctx.stroke();ctx.setLineDash([])}
+function aimBarrage(px,py,a,s,pal){
+  const x=px+Math.cos(a)*s.distance,y=py+Math.sin(a)*s.distance;
+  ctx.fillStyle=pal[0];ctx.strokeStyle=pal[1];ctx.lineWidth=2.5;
+  for(let k=0;k<s.count;k++){
+    const off=(k-(s.count-1)/2)*s.spacing;
+    ctx.beginPath();ctx.arc(x+Math.cos(a)*off,y+Math.sin(a)*off,s.radius,0,TAU);ctx.fill();ctx.stroke();
+  }
+  ctx.setLineDash([8,8]);ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(x,y);ctx.stroke();ctx.setLineDash([]);
+}
 function drawBasicAimGuide(){if(!running||!player?.alive||heldSkillAim.active||!(input.mobileAimActive||input.firing||input.keys.has('Space')))return;const[px,py]=worldToScreen(player.x,player.y),s=basicAimSpec(player.cannonType||'standard'),p=aimPal(0);ctx.save();s.type==='cone'?aimCone(px,py,player.angle,s.range,s.half,p):aimLane(px,py,player.angle,s.range,s.width,p);ctx.restore()}
 function drawSkillAimGuide(){
   if(!running||!player?.alive||!heldSkillAim.active)return;const cannon=player.cannonType||'standard',[px,py]=worldToScreen(player.x,player.y),a=Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:player.angle,p=aimPal(heldSkillAim.slot);
@@ -5253,6 +5406,17 @@ function drawSkillAimGuide(){
   const s=skillAimSpec(cannon,heldSkillAim.slot);if(!s)return;ctx.save();
   if(s.type==='self'){ctx.fillStyle=p[0];ctx.strokeStyle=p[1];ctx.lineWidth=3;ctx.beginPath();ctx.arc(px,py,s.radius,0,TAU);ctx.fill();ctx.stroke()}
   else if(s.type==='target')aimTarget(px,py,a,s.distance,s.radius,p);
+  else if(s.type==='barrage')aimBarrage(px,py,a,s,p);
+  else if(s.type==='autoTarget'){
+    const target=nearestSkillTarget(player.x,player.y,s.distance);
+    ctx.fillStyle=p[0];ctx.strokeStyle=p[1];ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(px,py,s.distance,0,TAU);ctx.fill();ctx.stroke();
+    if(target){
+      const[tx,ty]=worldToScreen(target.x,target.y);
+      ctx.setLineDash([8,8]);ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(tx,ty);ctx.stroke();ctx.setLineDash([]);
+      ctx.lineWidth=3;ctx.beginPath();ctx.arc(tx,ty,s.radius,0,TAU);ctx.fill();ctx.stroke();
+    }
+  }
   else if(s.type==='line')aimLane(px,py,a,s.distance,s.width,p);
   else if(s.type==='dash'){aimLane(px,py,a,s.distance,s.width,p);const x=px+Math.cos(a)*s.distance,y=py+Math.sin(a)*s.distance;ctx.fillStyle=p[0];ctx.strokeStyle=p[1];ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,y,s.end,0,TAU);ctx.fill();ctx.stroke()}
   else if(s.type==='cone')aimCone(px,py,a,s.distance,s.half,p);
