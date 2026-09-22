@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.85 · reliable stat buttons and full quad damage');
+console.info('[Sworder VS Tank] game V5.86 · skill defeats and Oracle aim preview');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -3503,7 +3503,7 @@ function updateSkillZones(dt){
         z.data.next=.38;z.data.strikes=(z.data.strikes||0)+1;
         let tx=z.x+rand(-z.radius*.85,z.radius*.85),ty=z.y+rand(-z.radius*.85,z.radius*.85),target=null,best=150*150;
         for(const s of shapes){const d2=(s.x-tx)**2+(s.y-ty)**2;if(d2<best&&Math.hypot(s.x-z.x,s.y-z.y)<z.radius){best=d2;target=s}}
-        if(target){tx=target.x;ty=target.y;applyShapeDamage(target,z.damage);if(target.hp<=0){gainPolygonXp(target.xp)}}
+        if(target){tx=target.x;ty=target.y;applyShapeDamage(target,z.damage)}
         for(const e of remotePlayers.values()){if(!e.alive)continue;if((e.x-tx)**2+(e.y-ty)**2<75*75)sendDamage(e.id,z.damage*.85)}
         spawnCombatFx('skyLightning',tx,ty-260,{angle:Math.PI/2,color:'#fff36f',life:.34,radius:260,cannon:'thunder'});
         burst(tx,ty,'#fff37a',15);
@@ -5431,7 +5431,7 @@ function drawSkillAimGuide(){
   else if(s.type==='autoTarget'){
     const target=nearestSkillTarget(player.x,player.y,s.distance);
     ctx.fillStyle=p[0];ctx.strokeStyle=p[1];ctx.lineWidth=2;
-    ctx.beginPath();ctx.arc(px,py,s.distance,0,TAU);ctx.fill();ctx.stroke();
+    ctx.setLineDash([12,12]);ctx.beginPath();ctx.arc(px,py,s.distance,0,TAU);ctx.stroke();ctx.setLineDash([]);
     if(target){
       const[tx,ty]=worldToScreen(target.x,target.y);
       ctx.setLineDash([8,8]);ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(tx,ty);ctx.stroke();ctx.setLineDash([]);
@@ -5456,6 +5456,14 @@ function update(dt){
   updateParticles(dt);
   updateCombatFx(dt);
   updateSkillZones(dt);
+  // Some persistent skills apply damage directly without removing defeated shapes.
+  for(let i=shapes.length-1;i>=0;i--){
+    const s=shapes[i];
+    if(s.hp>0)continue;
+    gainPolygonXp(s.xp);
+    burst(s.x,s.y,colorForShape(s.type),10);
+    shapes.splice(i,1);
+  }
   updatePhantomMarkState();
   const hudNow=performance.now();
   if(hudNow-lastSkillHudFrameUpdate>90){lastSkillHudFrameUpdate=hudNow;updateSkillHud()}
