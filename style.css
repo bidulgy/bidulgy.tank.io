@@ -1038,6 +1038,18 @@
   .upgrade-panel{bottom:var(--m-safe-b)!important;left:calc(max(12px,env(safe-area-inset-left)) + 112px)!important;max-height:58vh!important}
 }
 
+/* V5.85: keep stat controls above play-field touch layers and easy to hit. */
+.upgrade-panel{z-index:40}
+.stat button{width:38px;height:38px;min-width:38px;touch-action:manipulation}
+.stat button:focus-visible{outline:2px solid #c9edff;outline-offset:2px}
+@media (max-width:760px),(pointer:coarse){
+  .upgrade-panel{width:164px!important}
+  .stat button{width:42px!important;height:42px!important;min-width:42px!important;font-size:23px!important}
+}
+@media (max-width:390px),(max-height:650px) and (pointer:coarse){
+  .upgrade-panel{width:154px!important}
+}
+
 /* ===== V5.74 DIVINE BLOODLUST ===== */
 .mini-cannon.cannon-bloodlust{background:#741f2b;border-color:#ff5368;box-shadow:0 0 14px rgba(255,65,88,.45)}
 .mini-cannon.cannon-bloodlust:after{content:"";position:absolute;right:-10px;top:1px;width:13px;height:13px;border-radius:50%;background:#ff334f;box-shadow:0 0 12px #ff334f}

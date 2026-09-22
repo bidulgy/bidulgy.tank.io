@@ -17,6 +17,7 @@ vm.runInContext([
   section('const TANK_THEMES=', '// V5.61: Diep.io-style evolution tree.'),
   section('const DIEP_EVOLUTION_INFO=', 'const DIEP_EVOLUTION_CHILDREN='),
   section('function evolutionBarrelSpecs(', 'function evolutionHasNoBasicGun('),
+  section('function evolutionVolleySpecs(', 'function evolutionShotsFromBase('),
   section('function drawVariantProjectile(', 'function drawUniqueProjectile('),
   section('function skillAimSpec(', 'function aimPal('),
   section('function aimPal(', 'function drawAimGuides('),
@@ -35,6 +36,9 @@ const data = vm.runInContext(`({
   barrels: Object.fromEntries(Object.keys(DIEP_EVOLUTION_INFO).map(id => [id, evolutionBarrelSpecs(id, 27)]))
 })`, context);
 assert.equal(data.themes.length, 46, 'all 46 cannon themes must remain');
+assert.equal(vm.runInContext("DIEP_EVOLUTION_INFO.quadTank.mods.damage ?? 1",context),1,'Quad evolution must not lower base damage');
+assert.equal(vm.runInContext("evolutionVolleySpecs('quadTank',27,1).length",context),4,'Quad must keep four firing directions');
+assert.equal(vm.runInContext("evolutionVolleySpecs('quadTank',27,1).every(shot => shot.damageScale === 1)",context),true,'Quad bullets must retain full damage');
 const traces = new Set();
 const variantTraces = new Set();
 for (const id of data.themes) {

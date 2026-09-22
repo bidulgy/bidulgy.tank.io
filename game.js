@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.84 · twin evolution retains equipped cannon appearance');
+console.info('[Sworder VS Tank] game V5.85 · reliable stat buttons and full quad damage');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -285,7 +285,7 @@ const DIEP_EVOLUTION_INFO=Object.freeze({
   flankGuard:{name:'플랭크 가드',tier:15,desc:'전후방 포신 · 기동 전투',mods:{damage:.96,reload:.92,move:1.05}},
 
   tripleShot:{name:'트리플 샷',tier:30,desc:'전방 3포신',mods:{damage:.96,reload:.82}},
-  quadTank:{name:'쿼드 탱크',tier:30,desc:'4방향 포신',mods:{damage:.90,reload:.80}},
+  quadTank:{name:'쿼드 탱크',tier:30,desc:'4방향 포신',mods:{reload:.80}},
   twinFlank:{name:'트윈 플랭크',tier:30,desc:'전후방 쌍포신',mods:{damage:.88,reload:.76,move:1.03}},
   assassin:{name:'어쌔신',tier:30,desc:'초장거리 저격',mods:{damage:1.22,bulletSpeed:1.24,reload:1.22}},
   hunter:{name:'헌터',tier:30,desc:'고속 중저격',mods:{damage:1.12,bulletSpeed:1.18,reload:1.05}},
@@ -1217,7 +1217,20 @@ function gainPolygonXp(rawXp){
   updateUI();
 }
 function updateUI(){ui.level.textContent=player.level;ui.score.textContent=player.score.toLocaleString();ui.xp.style.width=player.level>=45?'100%':`${clamp(player.xp/player.xpNeed*100,0,100)}%`;ui.points.textContent=player.points;ui.upgradePanel.classList.toggle('has-points',player.points>0);renderUpgrades()}
-function renderUpgrades(){ui.upgrades.innerHTML=statsDef.map(([k,l])=>{const n=player.stats[k]||0;return`<div class="stat"><span class="stat-name">${l}</span><span class="stat-bars">${Array.from({length:7},(_,i)=>`<i class="${i<n?'on':''}"></i>`).join('')}</span><button type="button" data-stat="${k}" ${player.points<=0||n>=7?'disabled':''}>+</button></div>`}).join('');ui.upgrades.querySelectorAll('[data-stat]').forEach(b=>b.onclick=()=>upgrade(b.dataset.stat))}
+function renderUpgrades(){
+  // Keep the same button nodes while XP and score change. Replacing a pressed
+  // button before pointerup can silently drop its click on touch devices.
+  if(!ui.upgrades.dataset.ready){
+    ui.upgrades.innerHTML=statsDef.map(([k,l])=>`<div class="stat"><span class="stat-name">${l}</span><span class="stat-bars">${Array.from({length:7},()=>'<i></i>').join('')}</span><button type="button" data-stat="${k}" aria-label="${l} 강화">+</button></div>`).join('');
+    ui.upgrades.addEventListener('click',event=>{const button=event.target.closest('button[data-stat]');if(button&&!button.disabled)upgrade(button.dataset.stat)});
+    ui.upgrades.dataset.ready='1';
+  }
+  for(const button of ui.upgrades.querySelectorAll('button[data-stat]')){
+    const n=player.stats[button.dataset.stat]||0;
+    button.disabled=player.points<=0||n>=7;
+    button.closest('.stat').querySelectorAll('.stat-bars i').forEach((bar,i)=>bar.classList.toggle('on',i<n));
+  }
+}
 function upgrade(k){if(player.points<=0||player.stats[k]>=7)return;player.points--;player.stats[k]++;if(k==='maxHealth'){const old=player.maxHp;player.maxHp=120+player.stats.maxHealth*18;player.hp+=player.maxHp-old}updateUI()}
 function hideEvolutionPanel(){
   classUpgradeShown=false;
@@ -4104,7 +4117,7 @@ function evolutionVolleySpecs(type,r,shotNo){
     case 'tripleShot':
       return all(.48,1,1,.42);
     case 'quadTank':
-      return all(.36,1,1,.32);
+      return all(1,1,1,.32);
     case 'twinFlank': {
       const side=n%2;
       return[wrap(specs[side],.58,1,1,.38),wrap(specs[2+side],.58,1,1,.38)];
