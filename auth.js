@@ -402,7 +402,7 @@ const CANNONS=Object.freeze({
   }
 });
 
-const AUTH_BUILD='V5.90';
+const AUTH_BUILD='V5.91';
 console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · 47-cannon registry`);
 const CANNON_DISPLAY_ORDER=Object.freeze([
   'standard','scout','bastion',
@@ -629,7 +629,7 @@ function renderCannonGarage(){
     }
   }
   if(els.collection){
-    els.collection.innerHTML=displayCannons().map(c=>{
+    els.collection.innerHTML=displayCannons().filter(c=>c.id!=='gojo'||Number(profile.best_level||1)>=45).map(c=>{
       const own=owned.has(c.id),eq=equipped.id===c.id;
       const claimable=c.id==='gojo'&&Number(profile.best_level||1)>=45;
       const available=own||claimable;

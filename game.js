@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.90 · Gojo Singularity and simultaneous Twin volley');
+console.info('[Sworder VS Tank] game V5.91 · Gojo attack effects and level gate');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -1379,6 +1379,10 @@ function spawnCombatFx(type,x,y,opts={}){
   });
 }
 function spawnAttackFx(cannon,x,y,angle,remote=false){
+  if(cannon==='gojo'){
+    spawnCombatFx('gojoInfinityShot',x,y,{angle:normalizeFxAngle(angle),color:'#a596ff',life:.34,radius:76,cannon});
+    return;
+  }
   const types={
     standard:['muzzle','#70bdff',.18,25],
     rapid:['rapid','#83f5a8',.12,18],
@@ -3858,6 +3862,16 @@ function drawPlayerCannon(cannon,r){
   };
   const line=(x1,y1,x2,y2,color=theme.glow,width=3)=>{ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()};
 
+  if(cannon==='gojo'){
+    const t=performance.now()*.001,orbX=r+41;
+    barrel(r*.08,-8,r+24,16,'#e0e8ff','#596fa8',7);
+    ctx.shadowBlur=20;ctx.strokeStyle='#80caff';ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(orbX,0,17,-1.18,1.18);ctx.stroke();
+    ctx.strokeStyle='#ff8fa8';ctx.beginPath();ctx.arc(orbX,0,17,Math.PI-1.18,Math.PI+1.18);ctx.stroke();
+    for(let k=0;k<4;k++){const a=t*3.4+k*TAU/4;ctx.fillStyle=k%2?'#ff7899':'#71c8ff';ctx.beginPath();ctx.arc(orbX+Math.cos(a)*18,Math.sin(a)*18,3,0,TAU);ctx.fill()}
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(orbX,0,6+Math.sin(t*8)*1.5,0,TAU);ctx.fill();ctx.restore();return;
+  }
+
   switch(cannonBaseBehavior(cannon)){
     case 'standard':
       barrel(r*.15,-7,r+28,14);ctx.fillStyle='#a8dfff';ctx.fillRect(r+15,-4,14,8);break;
@@ -4547,6 +4561,11 @@ function drawSkillZones(){
       const blue=z.type==='gojoAo',color=blue?'#75c7ff':'#ff8395';
       ctx.strokeStyle=color;ctx.shadowColor=color;ctx.shadowBlur=20;ctx.lineWidth=4;
       for(let k=0;k<3;k++){const rr=z.radius*(blue?.24+k*.21:.42+k*.20)*(blue?1-.14*q:1+.18*q);ctx.beginPath();ctx.arc(0,0,rr,0,TAU);ctx.stroke()}
+      for(let k=0;k<12;k++){
+        const a=k*TAU/12+(blue?-t*2.4:t*2.9),outer=z.radius*(blue?.87:.78),inner=z.radius*(blue?.48:.25);
+        ctx.beginPath();ctx.moveTo(Math.cos(a)*outer,Math.sin(a)*outer);
+        ctx.quadraticCurveTo(Math.cos(a+(blue?-.4:.35))*z.radius*.67,Math.sin(a+(blue?-.4:.35))*z.radius*.67,Math.cos(a+(blue?-.75:.7))*inner,Math.sin(a+(blue?-.75:.7))*inner);ctx.stroke();
+      }
       ctx.fillStyle=blue?'rgba(74,155,255,.14)':'rgba(255,75,105,.14)';ctx.beginPath();ctx.arc(0,0,z.radius*.42,0,TAU);ctx.fill();ctx.shadowBlur=0;
     }else if(z.type==='burstBomb'){
       const pulse=.75+.25*Math.sin(t*12);ctx.shadowColor='#65ecff';ctx.shadowBlur=20;ctx.strokeStyle='#8df6ff';ctx.lineWidth=5;ctx.beginPath();ctx.arc(0,0,z.radius*(.35+.1*pulse),0,TAU);ctx.stroke();for(let k=0;k<8;k++){const aa=k*TAU/8+t*2;ctx.beginPath();ctx.moveTo(Math.cos(aa)*28,Math.sin(aa)*28);ctx.lineTo(Math.cos(aa)*z.radius*.55,Math.sin(aa)*z.radius*.55);ctx.stroke()}ctx.shadowBlur=0;
@@ -4676,7 +4695,13 @@ function drawCombatEffects(layer='base'){
       ctx.strokeStyle='rgba(121,79,255,.48)';ctx.lineWidth=148*p*flare;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(length,0);ctx.stroke();
       ctx.strokeStyle='rgba(206,139,255,.86)';ctx.lineWidth=77*p;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(length,0);ctx.stroke();
       ctx.strokeStyle='#fff3ff';ctx.lineWidth=21*p;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(length,0);ctx.stroke();
+      for(let k=0;k<9;k++){const xx=length*(k+.5)/9,rr=(16+13*Math.sin(t*19+k*2))*p;ctx.strokeStyle=k%2?'#75c7ff':'#ff718e';ctx.lineWidth=3*p;ctx.beginPath();ctx.arc(xx,0,Math.abs(rr)+7,0,TAU);ctx.stroke()}
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(length,0,Math.max(5,28*p),0,TAU);ctx.fill();
       ctx.shadowBlur=0;
+    }else if(f.type==='gojoInfinityShot'){
+      ctx.shadowColor='#a780ff';ctx.shadowBlur=28;ctx.lineWidth=4*p;
+      for(let k=0;k<3;k++){ctx.strokeStyle=k%2?'#ff8ca6':'#7bcaff';ctx.beginPath();ctx.arc(0,0,(10+k*9)+f.radius*q*.35,-q*5+k*TAU/3,-q*5+k*TAU/3+Math.PI*1.35);ctx.stroke()}
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,0,6*p,0,TAU);ctx.fill();ctx.shadowBlur=0;
     }else if(f.type==='cannonSignature'){
       drawCannonSignature(f.cannon,t,f.radius,'muzzle');
     }else if(f.type==='phantomTeleportTrace'){
@@ -5134,9 +5159,11 @@ function drawVariantProjectile(b,time){
       ctx.fillStyle='#fff2b5';ctx.ellipse(0,0,17,9,0,0,TAU);ctx.fill();ctx.stroke();
       ctx.fillStyle='#9b7937';ctx.beginPath();ctx.arc(2,0,6,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(3,-2,2,0,TAU);ctx.fill();break;
     case 'gojo':
-      ctx.strokeStyle='#7abaff';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,0,17,10,time*2,0,TAU);ctx.stroke();
-      ctx.strokeStyle='#ff829d';ctx.beginPath();ctx.ellipse(0,0,10,17,-time*2.3,0,TAU);ctx.stroke();
-      ctx.fillStyle='#e9d7ff';ctx.beginPath();ctx.arc(0,0,7,0,TAU);ctx.fill();break;
+      ctx.shadowBlur=25;ctx.strokeStyle='#7abaff';ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(0,0,19,10,time*4,0,TAU);ctx.stroke();
+      ctx.strokeStyle='#ff829d';ctx.beginPath();ctx.ellipse(0,0,10,19,-time*4.5,0,TAU);ctx.stroke();
+      for(let k=0;k<4;k++){const a=time*5+k*TAU/4;ctx.fillStyle=k%2?'#ff839b':'#8ad6ff';ctx.beginPath();ctx.arc(Math.cos(a)*17,Math.sin(a)*12,3,0,TAU);ctx.fill()}
+      ctx.strokeStyle='rgba(190,160,255,.8)';ctx.beginPath();ctx.moveTo(-37,-10);ctx.quadraticCurveTo(-22,-4,-13,0);ctx.quadraticCurveTo(-22,4,-37,10);ctx.stroke();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,0,8,0,TAU);ctx.fill();break;
     default:return false;
   }
   ctx.shadowBlur=0;return true;
