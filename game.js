@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.87 · projectile trails and skill runes');
+console.info('[Sworder VS Tank] game V5.88 · layered arcane skill circles');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -4427,25 +4427,53 @@ function skillRuneColor(z){
 function drawSkillRune(z,t,p){
   const r=Number(z.radius)||0;
   if(r<70||r>760||z.type==='dekuSmoke'||z.type==='glitchWarpTrail'||z.type==='earthFissure'||z.type==='flameWall'||z.type==='cometTrail')return;
-  const color=skillRuneColor(z), detail=renderPressure>=2?6:12;
-  ctx.save();ctx.globalAlpha*=Math.min(.82,p*.95);ctx.strokeStyle=color;ctx.lineWidth=1.8;
-  ctx.setLineDash([Math.max(8,r*.075),Math.max(7,r*.035)]);
-  ctx.beginPath();ctx.arc(0,0,r*.90,t*.24,t*.24+TAU);ctx.stroke();ctx.setLineDash([]);
-  ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(0,0,r*.68,0,TAU);ctx.stroke();
-  ctx.rotate(t*(z.networkRemote?-.22:.22));
-  for(let k=0;k<detail;k++){
-    const a=k*TAU/detail,ca=Math.cos(a),sa=Math.sin(a);
-    ctx.beginPath();ctx.moveTo(ca*r*.72,sa*r*.72);ctx.lineTo(ca*r*.84,sa*r*.84);ctx.stroke();
+  const color=skillRuneColor(z),highDetail=renderPressure===0&&r>=125;
+  ctx.save();ctx.globalAlpha*=Math.min(.88,p*.95);ctx.strokeStyle=color;ctx.fillStyle=color;
+  if(renderPressure===0){ctx.shadowColor=color;ctx.shadowBlur=8}
+  ctx.lineWidth=2.2;
+  for(const radius of [.96,.89,.66]){ctx.beginPath();ctx.arc(0,0,r*radius,0,TAU);ctx.stroke()}
+  ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(0,0,r*.83,0,TAU);ctx.stroke();
+  const marks=renderPressure>=2?12:24;
+  ctx.rotate(t*(z.networkRemote?-.10:.10));
+  for(let k=0;k<marks;k++){
+    const a=k*TAU/marks,ca=Math.cos(a),sa=Math.sin(a),inner=k%3===0?.84:.87;
+    ctx.lineWidth=k%3===0?2:1;
+    ctx.beginPath();ctx.moveTo(ca*r*inner,sa*r*inner);ctx.lineTo(ca*r*.95,sa*r*.95);ctx.stroke();
   }
-  if(renderPressure<2){
-    ctx.rotate(-t*.45);ctx.beginPath();
-    for(let k=0;k<6;k++){
-      const a=k*TAU/6,px=Math.cos(a)*r*.43,py=Math.sin(a)*r*.43;
-      k?ctx.lineTo(px,py):ctx.moveTo(px,py);
+  ctx.rotate(-t*(z.networkRemote?-.18:.18));
+  const points=7,step=2,starRadius=r*.61;
+  ctx.lineWidth=highDetail?2.3:1.6;ctx.beginPath();
+  for(let k=0;k<=points;k++){
+    const a=-Math.PI/2+(k*step%points)*TAU/points;
+    const xx=Math.cos(a)*starRadius,yy=Math.sin(a)*starRadius;
+    k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);
+  }
+  ctx.stroke();
+  if(highDetail){
+    ctx.lineWidth=1.2;
+    for(const offset of [0,Math.PI]){
+      ctx.beginPath();
+      for(let k=0;k<3;k++){
+        const a=-Math.PI/2+offset+k*TAU/3;
+        const xx=Math.cos(a)*r*.47,yy=Math.sin(a)*r*.47;
+        k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);
+      }
+      ctx.closePath();ctx.stroke();
     }
-    ctx.closePath();ctx.stroke();
-    ctx.beginPath();ctx.arc(0,0,r*.15,0,TAU);ctx.stroke();
+    for(let k=0;k<12;k++){
+      const a=k*TAU/12+t*.04,rr=r*.75;
+      ctx.save();ctx.translate(Math.cos(a)*rr,Math.sin(a)*rr);ctx.rotate(a+Math.PI/2);
+      const glyph=Math.max(3,Math.min(8,r*.027));
+      ctx.lineWidth=1.4;ctx.beginPath();
+      ctx.moveTo(-glyph*.5,-glyph);ctx.lineTo(glyph*.5,glyph);
+      ctx.moveTo(glyph*.5,-glyph);ctx.lineTo(-glyph*.5,glyph);
+      if(k%2===0){ctx.moveTo(-glyph,0);ctx.lineTo(glyph,0)}
+      ctx.stroke();ctx.restore();
+    }
   }
+  ctx.shadowBlur=0;ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,r*.20,0,TAU);ctx.stroke();
+  ctx.beginPath();ctx.arc(0,0,r*.075,0,TAU);ctx.stroke();
   ctx.restore();
 }
 function drawSkillZones(){
