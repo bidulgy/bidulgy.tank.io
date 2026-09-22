@@ -76,6 +76,14 @@ for (const id of data.evolutions) {
 }
 assert(source.includes("drawCannonSignature(b.cannon,time+(b.motionSeed||0)"));
 assert(source.includes("drawCannonSignature(f.cannon,t+q*2"));
+const twinContext = vm.createContext({TAU:Math.PI*2, TANK_THEMES:{standard:{glow:'#fff'}}, drawPlayerCannon:(cannon,r)=>twinDraws.push([cannon,r]), twinDraws:[]});
+const twinDraws = twinContext.twinDraws;
+vm.runInContext(section('function evolutionBarrelSpecs(', 'function evolutionHasNoBasicGun(')+section('function drawEvolutionChassis(', 'function drawEvolutionAutoTurretCaps('),twinContext);
+twinContext.ctx = new Proxy({globalAlpha:1},{get:(target,key)=>key in target?target[key]:(...args)=>{if(key==='translate')twinOffsets.push(args)},set:(target,key,value)=>(target[key]=value,true)});
+const twinOffsets=[];
+vm.runInContext("drawEvolutionChassis({classType:'twin',cannonType:'scout'},27)",twinContext);
+assert.deepEqual(twinDraws,[['scout',27],['scout',27]],'Twin must retain two copies of the equipped cannon');
+assert.deepEqual(twinOffsets,[[0,-10],[0,10]],'Twin visuals must follow both firing lanes');
 context.WORLD = 12600;
 const central = [];
 context.spawnShape = type => { const shape = {type}; central.push(shape); return shape; };

@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.83 · complete skill previews + central pentagon swarm');
+console.info('[Sworder VS Tank] game V5.84 · twin evolution retains equipped cannon appearance');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -3998,7 +3998,7 @@ function drawUniqueTankBody(cannon,r,t,theme){
 function evolutionBarrelSpecs(type,r){
   const b=(a=0,side=0,len=1,w=1,kind='barrel')=>({a,side,len,w,kind});
   switch(type){
-    case 'twin':return[b(0,-8,1,.78),b(0,8,1,.78)];
+    case 'twin':return[b(0,-10,1,.78),b(0,10,1,.78)];
     case 'sniperClass':return[b(0,0,1.34,.70)];
     case 'machineGun':return[b(0,0,1.00,1.22)];
     case 'flankGuard':return[b(0,0,1,.82),b(Math.PI,0,.88,.72)];
@@ -4245,6 +4245,14 @@ function drawEvolutionChassis(e,r){
   };
 
   for(const spec of evolutionBarrelSpecs(type,r)){
+    if(type==='twin'){
+      // Keep both evolved firing lanes, but repeat the equipped cannon's own
+      // silhouette instead of replacing it with two generic gray barrels.
+      ctx.save();ctx.translate(0,spec.side);ctx.scale(.85,.85);
+      drawPlayerCannon(e.cannonType||'standard',r);
+      ctx.restore();
+      continue;
+    }
     if(spec.kind==='rimAuto')drawRimAuto(spec);
     else if(spec.kind==='centerAuto')drawCenterAuto(spec.a||0);
     else drawBarrel(spec);
@@ -4310,8 +4318,8 @@ function drawTank(e){
   // Diep.io evolution barrels/chassis are drawn as the evolved weapon geometry.
   drawEvolutionChassis(e,r);
 
-  // V5.79: 진화 후에는 Diep.io 진화체 포신만 표시해 포신 수가 하나 더 생기는 문제를 제거한다.
-  // 장착 대포의 캐릭터 바디/색/탄환 능력은 유지되며, ERROR 검 모드는 별도 무기라 계속 표시한다.
+  // Evolved geometry supplies the exact barrel count; Twin repeats the equipped
+  // cannon appearance inside drawEvolutionChassis instead of adding a third gun.
   if(swordModeActive)drawErrorSword(e,r,t);
   else if((e.classType||'basic')==='basic')drawPlayerCannon(cannon,r);
 
