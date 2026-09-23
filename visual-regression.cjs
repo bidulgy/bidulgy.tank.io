@@ -5,6 +5,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync(__dirname + '/game.js', 'utf8');
 const authSource = fs.readFileSync(__dirname + '/auth.js', 'utf8');
 const unlockSql = fs.readFileSync(__dirname + '/singularity_unlock.sql', 'utf8');
+const gojoRewardSql = fs.readFileSync(__dirname + '/gojo_reward_fix.sql', 'utf8');
 const section = (start, end) => {
   const a = source.indexOf(start);
   const b = source.indexOf(end, a + start.length);
@@ -116,6 +117,10 @@ assert.equal(runeTrace.length,0,'smoke must not receive a circular overlay');
 assert(source.includes("drawCannonSignature(f.cannon,t+q*2"));
 assert(source.includes("spawnCombatFx('gojoInfinityShot'"),'Gojo basic attacks need their own visible cast effect');
 assert(authSource.includes("displayCannons().filter(c=>c.id!=='gojo'||owned.has('gojo'))"),'Gojo must stay hidden until earned');
+assert(authSource.includes("client.rpc('iron_cell_admin_set_cannon_v2'"),'admin grants must use the verified Gojo-aware RPC');
+assert(authSource.includes('async function reportGojoDeath(')&&authSource.includes('async function confirmGojoKill('),'Gojo kill attestation client hooks are missing');
+assert(source.includes("victimCannon:defeatedCannon")&&source.includes('confirmGojoKill?.'),'Gojo PvP reward handshake is missing');
+assert(gojoRewardSql.includes('iron_cell_admin_set_cannon_v2')&&gojoRewardSql.includes('iron_cell_gojo_kill_attestations'),'Gojo reward database migration is incomplete');
 assert(source.includes("z.type==='gojoAkaImpact'||z.type==='gojoPurpleProjectile'"),'Gojo zones must skip the generic magic circle');
 assert(source.includes("addSkillZone('gojoPurpleProjectile'"),'Purple needs a collision-tracked moving projectile');
 assert(!source.includes("damageSkillLine(player.x,player.y,a,length,78,p.damage*13"),'Purple must not damage the full path before contact');

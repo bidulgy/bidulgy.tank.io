@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.95 · contact-timed Gojo techniques');
+console.info('[Sworder VS Tank] game V5.96 · verified Gojo rewards');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -986,6 +986,15 @@ function receiveKill(payload){
   const victimLevel=clamp(Math.floor(Number(payload?.victimLevel||1)),1,100);
   const earnedXp=tankKillXp(victimLevel);
   gainXp(earnedXp);
+  if(String(payload?.victimCannon||'')==='gojo'&&payload?.victimId&&payload?.runId){
+    void (async()=>{
+      for(let attempt=0;attempt<7;attempt++){
+        try{const granted=await window.IronCellAuth?.confirmGojoKill?.(String(payload.victimId),String(payload.runId));if(granted){console.info('[Sworder VS Tank] Gojo unlocked by defeating a Gojo player');return}}catch(error){if(!String(error?.message||'').includes('victim_attestation_pending')){console.warn('Gojo kill confirmation failed:',error);return}}
+        await new Promise(resolve=>setTimeout(resolve,300+attempt*350));
+      }
+      console.warn('Gojo kill confirmation timed out');
+    })();
+  }
 }
 function clearOnlineReconnectTimer(){
   if(onlineReconnectTimer){
@@ -3240,12 +3249,15 @@ function killPlayer(killerId=''){
   player.alive=false;
   player.hp=0;
   broadcastLocalState(true);
+  const defeatedRunId=String(player.runId||''),defeatedCannon=String(player.cannonType||'standard');
   if(killerId){
     sendOnline('kill',{
       killerId:String(killerId),
       victimId:onlineSelfId,
       victimLevel:player.level,
-      victimName:player.name
+      victimName:player.name,
+      victimCannon:defeatedCannon,
+      runId:defeatedRunId
     });
   }
   ui.deathLevel.textContent=player.level;
@@ -3253,7 +3265,12 @@ function killPlayer(killerId=''){
   ui.deathKills.textContent=player.kills;
   if(ui.deathGems)ui.deathGems.textContent=(player.score*2).toLocaleString();
   ui.deathScreen.classList.add('show');
-  void saveCurrentRun(true);
+  void (async()=>{
+    const saved=await saveCurrentRun(true);
+    if(killerId&&defeatedCannon==='gojo'&&defeatedRunId&&saved&&!saved.error){
+      try{await window.IronCellAuth?.reportGojoDeath?.(String(killerId),defeatedRunId)}catch(error){console.warn('Gojo death report failed:',error)}
+    }
+  })();
 }
 
 function pointSegmentDistanceSq(px,py,ax,ay,bx,by){

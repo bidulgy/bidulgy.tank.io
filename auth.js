@@ -402,7 +402,7 @@ const CANNONS=Object.freeze({
   }
 });
 
-const AUTH_BUILD='V5.91';
+const AUTH_BUILD='V5.96';
 console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · 47-cannon registry`);
 const CANNON_DISPLAY_ORDER=Object.freeze([
   'standard','scout','bastion',
@@ -629,16 +629,15 @@ function renderCannonGarage(){
     }
   }
   if(els.collection){
-    els.collection.innerHTML=displayCannons().filter(c=>c.id!=='gojo'||Number(profile.best_level||1)>=45).map(c=>{
+    els.collection.innerHTML=displayCannons().filter(c=>c.id!=='gojo'||owned.has('gojo')).map(c=>{
       const own=owned.has(c.id),eq=equipped.id===c.id;
-      const claimable=c.id==='gojo'&&Number(profile.best_level||1)>=45;
-      const available=own||claimable;
+      const available=own;
       const chance=c.id==='standard'?'기본 지급':c.id==='gojo'?'LV 45 해금 · 뽑기 제외':`뽑기 ${c.chance}%`;
       return `<button type="button" class="cannon-card rarity-card-${c.rarity} ${available?'':'locked'} ${eq?'equipped':''}" data-cannon="${c.id}" ${available?'':'disabled'}>
         <div class="cannon-card-head"><strong>${c.name}${c.id==='sniper'?' · NEW':''}</strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span></div>
         <small class="cannon-chance">${chance}</small>
         <p>${available?c.desc:c.id==='gojo'?'최고 레벨 45를 달성하면 해금됩니다.':'아직 획득하지 않은 대포입니다.'}</p>${available&&c.passive?`<div class="cannon-passive-line">● ${c.passive}</div>`:''}${available&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}${available&&c.skill2?`<div class="cannon-skill-line second">◆ ${c.skill2}</div>`:''}${available&&c.skill3?`<div class="cannon-skill-line third">✦ ${c.skill3}</div>`:''}${available&&c.skill4?`<div class="cannon-skill-line fourth">◆ ${c.skill4}</div>`:''}
-        <div class="equip-label">${eq?'장착 중':own?'눌러서 장착':claimable?'눌러서 해금·장착':c.id==='gojo'?'LV 45 필요':'미보유'}</div>
+        <div class="equip-label">${eq?'장착 중':own?'눌러서 장착':'미보유'}</div>
       </button>`;
     }).join('');
     els.collection.querySelectorAll('.cannon-card:not(.locked)').forEach(b=>b.addEventListener('click',()=>void equipCannon(b.dataset.cannon)));
@@ -1117,11 +1116,15 @@ async function adminSetCannon(cannon,owned){
     setAdminMessage('먼저 관리할 계정을 검색하세요.','error');return;
   }
   setAdminMessage(`${CANNONS[cannon]?.name||cannon} ${owned?'지급':'회수'} 중...`,'busy');
-  const {data,error}=await client.rpc('iron_cell_admin_set_cannon',{
-    p_username:adminTargetUsername,p_cannon:cannon,p_owned:owned
-  });
-  if(error){setAdminMessage(adminFriendlyError(error),'error');return}
-  renderAdminTarget({username:adminTargetUsername,profile:data?.profile||{}});
+  const args={p_username:adminTargetUsername,p_cannon:cannon,p_owned:owned};
+  let response=await client.rpc('iron_cell_admin_set_cannon_v2',args);
+  if(response.error&&String(response.error.message||'').toLowerCase().includes('could not find the function'))response=await client.rpc('iron_cell_admin_set_cannon',args);
+  if(response.error){setAdminMessage(adminFriendlyError(response.error),'error');return}
+  const returnedProfile=response.data?.profile||response.data||{};
+  renderAdminTarget({username:adminTargetUsername,profile:returnedProfile});
+  try{await adminLookup(adminTargetUsername)}catch(_){}
+  const verified=Array.isArray(adminTargetData?.profile?.owned_cannons)&&adminTargetData.profile.owned_cannons.includes(cannon);
+  if(owned&&!verified){setAdminMessage(`${CANNONS[cannon]?.name||cannon} 지급이 서버에 저장되지 않았습니다. DB 함수를 확인해 주세요.`,'error');return}
   setAdminMessage(`${CANNONS[cannon]?.name||cannon} ${owned?'지급':'회수'} 완료`,'good');
   if(adminTargetUsername===currentUsername)await refreshProfile();
 }
@@ -1341,11 +1344,6 @@ async function pullCannons(count=1){
 async function equipCannon(cannonId){
   if(authBusy||!currentUser)return;const cannon=CANNONS[cannonId];if(!cannon)return;
   try{
-    if(cannonId==='gojo'&&!ownedCannons().includes('gojo')){
-      const claim=await client.rpc('iron_cell_claim_singularity_v1');
-      if(claim.error)throw claim.error;
-      profile=claim.data||profile;
-    }
     const {data,error}=await client.rpc('iron_cell_equip_cannon_v1',{p_cannon:cannonId});
     if(error)throw error;profile=data||profile;renderProfile();setGachaMessage(`${cannon.name} 장착 완료`,'good')
   }
@@ -1542,10 +1540,6 @@ async function saveRun(run, finish=false){
 
     const result = data || {};
     if(result.profile) profile = result.profile;
-    if(Number(profile?.best_level||1)>=45&&!ownedCannons().includes('gojo')){
-      const claim=await client.rpc('iron_cell_claim_singularity_v1');
-      if(!claim.error&&claim.data)profile=claim.data;
-    }
     renderProfile();
     return result;
   }catch(error){
@@ -1559,6 +1553,23 @@ async function finishRun(run){
 
 async function saveRunProgress(run){
   return saveRun(run,false);
+}
+
+async function reportGojoDeath(killerId,runId){
+  if(!currentUser||!killerId||!runId)return false;
+  await ensureActiveIronCellSession();
+  const {data,error}=await client.rpc('iron_cell_report_gojo_death_v1',{p_killer_id:String(killerId),p_run_id:String(runId).slice(0,80)});
+  if(error)throw error;
+  return data===true;
+}
+
+async function confirmGojoKill(victimId,runId){
+  if(!currentUser||!victimId||!runId)return null;
+  await ensureActiveIronCellSession();
+  const {data,error}=await client.rpc('iron_cell_confirm_gojo_kill_v1',{p_victim_id:String(victimId),p_run_id:String(runId).slice(0,80)});
+  if(error)throw error;
+  if(data){profile=data;renderProfile()}
+  return data||null;
 }
 
 async function refreshProfile(){
@@ -1691,6 +1702,8 @@ window.IronCellAuth = {
   logout,
   finishRun,
   saveRunProgress,
+  reportGojoDeath,
+  confirmGojoKill,
   savePilotName,
   refreshProfile,
   showLobby,
