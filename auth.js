@@ -402,7 +402,7 @@ const CANNONS=Object.freeze({
   }
 });
 
-const AUTH_BUILD='V5.96';
+const AUTH_BUILD='V5.97';
 console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · 47-cannon registry`);
 const CANNON_DISPLAY_ORDER=Object.freeze([
   'standard','scout','bastion',
@@ -602,11 +602,21 @@ async function ensureProfile(){
 
 function ownedCannons(){
   const raw=profile?.owned_cannons;
-  if(Array.isArray(raw))return raw;
-  if(typeof raw==='string'){try{const p=JSON.parse(raw);if(Array.isArray(p))return p}catch(_){}}
-  return ['standard'];
+  let owned=Array.isArray(raw)?[...raw]:null;
+  if(!owned&&typeof raw==='string'){try{const p=JSON.parse(raw);if(Array.isArray(p))owned=p}catch(_){}}
+  owned=owned||['standard'];
+  if(localGojoOwned()&&!owned.includes('gojo'))owned.push('gojo');
+  return owned;
 }
-function currentCannon(){const id=String(profile?.equipped_cannon||'standard');return CANNONS[id]||CANNONS.standard}
+function localGojoKey(){return `sworder_vs_tank_gojo_survival:${currentUser?.id||currentUsername||'guest'}`}
+function localGojoOwned(){try{return localStorage.getItem(localGojoKey())==='1'}catch(_){return false}}
+function currentCannon(){let id=String(profile?.equipped_cannon||'standard');try{if(localGojoOwned()&&localStorage.getItem(`${localGojoKey()}:equipped`)==='1')id='gojo'}catch(_){}return CANNONS[id]||CANNONS.standard}
+function unlockLocalGojo(){
+  if(!currentUser)return false;
+  try{localStorage.setItem(localGojoKey(),'1')}catch(_){}
+  if(profile){const owned=Array.isArray(profile.owned_cannons)?[...profile.owned_cannons]:[];if(!owned.includes('gojo'))owned.push('gojo');profile={...profile,owned_cannons:owned}}
+  renderProfile();setGachaMessage('생존 30분 달성! SINGULARITY 고죠가 영구 해금되었습니다.','good');return true;
+}
 function setGachaMessage(text='',type=''){if(!els.gachaMessage)return;els.gachaMessage.textContent=text;els.gachaMessage.className=`gacha-message ${type}`.trim()}
 function renderCannonGarage(){
   if(!profile)return;
@@ -632,11 +642,11 @@ function renderCannonGarage(){
     els.collection.innerHTML=displayCannons().filter(c=>c.id!=='gojo'||owned.has('gojo')).map(c=>{
       const own=owned.has(c.id),eq=equipped.id===c.id;
       const available=own;
-      const chance=c.id==='standard'?'기본 지급':c.id==='gojo'?'LV 45 해금 · 뽑기 제외':`뽑기 ${c.chance}%`;
+      const chance=c.id==='standard'?'기본 지급':c.id==='gojo'?'한 전투 생존 30분 해금 · 뽑기 제외':`뽑기 ${c.chance}%`;
       return `<button type="button" class="cannon-card rarity-card-${c.rarity} ${available?'':'locked'} ${eq?'equipped':''}" data-cannon="${c.id}" ${available?'':'disabled'}>
         <div class="cannon-card-head"><strong>${c.name}${c.id==='sniper'?' · NEW':''}</strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span></div>
         <small class="cannon-chance">${chance}</small>
-        <p>${available?c.desc:c.id==='gojo'?'최고 레벨 45를 달성하면 해금됩니다.':'아직 획득하지 않은 대포입니다.'}</p>${available&&c.passive?`<div class="cannon-passive-line">● ${c.passive}</div>`:''}${available&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}${available&&c.skill2?`<div class="cannon-skill-line second">◆ ${c.skill2}</div>`:''}${available&&c.skill3?`<div class="cannon-skill-line third">✦ ${c.skill3}</div>`:''}${available&&c.skill4?`<div class="cannon-skill-line fourth">◆ ${c.skill4}</div>`:''}
+        <p>${available?c.desc:c.id==='gojo'?'한 전투에서 죽지 않고 30분 이상 생존하면 해금됩니다.':'아직 획득하지 않은 대포입니다.'}</p>${available&&c.passive?`<div class="cannon-passive-line">● ${c.passive}</div>`:''}${available&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}${available&&c.skill2?`<div class="cannon-skill-line second">◆ ${c.skill2}</div>`:''}${available&&c.skill3?`<div class="cannon-skill-line third">✦ ${c.skill3}</div>`:''}${available&&c.skill4?`<div class="cannon-skill-line fourth">◆ ${c.skill4}</div>`:''}
         <div class="equip-label">${eq?'장착 중':own?'눌러서 장착':'미보유'}</div>
       </button>`;
     }).join('');
@@ -1343,9 +1353,13 @@ async function pullCannons(count=1){
 }
 async function equipCannon(cannonId){
   if(authBusy||!currentUser)return;const cannon=CANNONS[cannonId];if(!cannon)return;
+  if(cannonId==='gojo'&&localGojoOwned()){
+    try{localStorage.setItem(`${localGojoKey()}:equipped`,'1')}catch(_){}
+    profile={...(profile||{}),equipped_cannon:'gojo'};renderProfile();setGachaMessage(`${cannon.name} 장착 완료`,'good');return;
+  }
   try{
     const {data,error}=await client.rpc('iron_cell_equip_cannon_v1',{p_cannon:cannonId});
-    if(error)throw error;profile=data||profile;renderProfile();setGachaMessage(`${cannon.name} 장착 완료`,'good')
+    if(error)throw error;try{localStorage.removeItem(`${localGojoKey()}:equipped`)}catch(_){}profile=data||profile;renderProfile();setGachaMessage(`${cannon.name} 장착 완료`,'good')
   }
   catch(error){console.error(error);setGachaMessage('대포 장착에 실패했습니다.','error')}
 }
@@ -1704,6 +1718,7 @@ window.IronCellAuth = {
   saveRunProgress,
   reportGojoDeath,
   confirmGojoKill,
+  unlockLocalGojo,
   savePilotName,
   refreshProfile,
   showLobby,

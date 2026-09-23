@@ -44,7 +44,7 @@ const data = vm.runInContext(`({
 assert.equal(data.themes.length, 47, 'all 47 cannon themes must remain');
 assert(data.themes.includes('gojo'),'Gojo needs a dedicated tank theme');
 assert(authSource.includes("id:'gojo',name:'고죠',rarity:'singularity'"),'Gojo must be Singularity');
-assert(authSource.includes("c.id==='gojo'?'LV 45 해금 · 뽑기 제외'"),'Gojo must not appear as a gacha drop');
+assert(authSource.includes("c.id==='gojo'?'한 전투 생존 30분 해금 · 뽑기 제외'"),'Gojo must not appear as a gacha drop');
 assert(unlockSql.includes("'deku','sniper','bloodlust','gojo'"),'equipping Gojo must be server supported');
 assert.equal(vm.runInContext("DIEP_EVOLUTION_INFO.quadTank.mods.damage ?? 1",context),1,'Quad evolution must not lower base damage');
 assert.equal(vm.runInContext("evolutionVolleySpecs('quadTank',27,1).length",context),4,'Quad must keep four firing directions');
@@ -120,8 +120,10 @@ assert(authSource.includes("displayCannons().filter(c=>c.id!=='gojo'||owned.has(
 assert(authSource.includes("client.rpc('iron_cell_admin_set_cannon_v2'"),'admin grants must use the verified Gojo-aware RPC');
 assert(authSource.includes('async function reportGojoDeath(')&&authSource.includes('async function confirmGojoKill('),'Gojo kill attestation client hooks are missing');
 assert(source.includes("victimCannon:defeatedCannon")&&source.includes('confirmGojoKill?.'),'Gojo PvP reward handshake is missing');
+assert(source.includes('player.survivalSeconds>=1800')&&authSource.includes('function unlockLocalGojo()'),'30-minute survival unlock is missing');
+assert(source.includes("addSkillZone('gojoAkaProjectile'")&&source.includes('distanceToWorldEdge(player.x,player.y,a,120)'),'Red and Purple must reach the world boundary');
 assert(gojoRewardSql.includes('iron_cell_admin_set_cannon_v2')&&gojoRewardSql.includes('iron_cell_gojo_kill_attestations'),'Gojo reward database migration is incomplete');
-assert(source.includes("z.type==='gojoAkaImpact'||z.type==='gojoPurpleProjectile'"),'Gojo zones must skip the generic magic circle');
+assert(source.includes("z.type==='gojoAkaProjectile'")&&source.includes("z.type==='gojoPurpleProjectile'"),'Gojo zones must skip the generic magic circle');
 assert(source.includes("addSkillZone('gojoPurpleProjectile'"),'Purple needs a collision-tracked moving projectile');
 assert(!source.includes("damageSkillLine(player.x,player.y,a,length,78,p.damage*13"),'Purple must not damage the full path before contact');
 assert(source.includes("if(elapsed<charge)continue"),'Purple damage must wait until its merge animation completes');

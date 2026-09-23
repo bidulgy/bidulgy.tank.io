@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.96 · verified Gojo rewards');
+console.info('[Sworder VS Tank] game V5.97 · survival Gojo and limitless techniques');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -355,7 +355,7 @@ function eligibleEvolutionChildren(type,level){
 function evolutionName(type){return DIEP_EVOLUTION_INFO[type]?.name||'탱크'}
 
 const statsDef=[['maxHealth','최대 체력'],['regen','체력 회복'],['bulletDamage','탄환 피해'],['bulletSpeed','탄환 속도'],['reload','연사 속도'],['moveSpeed','이동 속도']];
-function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',evolutionTier:0,cannonType:'standard',runId:'',skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,skill4Cd:0,skill4Max:0,skill4ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,siegeUntil:0,stellarReviveUntil:0,stellarReviveReady:false,phantomMarkActive:false,phantomMarkUntil:0,phantomMarkOriginX:0,phantomMarkOriginY:0,phantomMarkDestX:0,phantomMarkDestY:0,cloakUntil:0,dekuSmokeUntil:0,dekuFaJinUntil:0,dekuGearshiftUntil:0,dekuWhipChainRemaining:0,dekuWhipChainUntil:0,sniperScopeUntil:0,stunUntil:0,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
+function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',evolutionTier:0,cannonType:'standard',runId:'',survivalSeconds:0,gojoSurvivalAwarded:false,skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,skill4Cd:0,skill4Max:0,skill4ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,siegeUntil:0,stellarReviveUntil:0,stellarReviveReady:false,phantomMarkActive:false,phantomMarkUntil:0,phantomMarkOriginX:0,phantomMarkOriginY:0,phantomMarkDestX:0,phantomMarkDestY:0,cloakUntil:0,dekuSmokeUntil:0,dekuFaJinUntil:0,dekuGearshiftUntil:0,dekuWhipChainRemaining:0,dekuWhipChainUntil:0,sniperScopeUntil:0,stunUntil:0,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
 function resize(){
   const mobileLike=innerWidth<900||matchMedia('(pointer:coarse)').matches;
   const dpr=Math.min(mobileLike?1.25:1.5,devicePixelRatio||1);
@@ -1441,8 +1441,9 @@ function receiveRemoteSkill(payload){
       return;
     }
     if(cannon==='gojo'&&skillType==='gojoAka'){
-      const sx=x+Math.cos(travelAngle)*68,sy=y+Math.sin(travelAngle)*68;
-      spawnCombatFx('gojoAkaFlight',sx,sy,{angle:travelAngle,color:'#ff718b',life:.22,radius:Math.hypot(tx-sx,ty-sy),cannon:'gojo'});
+      const sx=x+Math.cos(travelAngle)*68,sy=y+Math.sin(travelAngle)*68,flight=Math.max(.35,safeRemoteNumber(payload.flight,Math.hypot(tx-sx,ty-sy)/3100));
+      skillZones.push({type:'gojoAkaProjectile',x:sx,y:sy,radius,life:flight,maxLife:flight,damage:0,tick:0,angle:travelAngle,length:Math.min(WORLD*1.5,safeRemoteNumber(payload.length,Math.hypot(tx-sx,ty-sy))),ownerId:String(payload.ownerId||''),networkRemote:true,pulses:0,interval:.4,data:{flight}});
+      return;
     }
     if(cannon==='deku'){
       if(skillType==='dekuSmoke'){skillZones.push({type:'dekuSmoke',x:tx,y:ty,radius,life,maxLife:life,damage:0,tick:0,angle:0,length:0,width:0,ownerId:String(payload.ownerId||''),networkRemote:true,pulses:0,interval:.4,data:{}});return}
@@ -2028,6 +2029,12 @@ function gojoAimPoint(distance){
   const reach=Math.min(distance,d);
   return[clamp(player.x+dx/d*reach,80,WORLD-80),clamp(player.y+dy/d*reach,80,WORLD-80)];
 }
+function distanceToWorldEdge(x,y,angle,pad=90){
+  const dx=Math.cos(angle),dy=Math.sin(angle),hits=[];
+  if(dx>.0001)hits.push((WORLD-pad-x)/dx);else if(dx<-.0001)hits.push((pad-x)/dx);
+  if(dy>.0001)hits.push((WORLD-pad-y)/dy);else if(dy<-.0001)hits.push((pad-y)/dy);
+  return Math.max(300,Math.min(...hits.filter(v=>v>0)));
+}
 function pointToLineInfo(px,py,x1,y1,x2,y2){
   const vx=x2-x1,vy=y2-y1,l2=vx*vx+vy*vy||1;
   const t=clamp(((px-x1)*vx+(py-y1)*vy)/l2,0,1);
@@ -2173,18 +2180,18 @@ function castGojoSkill(kind,target=null){
   if(kind!=='aka'){player.skillCd=player.skillMax=qCd;player.skillReadyAt=wall+qCd*1000}
   if(kind!=='ao'){player.skill2Cd=player.skill2Max=eCd;player.skill2ReadyAt=wall+eCd*1000}
   if(kind==='purple'){
-    const length=980,charge=.72,flight=.78;
-    addSkillZone('gojoPurpleProjectile',{x:player.x,y:player.y,radius:82,life:charge+flight,damage:p.damage*13,angle:a,length,data:{charge,flight,hitShapes:new Set(),hitPlayers:new Set()}});
-    sendUniqueSkill('gojo','gojoPurple',{length,radius:82,life:charge+flight,charge,flight,targetX:player.x+Math.cos(a)*length,targetY:player.y+Math.sin(a)*length});
+    const length=distanceToWorldEdge(player.x,player.y,a,120),charge=.92,flight=Math.max(.85,length/2350),radius=175;
+    addSkillZone('gojoPurpleProjectile',{x:player.x,y:player.y,radius,life:charge+flight,damage:p.damage*15,angle:a,length,data:{charge,flight,hitShapes:new Set(),hitPlayers:new Set()}});
+    sendUniqueSkill('gojo','gojoPurple',{length,radius,life:charge+flight,charge,flight,targetX:player.x+Math.cos(a)*length,targetY:player.y+Math.sin(a)*length});
     shake=Math.max(shake,16);
   }else{
     const distance=kind==='ao'?480:540,radius=kind==='ao'?210:225;
     const [tx,ty]=target||gojoAimPoint(distance),color=kind==='ao'?'#62b8ff':'#ff7083';
     if(kind==='aka'){
       const sx=player.x+Math.cos(a)*(player.r+41),sy=player.y+Math.sin(a)*(player.r+41);
-      const flight=.24;
-      spawnCombatFx('gojoAkaFlight',sx,sy,{angle:Math.atan2(ty-sy,tx-sx),color:'#ff718b',life:flight,radius:Math.hypot(tx-sx,ty-sy),cannon:'gojo'});
-      addSkillZone('gojoAkaImpact',{x:tx,y:ty,radius,life:flight+.30,damage:p.damage*4.3,data:{delay:flight}});
+      const length=distanceToWorldEdge(sx,sy,a,80),flight=Math.max(.45,length/3100);
+      addSkillZone('gojoAkaProjectile',{x:sx,y:sy,radius:86,life:flight,damage:p.damage*5.2,angle:a,length,data:{flight,hitShapes:new Set(),hitPlayers:new Set()}});
+      sendUniqueSkill('gojo','gojoAka',{targetX:sx+Math.cos(a)*length,targetY:sy+Math.sin(a)*length,length,radius:86,life:flight,flight});
     }else{
       skillAreaDamage(tx,ty,radius,p.damage*3.2,color);
     }
@@ -2192,7 +2199,7 @@ function castGojoSkill(kind,target=null){
       for(const s of shapes){const dx=s.x-tx,dy=s.y-ty,d=Math.hypot(dx,dy)||1;if(d<=radius)reportShapeImpulse(s,dx/d*-270*(1-d/radius),dy/d*-270*(1-d/radius))}
       addSkillZone('gojoAo',{x:tx,y:ty,radius,life:1.55,damage:0});burst(tx,ty,color,24);shake=Math.max(shake,7);
     }
-    sendUniqueSkill('gojo',kind==='ao'?'gojoAo':'gojoAka',{targetX:tx,targetY:ty,radius,life:kind==='ao'?1.55:.95});
+    if(kind==='ao')sendUniqueSkill('gojo','gojoAo',{targetX:tx,targetY:ty,radius,life:1.55});
   }
   updateSkillHud();return true;
 }
@@ -3105,7 +3112,7 @@ function getRewindState(msAgo=4000){
   return best;
 }
 
-function updatePlayer(dt){if(!player.alive)return;refreshRealTimeSkillCooldowns();player.shapeContactCd=Math.max(0,(player.shapeContactCd||0)-dt);const p=playerParams(),stunned=performance.now()<(player.stunUntil||0);let mx=stunned?0:input.moveX,my=stunned?0:input.moveY;if(input.keys.has('KeyA')||input.keys.has('ArrowLeft'))mx-=1;if(input.keys.has('KeyD')||input.keys.has('ArrowRight'))mx+=1;if(input.keys.has('KeyW')||input.keys.has('ArrowUp'))my-=1;if(input.keys.has('KeyS')||input.keys.has('ArrowDown'))my+=1;if(mx||my){[mx,my]=norm(mx,my);player.vx+=mx*p.move*dt*5.2;player.vy+=my*p.move*dt*5.2}const aimWorld=screenToWorldPoint(input.mouseX,input.mouseY),normalAimAngle=Math.atan2(aimWorld[1]-player.y,aimWorld[0]-player.x);
+function updatePlayer(dt){if(!player.alive)return;player.survivalSeconds=(player.survivalSeconds||0)+dt;if(!player.gojoSurvivalAwarded&&player.survivalSeconds>=1800){player.gojoSurvivalAwarded=true;window.IronCellAuth?.unlockLocalGojo?.()}refreshRealTimeSkillCooldowns();player.shapeContactCd=Math.max(0,(player.shapeContactCd||0)-dt);const p=playerParams(),stunned=performance.now()<(player.stunUntil||0);let mx=stunned?0:input.moveX,my=stunned?0:input.moveY;if(input.keys.has('KeyA')||input.keys.has('ArrowLeft'))mx-=1;if(input.keys.has('KeyD')||input.keys.has('ArrowRight'))mx+=1;if(input.keys.has('KeyW')||input.keys.has('ArrowUp'))my-=1;if(input.keys.has('KeyS')||input.keys.has('ArrowDown'))my+=1;if(mx||my){[mx,my]=norm(mx,my);player.vx+=mx*p.move*dt*5.2;player.vy+=my*p.move*dt*5.2}const aimWorld=screenToWorldPoint(input.mouseX,input.mouseY),normalAimAngle=Math.atan2(aimWorld[1]-player.y,aimWorld[0]-player.x);
 player.angle=heldSkillAim.active&&Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:normalAimAngle;let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);if(!stunned&&(input.firing||input.keys.has('Space')))fire(player);handleShapeContact();if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}recordPlayerHistory()
 function updateShapes(dt){
   const host=isWorldHost();
@@ -3602,6 +3609,15 @@ function updateSkillZones(dt){
         for(const s of shapes){const dx=s.x-z.x,dy=s.y-z.y,d=Math.hypot(dx,dy)||1;if(d<=z.radius)reportShapeImpulse(s,dx/d*340*(1-d/z.radius),dy/d*340*(1-d/z.radius))}
         burst(z.x,z.y,'#ff7083',36);shake=Math.max(shake,11);
       }
+      continue;
+    }
+    if(z.type==='gojoAkaProjectile'){
+      const progress=clamp((z.maxLife-z.life)/(z.data.flight||z.maxLife),0,1),prev=z.data.prevProgress??progress;
+      const x1=z.x+Math.cos(z.angle)*z.length*prev,y1=z.y+Math.sin(z.angle)*z.length*prev,x2=z.x+Math.cos(z.angle)*z.length*progress,y2=z.y+Math.sin(z.angle)*z.length*progress;
+      z.data.prevProgress=progress;let impactX=0,impactY=0,hitSomething=false;
+      for(let i=shapes.length-1;i>=0;i--){const s=shapes[i],hit=pointToLineInfo(s.x,s.y,x1,y1,x2,y2);if(hit.d2>(z.radius+s.r)**2)continue;impactX=hit.x;impactY=hit.y;hitSomething=true;break}
+      if(!hitSomething)for(const enemy of remotePlayers.values()){if(!enemy.alive)continue;const hit=pointToLineInfo(enemy.x,enemy.y,x1,y1,x2,y2);if(hit.d2>(z.radius+(enemy.r||27))**2)continue;impactX=hit.x;impactY=hit.y;hitSomething=true;break}
+      if(hitSomething){skillAreaDamage(impactX,impactY,235,z.damage,'#ff5475');for(const s of shapes){const dx=s.x-impactX,dy=s.y-impactY,d=Math.hypot(dx,dy)||1;if(d<235)reportShapeImpulse(s,dx/d*390*(1-d/235),dy/d*390*(1-d/235))}burst(impactX,impactY,'#ff6b87',52);shake=Math.max(shake,15);z.life=.001}
       continue;
     }
     if(z.type==='gojoPurpleProjectile'){
@@ -4595,7 +4611,7 @@ function skillRuneColor(z){
 }
 function drawSkillRune(z,t,p){
   const r=Number(z.radius)||0;
-  if(r<70||r>760||z.type==='gojoAo'||z.type==='gojoAka'||z.type==='gojoAkaImpact'||z.type==='gojoPurpleProjectile'||z.type==='dekuSmoke'||z.type==='glitchWarpTrail'||z.type==='earthFissure'||z.type==='flameWall'||z.type==='cometTrail')return;
+  if(r<70||r>760||z.type==='gojoAo'||z.type==='gojoAka'||z.type==='gojoAkaImpact'||z.type==='gojoAkaProjectile'||z.type==='gojoPurpleProjectile'||z.type==='dekuSmoke'||z.type==='glitchWarpTrail'||z.type==='earthFissure'||z.type==='flameWall'||z.type==='cometTrail')return;
   const color=skillRuneColor(z),highDetail=renderPressure===0&&r>=125;
   ctx.save();ctx.globalAlpha*=Math.min(.88,p*.95);ctx.strokeStyle=color;ctx.fillStyle=color;
   if(renderPressure===0){ctx.shadowColor=color;ctx.shadowBlur=8}
@@ -4649,19 +4665,26 @@ function drawSkillZones(){
   const t=performance.now()*.001;
   for(const z of skillZones){
     const extent=Math.max(100,Number(z.radius)||0,Number(z.length)||0);
-    if(!screenVisibleWorld(z.x,z.y,Math.min(1400,extent+100)))continue;
+    const travelingGojo=z.type==='gojoPurpleProjectile'||z.type==='gojoAkaProjectile';
+    if(travelingGojo){const ex=z.x+Math.cos(z.angle)*z.length,ey=z.y+Math.sin(z.angle)*z.length;if(!segmentMayTouchScreen(z.x,z.y,ex,ey,(z.radius||100)+120))continue}
+    else if(!screenVisibleWorld(z.x,z.y,Math.min(1400,extent+100)))continue;
     const[x,y]=worldToScreen(z.x,z.y),p=clamp(z.life/z.maxLife,0,1),q=1-p;ctx.save();ctx.translate(x,y);ctx.globalAlpha=Math.min(1,p*1.3);
-    if(z.type==='gojoPurpleProjectile'){
+    if(z.type==='gojoAkaProjectile'){
+      const elapsed=z.maxLife-z.life,progress=clamp(elapsed/(z.data.flight||z.maxLife),0,1),head=z.length*progress,tail=Math.max(0,head-520),orb=72+Math.sin(t*26)*9;
+      ctx.rotate(z.angle);ctx.lineCap='round';ctx.shadowColor='#ff365f';ctx.shadowBlur=48;
+      for(let k=0;k<13;k++){const spread=(k-6)*8,wave=Math.sin(t*15+k*.91)*24;ctx.strokeStyle=k%3?'rgba(255,70,101,.35)':'rgba(255,205,214,.62)';ctx.lineWidth=5+(k%4)*3;ctx.beginPath();ctx.moveTo(tail,spread*.25);ctx.bezierCurveTo(tail+(head-tail)*.36,wave+spread,tail+(head-tail)*.74,-wave+spread*.4,head-18,spread*.08);ctx.stroke()}
+      const wake=ctx.createLinearGradient(tail,0,head,0);wake.addColorStop(0,'rgba(110,0,25,0)');wake.addColorStop(.5,'rgba(255,32,76,.28)');wake.addColorStop(1,'rgba(255,208,218,.95)');ctx.strokeStyle=wake;ctx.lineWidth=58;ctx.beginPath();ctx.moveTo(tail,0);ctx.lineTo(head,0);ctx.stroke();const g=ctx.createRadialGradient(head-14,-14,3,head,0,orb);g.addColorStop(0,'#fff');g.addColorStop(.16,'#ffe4e9');g.addColorStop(.43,'#ff4168');g.addColorStop(.74,'#b5002f');g.addColorStop(1,'rgba(92,0,28,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(head,0,orb,0,TAU);ctx.fill();ctx.shadowBlur=0;
+    }else if(z.type==='gojoPurpleProjectile'){
       const elapsed=z.maxLife-z.life,charge=z.data.charge||.72,flight=z.data.flight||.78,charging=elapsed<charge;
       ctx.rotate(z.angle);ctx.lineCap='round';ctx.shadowColor='#9c5cff';ctx.shadowBlur=34;
       if(charging){
-        const merge=clamp(elapsed/charge,0,1),ease=1-Math.pow(1-merge,3),side=125*(1-ease),forward=54+ease*22;
+        const merge=clamp(elapsed/charge,0,1),ease=1-Math.pow(1-merge,3),side=235*(1-ease),forward=70+ease*50;
         for(const sign of [-1,1]){const blue=sign<0,ox=forward,oy=side*sign,wobble=Math.sin(t*17+sign)*8*(1-merge);ctx.strokeStyle=blue?'rgba(88,176,255,.65)':'rgba(255,88,120,.65)';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(4,sign*165);ctx.bezierCurveTo(35,sign*120+wobble,65,sign*55-wobble,ox,oy);ctx.stroke();const g=ctx.createRadialGradient(ox-5,oy-5,2,ox,oy,26);g.addColorStop(0,'#fff');g.addColorStop(.22,blue?'#c9efff':'#ffd0d8');g.addColorStop(.6,blue?'#248cff':'#ff3159');g.addColorStop(1,blue?'rgba(20,66,210,0)':'rgba(150,0,32,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(ox,oy,26,0,TAU);ctx.fill()}
-        const core=9+merge*31,g=ctx.createRadialGradient(72,-5,1,72,0,core);g.addColorStop(0,'#fff');g.addColorStop(.22,'#efd7ff');g.addColorStop(.58,'#9b48dc');g.addColorStop(1,'rgba(50,5,88,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(72,0,core,0,TAU);ctx.fill();
+        const core=18+merge*92,g=ctx.createRadialGradient(112,-12,2,112,0,core);g.addColorStop(0,'#fff');g.addColorStop(.18,'#f6e5ff');g.addColorStop(.48,'#b355f1');g.addColorStop(.76,'#5a167d');g.addColorStop(1,'rgba(45,3,80,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(112,0,core,0,TAU);ctx.fill();
       }else{
-        const progress=clamp((elapsed-charge)/flight,0,1),head=z.length*progress,tail=Math.max(0,head-300);
-        for(let k=0;k<9;k++){const spread=(k-4)*10,wave=Math.sin(t*9+k*.8)*18*(1-progress*.35);ctx.strokeStyle=k%3===0?'rgba(255,78,133,.34)':k%3===1?'rgba(72,156,255,.34)':'rgba(188,101,255,.42)';ctx.lineWidth=5+(k%3)*3;ctx.beginPath();ctx.moveTo(tail,spread*.3);ctx.bezierCurveTo(tail+(head-tail)*.35,wave+spread,tail+(head-tail)*.72,-wave+spread*.45,head-16,spread*.1);ctx.stroke()}
-        const trail=ctx.createLinearGradient(tail,0,head,0);trail.addColorStop(0,'rgba(48,10,91,0)');trail.addColorStop(.55,'rgba(122,51,190,.30)');trail.addColorStop(1,'rgba(232,190,255,.95)');ctx.strokeStyle=trail;ctx.lineWidth=42;ctx.beginPath();ctx.moveTo(tail,0);ctx.lineTo(head,0);ctx.stroke();const orb=38+Math.sin(t*28)*5,g=ctx.createRadialGradient(head-8,-8,2,head,0,orb);g.addColorStop(0,'#fff');g.addColorStop(.2,'#efd5ff');g.addColorStop(.5,'#9e4ddb');g.addColorStop(.78,'#441066');g.addColorStop(1,'rgba(30,2,53,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(head,0,orb,0,TAU);ctx.fill()
+        const progress=clamp((elapsed-charge)/flight,0,1),head=z.length*progress,tail=Math.max(0,head-760);
+        for(let k=0;k<17;k++){const spread=(k-8)*13,wave=Math.sin(t*11+k*.73)*38*(1-progress*.25);ctx.strokeStyle=k%3===0?'rgba(255,68,139,.40)':k%3===1?'rgba(55,153,255,.40)':'rgba(193,103,255,.50)';ctx.lineWidth=7+(k%5)*4;ctx.beginPath();ctx.moveTo(tail,spread*.3);ctx.bezierCurveTo(tail+(head-tail)*.35,wave+spread,tail+(head-tail)*.72,-wave+spread*.45,head-24,spread*.1);ctx.stroke()}
+        const trail=ctx.createLinearGradient(tail,0,head,0);trail.addColorStop(0,'rgba(48,10,91,0)');trail.addColorStop(.45,'rgba(118,42,191,.34)');trail.addColorStop(1,'rgba(240,205,255,.98)');ctx.strokeStyle=trail;ctx.lineWidth=120;ctx.beginPath();ctx.moveTo(tail,0);ctx.lineTo(head,0);ctx.stroke();const orb=142+Math.sin(t*28)*13,g=ctx.createRadialGradient(head-22,-22,4,head,0,orb);g.addColorStop(0,'#fff');g.addColorStop(.16,'#f7e7ff');g.addColorStop(.42,'#b158ee');g.addColorStop(.72,'#57127c');g.addColorStop(1,'rgba(30,2,53,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(head,0,orb,0,TAU);ctx.fill()
       }
       ctx.shadowBlur=0;
     }else if(z.type==='gojoAo'||z.type==='gojoAka'||z.type==='gojoAkaImpact'){
@@ -4673,7 +4696,7 @@ function drawSkillZones(){
         const haze=ctx.createRadialGradient(0,0,core*.2,0,0,z.radius*.82);
         haze.addColorStop(0,'rgba(235,252,255,.95)');haze.addColorStop(.10,'rgba(56,151,255,.72)');haze.addColorStop(.44,'rgba(29,94,217,.20)');haze.addColorStop(1,'rgba(25,70,180,0)');
         ctx.fillStyle=haze;ctx.beginPath();ctx.arc(0,0,z.radius*.82,0,TAU);ctx.fill();
-        for(let k=0;k<26;k++){
+        for(let k=0;k<42;k++){
           const seed=k*2.399,turn=t*(1.7+(k%4)*.13),outer=z.radius*(.46+(k%7)*.065),a=seed-turn;
           const ex=Math.cos(a)*outer,ey=Math.sin(a)*outer*.72;
           ctx.strokeStyle=k%3?'rgba(177,228,255,.72)':'rgba(89,167,255,.92)';ctx.lineWidth=1.4+(k%4)*.5;
@@ -5793,8 +5816,8 @@ function drawSkillAimGuide(){
       const [wx,wy]=gojoAimPoint(480),[tx,ty]=worldToScreen(wx,wy),r=210;
       ctx.strokeStyle='rgba(115,203,255,.42)';ctx.lineWidth=2;ctx.setLineDash([18,15]);ctx.beginPath();ctx.arc(tx,ty,r,0,TAU);ctx.stroke();ctx.setLineDash([]);
       const haze=ctx.createRadialGradient(tx,ty,4,tx,ty,r*.92);haze.addColorStop(0,'rgba(230,252,255,.9)');haze.addColorStop(.12,'rgba(52,153,255,.45)');haze.addColorStop(1,'rgba(26,91,210,0)');ctx.fillStyle=haze;ctx.beginPath();ctx.arc(tx,ty,r*.92,0,TAU);ctx.fill();
-      for(let k=0;k<22;k++){const aa=k*2.399-t*(1.4+(k%4)*.12),rr=r*(.35+(k%8)*.075);ctx.strokeStyle='rgba(173,226,255,.72)';ctx.lineWidth=1.5+(k%3);ctx.beginPath();ctx.moveTo(tx+Math.cos(aa)*rr,ty+Math.sin(aa)*rr*.75);ctx.quadraticCurveTo(tx+Math.cos(aa-.7)*rr*.58,ty+Math.sin(aa-.7)*rr*.43,tx+Math.cos(aa-1.3)*18,ty+Math.sin(aa-1.3)*18);ctx.stroke()}
-      ctx.fillStyle='#f2fdff';ctx.beginPath();ctx.arc(tx,ty,14+Math.sin(t*9)*3,0,TAU);ctx.fill();
+       for(let k=0;k<36;k++){const aa=k*2.399-t*(1.4+(k%4)*.12),rr=r*(.28+(k%10)*.07);ctx.strokeStyle=k%4?'rgba(173,226,255,.76)':'rgba(70,145,255,.94)';ctx.lineWidth=1.5+(k%4);ctx.beginPath();ctx.moveTo(tx+Math.cos(aa)*rr,ty+Math.sin(aa)*rr*.75);ctx.quadraticCurveTo(tx+Math.cos(aa-.7)*rr*.58,ty+Math.sin(aa-.7)*rr*.43,tx+Math.cos(aa-1.3)*21,ty+Math.sin(aa-1.3)*21);ctx.stroke()}
+       ctx.fillStyle='#f2fdff';ctx.beginPath();ctx.arc(tx,ty,19+Math.sin(t*9)*4,0,TAU);ctx.fill();
     }
     ctx.restore();return;
   }
