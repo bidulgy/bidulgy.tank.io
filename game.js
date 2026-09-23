@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.94 · cinematic Gojo techniques');
+console.info('[Sworder VS Tank] game V5.95 · contact-timed Gojo techniques');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -1423,7 +1423,12 @@ function receiveRemoteSkill(payload){
     const radius=Math.max(20,safeRemoteNumber(payload.radius,180));
     const life=Math.max(.2,safeRemoteNumber(payload.life,2));
     if(cannon==='gojo'&&skillType==='gojoPurple'){
-      spawnCombatFx('gojoPurple',x,y,{angle:travelAngle,color:'#b184ff',life:1.05,radius:Math.min(1200,safeRemoteNumber(payload.length,980)),cannon:'gojo'});
+      const charge=Math.max(.35,safeRemoteNumber(payload.charge,.72)),flight=Math.max(.35,safeRemoteNumber(payload.flight,.78));
+      skillZones.push({type:'gojoPurpleProjectile',x,y,radius,life:charge+flight,maxLife:charge+flight,damage:0,tick:0,angle:travelAngle,length:Math.min(1200,safeRemoteNumber(payload.length,980)),ownerId:String(payload.ownerId||''),networkRemote:true,pulses:0,interval:.4,data:{charge,flight}});
+      return;
+    }
+    if(cannon==='gojo'&&skillType==='gojoAoEnd'){
+      for(let i=skillZones.length-1;i>=0;i--){const z=skillZones[i];if(z.networkRemote&&z.ownerId===String(payload.ownerId||'')&&z.type==='gojoAo')skillZones.splice(i,1)}
       return;
     }
     if(cannon==='gojo'&&skillType==='gojoAka'){
@@ -1471,6 +1476,7 @@ function receiveRemoteSkill(payload){
     }
     const zoneTypes=new Set(['artillery','barrier','rapidOverdrive','twinDrones','burstBomb','crystalPrism','laserSweep','plasmaCage','thunderStorm','flameWall','missileRain','earthFissure','ringGate','timeField','gravity','supernovaCore','cometTrail','constellation','secondStar','starOrbit','absoluteZero','ironDome','siegeAura','ringParry','rewindEcho','antiMatter','cometShower','glitchDriveAura','glitchWarpTrail','vortexPrison','mirrorWorld','abyssCollapse','lastBlood','threeFates','kineticArmor','gojoAo','gojoAka']);
     if(zoneTypes.has(skillType)){
+      if(skillType==='gojoAo'&&payload.held===true){for(let i=skillZones.length-1;i>=0;i--){const z=skillZones[i];if(z.networkRemote&&z.ownerId===String(payload.ownerId||'')&&z.type==='gojoAo')skillZones.splice(i,1)}}
       skillZones.push({type:skillType,x:tx,y:ty,radius,life,maxLife:life,damage:0,tick:0,angle:fxAngleToTarget(x,y,tx,ty,safeRemoteNumber(payload.zoneAngle,angle)),length:safeRemoteNumber(payload.length,0),width:safeRemoteNumber(payload.width,0),ownerId:String(payload.ownerId||''),networkRemote:true,pulses:0,interval:.4,data:{}});
     }else{
       spawnCombatFx('uniqueSkill',tx,ty,{angle:travelAngle,color:CANNON_SKILLS[cannon]?.color||'#fff',life:.85,radius:Math.max(90,radius),cannon});
@@ -1965,6 +1971,7 @@ function beginHeldSkillAim(slot,source='keyboard',event=null){
   heldSkillAim.active=true;heldSkillAim.slot=slot;heldSkillAim.source=source;
   heldSkillAim.pointerId=event?.pointerId??null;heldSkillAim.startX=Number(event?.clientX)||0;heldSkillAim.startY=Number(event?.clientY)||0;
   heldSkillAim.angle=source==='button'?(player?.angle||0):null;heldSkillAim.distance=null;heldSkillAim.moved=false;
+  if(slot===1&&player?.cannonType==='gojo')startGojoAoHold();
   if(slot===1&&player?.cannonType==='error'&&player.errorSwordMode)startErrorQCharge();
   return true;
 }
@@ -1978,6 +1985,7 @@ function updateHeldSkillAim(event){
   }
 }
 function cancelHeldSkillAim(){
+  if(player?.gojoAoHolding)finishGojoAoHold(false);
   if(player?.errorQCharging)cancelErrorQCharge();
   heldSkillAim.active=false;heldSkillAim.slot=0;heldSkillAim.source='';heldSkillAim.pointerId=null;heldSkillAim.angle=null;heldSkillAim.distance=null;heldSkillAim.moved=false;
 }
@@ -1988,7 +1996,8 @@ function releaseHeldSkillAim(slot=heldSkillAim.slot){
   const gojoTarget=cannon==='gojo'?gojoAimPoint(slot===1?480:540):null;
   if(player&&Number.isFinite(heldSkillAim.angle))player.angle=heldSkillAim.angle;
   heldSkillAim.active=false;heldSkillAim.slot=0;heldSkillAim.source='';heldSkillAim.pointerId=null;heldSkillAim.angle=null;heldSkillAim.distance=null;heldSkillAim.moved=false;
-  if(cannon==='gojo'&&slot<=2)return castGojoSkill(slot===1?'ao':'aka',gojoTarget);
+  if(cannon==='gojo'&&slot===1)return finishGojoAoHold(true);
+  if(cannon==='gojo'&&slot===2)return castGojoSkill('aka',gojoTarget);
   if(slot===1){if(cannon==='error'&&player?.errorSwordMode&&player?.errorQCharging)return releaseErrorQCharge();activateSkill(0,phantomTarget);return true}
   if(slot===2){activateSkill2();return true}
   if(slot===3){activateSkill3();return true}
@@ -2125,6 +2134,25 @@ function sendUniqueSkill(cannon,skillType,extra={}){
   sendOnline('skill',{ownerId:onlineSelfId,cannon,x:player.x,y:player.y,angle:player.angle,skillType,...extra});
 }
 
+function removeLocalGojoAoZone(){
+  for(let i=skillZones.length-1;i>=0;i--){const z=skillZones[i];if(z.type==='gojoAo'&&!z.networkRemote&&z.ownerId===onlineSelfId)skillZones.splice(i,1)}
+}
+function startGojoAoHold(){
+  if(!player||player.gojoAoHolding)return false;
+  const [x,y]=gojoAimPoint(480);
+  player.gojoAoHolding=true;player.gojoAoNetAt=0;
+  addSkillZone('gojoAo',{x,y,radius:210,life:999,damage:playerParams().damage*.42,data:{held:true}});
+  sendUniqueSkill('gojo','gojoAo',{targetX:x,targetY:y,radius:210,life:.22,held:true});
+  return true;
+}
+function finishGojoAoHold(commitCooldown=true){
+  if(!player?.gojoAoHolding)return false;
+  player.gojoAoHolding=false;removeLocalGojoAoZone();
+  if(commitCooldown){const cd=CANNON_SKILLS.gojo.cooldown,wall=Date.now();player.skillCd=player.skillMax=cd;player.skillReadyAt=wall+cd*1000;updateSkillHud()}
+  sendUniqueSkill('gojo','gojoAoEnd',{targetX:player.x,targetY:player.y,radius:20,life:.2});
+  return true;
+}
+
 function castGojoSkill(kind,target=null){
   if(!running||paused||!player?.alive||player.cannonType!=='gojo')return false;
   refreshRealTimeSkillCooldowns();
@@ -2136,36 +2164,32 @@ function castGojoSkill(kind,target=null){
   if(kind!=='aka'){player.skillCd=player.skillMax=qCd;player.skillReadyAt=wall+qCd*1000}
   if(kind!=='ao'){player.skill2Cd=player.skill2Max=eCd;player.skill2ReadyAt=wall+eCd*1000}
   if(kind==='purple'){
-    const length=980;
-    damageSkillLine(player.x,player.y,a,length,78,p.damage*13,'#c38aff',140);
-    spawnCombatFx('gojoPurple',player.x,player.y,{angle:a,color:'#b184ff',life:1.05,radius:length,cannon:'gojo'});
-    burst(player.x+Math.cos(a)*length*.65,player.y+Math.sin(a)*length*.65,'#d9adff',40);
-    sendUniqueSkill('gojo','gojoPurple',{length,radius:78,targetX:player.x+Math.cos(a)*length,targetY:player.y+Math.sin(a)*length});
+    const length=980,charge=.72,flight=.78;
+    addSkillZone('gojoPurpleProjectile',{x:player.x,y:player.y,radius:82,life:charge+flight,damage:p.damage*13,angle:a,length,data:{charge,flight,hitShapes:new Set(),hitPlayers:new Set()}});
+    sendUniqueSkill('gojo','gojoPurple',{length,radius:82,life:charge+flight,charge,flight,targetX:player.x+Math.cos(a)*length,targetY:player.y+Math.sin(a)*length});
     shake=Math.max(shake,16);
   }else{
     const distance=kind==='ao'?480:540,radius=kind==='ao'?210:225;
     const [tx,ty]=target||gojoAimPoint(distance),color=kind==='ao'?'#62b8ff':'#ff7083';
     if(kind==='aka'){
       const sx=player.x+Math.cos(a)*(player.r+41),sy=player.y+Math.sin(a)*(player.r+41);
-      spawnCombatFx('gojoAkaFlight',sx,sy,{angle:Math.atan2(ty-sy,tx-sx),color:'#ff718b',life:.22,radius:Math.hypot(tx-sx,ty-sy),cannon:'gojo'});
+      const flight=.24;
+      spawnCombatFx('gojoAkaFlight',sx,sy,{angle:Math.atan2(ty-sy,tx-sx),color:'#ff718b',life:flight,radius:Math.hypot(tx-sx,ty-sy),cannon:'gojo'});
+      addSkillZone('gojoAkaImpact',{x:tx,y:ty,radius,life:flight+.30,damage:p.damage*4.3,data:{delay:flight}});
+    }else{
+      skillAreaDamage(tx,ty,radius,p.damage*3.2,color);
     }
-    skillAreaDamage(tx,ty,radius,p.damage*(kind==='ao'?3.2:4.3),color);
-    for(const s of shapes){
-      const dx=s.x-tx,dy=s.y-ty,d=Math.hypot(dx,dy)||1;
-      if(d>radius)continue;
-      const force=(1-d/radius)*(kind==='ao'?-270:340);
-      reportShapeImpulse(s,dx/d*force,dy/d*force);
+    if(kind==='ao'){
+      for(const s of shapes){const dx=s.x-tx,dy=s.y-ty,d=Math.hypot(dx,dy)||1;if(d<=radius)reportShapeImpulse(s,dx/d*-270*(1-d/radius),dy/d*-270*(1-d/radius))}
+      addSkillZone('gojoAo',{x:tx,y:ty,radius,life:1.55,damage:0});burst(tx,ty,color,24);shake=Math.max(shake,7);
     }
-    addSkillZone(kind==='ao'?'gojoAo':'gojoAka',{x:tx,y:ty,radius,life:kind==='ao'?1.55:.95,damage:0});
-    burst(tx,ty,color,kind==='ao'?24:32);
     sendUniqueSkill('gojo',kind==='ao'?'gojoAo':'gojoAka',{targetX:tx,targetY:ty,radius,life:kind==='ao'?1.55:.95});
-    shake=Math.max(shake,kind==='ao'?7:11);
   }
   updateSkillHud();return true;
 }
 function tryGojoPurple(){
   if(player?.cannonType!=='gojo'||!skillSlotReady(1)||!skillSlotReady(2))return false;
-  cancelHeldSkillAim();return castGojoSkill('purple');
+  if(player.gojoAoHolding)finishGojoAoHold(false);cancelHeldSkillAim();return castGojoSkill('purple');
 }
 
 function startErrorQCharge(){
@@ -3541,11 +3565,37 @@ function updateSkillZones(dt){
     const elapsed=z.maxLife-z.life;
 
     if(z.type==='gojoAo'){
+      if(z.data?.held&&player?.gojoAoHolding){
+        const [tx,ty]=gojoAimPoint(480);z.x=tx;z.y=ty;z.life=z.maxLife=999;
+        player.gojoAoNetAt=(player.gojoAoNetAt||0)-dt;
+        if(player.gojoAoNetAt<=0){player.gojoAoNetAt=.10;sendUniqueSkill('gojo','gojoAo',{targetX:z.x,targetY:z.y,radius:z.radius,life:.22,held:true})}
+      }
       z.tick=(z.tick||0)+dt;
       if(z.tick>=.055){
         z.tick=0;
         for(const s of shapes){const dx=z.x-s.x,dy=z.y-s.y,d=Math.hypot(dx,dy)||1;if(d<z.radius*1.15)reportShapeImpulse(s,dx/d*85,dy/d*85)}
       }
+      z.data.damageTick=(z.data.damageTick||0)+dt;
+      if(z.data.held&&z.data.damageTick>=.14){z.data.damageTick=0;skillAreaDamage(z.x,z.y,z.radius,z.damage,'#62b8ff')}
+      continue;
+    }
+    if(z.type==='gojoAkaImpact'){
+      if(!z.triggered&&elapsed>=(z.data.delay||.24)){
+        z.triggered=true;skillAreaDamage(z.x,z.y,z.radius,z.damage,'#ff7083');
+        for(const s of shapes){const dx=s.x-z.x,dy=s.y-z.y,d=Math.hypot(dx,dy)||1;if(d<=z.radius)reportShapeImpulse(s,dx/d*340*(1-d/z.radius),dy/d*340*(1-d/z.radius))}
+        burst(z.x,z.y,'#ff7083',36);shake=Math.max(shake,11);
+      }
+      continue;
+    }
+    if(z.type==='gojoPurpleProjectile'){
+      const charge=z.data.charge||.72,flight=z.data.flight||.78;
+      if(elapsed<charge)continue;
+      const progress=clamp((elapsed-charge)/flight,0,1),prev=z.data.prevProgress??progress;
+      const x1=z.x+Math.cos(z.angle)*z.length*prev,y1=z.y+Math.sin(z.angle)*z.length*prev;
+      const x2=z.x+Math.cos(z.angle)*z.length*progress,y2=z.y+Math.sin(z.angle)*z.length*progress;
+      z.data.prevProgress=progress;
+      for(let i=shapes.length-1;i>=0;i--){const s=shapes[i];if(z.data.hitShapes.has(s))continue;const hit=pointToLineInfo(s.x,s.y,x1,y1,x2,y2);if(hit.d2>(z.radius+s.r)**2)continue;z.data.hitShapes.add(s);applyShapeDamage(s,z.damage,Math.cos(z.angle)*140,Math.sin(z.angle)*140);burst(s.x,s.y,'#c38aff',12);if(s.hp<=0){gainPolygonXp(s.xp);burst(s.x,s.y,colorForShape(s.type),14);shapes.splice(i,1)}}
+      for(const enemy of remotePlayers.values()){if(!enemy.alive||z.data.hitPlayers.has(enemy.id))continue;const hit=pointToLineInfo(enemy.x,enemy.y,x1,y1,x2,y2);if(hit.d2>(z.radius+(enemy.r||27))**2)continue;z.data.hitPlayers.add(enemy.id);sendDamage(enemy.id,z.damage)}
       continue;
     }
 
@@ -4528,7 +4578,7 @@ function skillRuneColor(z){
 }
 function drawSkillRune(z,t,p){
   const r=Number(z.radius)||0;
-  if(r<70||r>760||z.type==='gojoAo'||z.type==='gojoAka'||z.type==='dekuSmoke'||z.type==='glitchWarpTrail'||z.type==='earthFissure'||z.type==='flameWall'||z.type==='cometTrail')return;
+  if(r<70||r>760||z.type==='gojoAo'||z.type==='gojoAka'||z.type==='gojoAkaImpact'||z.type==='gojoPurpleProjectile'||z.type==='dekuSmoke'||z.type==='glitchWarpTrail'||z.type==='earthFissure'||z.type==='flameWall'||z.type==='cometTrail')return;
   const color=skillRuneColor(z),highDetail=renderPressure===0&&r>=125;
   ctx.save();ctx.globalAlpha*=Math.min(.88,p*.95);ctx.strokeStyle=color;ctx.fillStyle=color;
   if(renderPressure===0){ctx.shadowColor=color;ctx.shadowBlur=8}
@@ -4584,8 +4634,22 @@ function drawSkillZones(){
     const extent=Math.max(100,Number(z.radius)||0,Number(z.length)||0);
     if(!screenVisibleWorld(z.x,z.y,Math.min(1400,extent+100)))continue;
     const[x,y]=worldToScreen(z.x,z.y),p=clamp(z.life/z.maxLife,0,1),q=1-p;ctx.save();ctx.translate(x,y);ctx.globalAlpha=Math.min(1,p*1.3);
-    if(z.type==='gojoAo'||z.type==='gojoAka'){
+    if(z.type==='gojoPurpleProjectile'){
+      const elapsed=z.maxLife-z.life,charge=z.data.charge||.72,flight=z.data.flight||.78,charging=elapsed<charge;
+      ctx.rotate(z.angle);ctx.lineCap='round';ctx.shadowColor='#9c5cff';ctx.shadowBlur=34;
+      if(charging){
+        const merge=clamp(elapsed/charge,0,1),ease=1-Math.pow(1-merge,3),side=125*(1-ease),forward=54+ease*22;
+        for(const sign of [-1,1]){const blue=sign<0,ox=forward,oy=side*sign,wobble=Math.sin(t*17+sign)*8*(1-merge);ctx.strokeStyle=blue?'rgba(88,176,255,.65)':'rgba(255,88,120,.65)';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(4,sign*165);ctx.bezierCurveTo(35,sign*120+wobble,65,sign*55-wobble,ox,oy);ctx.stroke();const g=ctx.createRadialGradient(ox-5,oy-5,2,ox,oy,26);g.addColorStop(0,'#fff');g.addColorStop(.22,blue?'#c9efff':'#ffd0d8');g.addColorStop(.6,blue?'#248cff':'#ff3159');g.addColorStop(1,blue?'rgba(20,66,210,0)':'rgba(150,0,32,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(ox,oy,26,0,TAU);ctx.fill()}
+        const core=9+merge*31,g=ctx.createRadialGradient(72,-5,1,72,0,core);g.addColorStop(0,'#fff');g.addColorStop(.22,'#efd7ff');g.addColorStop(.58,'#9b48dc');g.addColorStop(1,'rgba(50,5,88,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(72,0,core,0,TAU);ctx.fill();
+      }else{
+        const progress=clamp((elapsed-charge)/flight,0,1),head=z.length*progress,tail=Math.max(0,head-300);
+        for(let k=0;k<9;k++){const spread=(k-4)*10,wave=Math.sin(t*9+k*.8)*18*(1-progress*.35);ctx.strokeStyle=k%3===0?'rgba(255,78,133,.34)':k%3===1?'rgba(72,156,255,.34)':'rgba(188,101,255,.42)';ctx.lineWidth=5+(k%3)*3;ctx.beginPath();ctx.moveTo(tail,spread*.3);ctx.bezierCurveTo(tail+(head-tail)*.35,wave+spread,tail+(head-tail)*.72,-wave+spread*.45,head-16,spread*.1);ctx.stroke()}
+        const trail=ctx.createLinearGradient(tail,0,head,0);trail.addColorStop(0,'rgba(48,10,91,0)');trail.addColorStop(.55,'rgba(122,51,190,.30)');trail.addColorStop(1,'rgba(232,190,255,.95)');ctx.strokeStyle=trail;ctx.lineWidth=42;ctx.beginPath();ctx.moveTo(tail,0);ctx.lineTo(head,0);ctx.stroke();const orb=38+Math.sin(t*28)*5,g=ctx.createRadialGradient(head-8,-8,2,head,0,orb);g.addColorStop(0,'#fff');g.addColorStop(.2,'#efd5ff');g.addColorStop(.5,'#9e4ddb');g.addColorStop(.78,'#441066');g.addColorStop(1,'rgba(30,2,53,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(head,0,orb,0,TAU);ctx.fill()
+      }
+      ctx.shadowBlur=0;
+    }else if(z.type==='gojoAo'||z.type==='gojoAka'||z.type==='gojoAkaImpact'){
       const blue=z.type==='gojoAo',color=blue?'#75c7ff':'#ff8395';
+      if(z.type==='gojoAkaImpact'&&(z.maxLife-z.life)<(z.data.delay||.24)){ctx.restore();continue}
       ctx.shadowColor=color;ctx.shadowBlur=blue?30:38;
       if(blue){
         const core=18+Math.sin(t*15)*4;
