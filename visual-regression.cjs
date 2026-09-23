@@ -30,6 +30,7 @@ vm.runInContext([
 context.player = {errorSwordMode:false,overclockUntil:0};
 context.performance = {now:() => 1000};
 context.phantomPreviewDistance = () => 700;
+context.gojoAimPoint = () => [6450,6300];
 
 const data = vm.runInContext(`({
   themes: Object.keys(TANK_THEMES),
@@ -43,7 +44,6 @@ assert.equal(data.themes.length, 47, 'all 47 cannon themes must remain');
 assert(data.themes.includes('gojo'),'Gojo needs a dedicated tank theme');
 assert(authSource.includes("id:'gojo',name:'고죠',rarity:'singularity'"),'Gojo must be Singularity');
 assert(authSource.includes("c.id==='gojo'?'LV 45 해금 · 뽑기 제외'"),'Gojo must not appear as a gacha drop');
-assert(unlockSql.includes('coalesce(v_row.best_level,1)<45'),'server must enforce level 45');
 assert(unlockSql.includes("'deku','sniper','bloodlust','gojo'"),'equipping Gojo must be server supported');
 assert.equal(vm.runInContext("DIEP_EVOLUTION_INFO.quadTank.mods.damage ?? 1",context),1,'Quad evolution must not lower base damage');
 assert.equal(vm.runInContext("evolutionVolleySpecs('quadTank',27,1).length",context),4,'Quad must keep four firing directions');
@@ -115,8 +115,9 @@ vm.runInContext("drawSkillRune({type:'dekuSmoke',radius:300},1,1)",context);
 assert.equal(runeTrace.length,0,'smoke must not receive a circular overlay');
 assert(source.includes("drawCannonSignature(f.cannon,t+q*2"));
 assert(source.includes("spawnCombatFx('gojoInfinityShot'"),'Gojo basic attacks need their own visible cast effect');
-assert(authSource.includes("displayCannons().filter(c=>c.id!=='gojo'||Number(profile.best_level||1)>=45)"),'Gojo must stay hidden before level 45');
-assert(fs.readFileSync('singularity_equip_guard.sql','utf8').includes("v_cannon='gojo' and coalesce(v_row.best_level,1)<45"),'server must reject early equipment');
+assert(authSource.includes("displayCannons().filter(c=>c.id!=='gojo'||owned.has('gojo'))"),'Gojo must stay hidden until earned');
+assert(source.includes("z.type==='gojoAo'||z.type==='gojoAka'"),'Gojo zones must skip the generic magic circle');
+assert(source.includes("const length=f.radius,travel=length*(1-Math.pow(p,3))"),'Purple must travel as a projectile instead of a static beam');
 const twinContext = vm.createContext({TAU:Math.PI*2, TANK_THEMES:{standard:{glow:'#fff'}}, drawPlayerCannon:(cannon,r)=>twinDraws.push([cannon,r]), twinDraws:[]});
 const twinDraws = twinContext.twinDraws;
 vm.runInContext(section('function evolutionBarrelSpecs(', 'function evolutionHasNoBasicGun(')+section('function drawEvolutionChassis(', 'function drawEvolutionAutoTurretCaps('),twinContext);
@@ -143,7 +144,7 @@ context.phantomMarkCanReturn = () => false;
 context.nearestSkillTarget = () => ({x:6450,y:6300});
 const previewTrace = [];
 context.ctx = new Proxy({}, {
-  get(target,key) { return key in target ? target[key] : (...args) => previewTrace.push([key,...args]); },
+  get(target,key) { if(key==='createRadialGradient'||key==='createLinearGradient')return(...args)=>{previewTrace.push([key,...args]);return{addColorStop:(...stop)=>previewTrace.push(['addColorStop',...stop])}};return key in target ? target[key] : (...args) => previewTrace.push([key,...args]); },
   set(target,key,value) { target[key]=value; return true; }
 });
 for (const id of data.themes) {
