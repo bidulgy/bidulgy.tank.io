@@ -402,7 +402,7 @@ const CANNONS=Object.freeze({
   }
 });
 
-const AUTH_BUILD='V5.97';
+const AUTH_BUILD='V5.98';
 console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · 47-cannon registry`);
 const CANNON_DISPLAY_ORDER=Object.freeze([
   'standard','scout','bastion',

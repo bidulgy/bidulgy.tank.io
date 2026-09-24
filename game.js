@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V5.97 · survival Gojo and limitless techniques');
+console.info('[Sworder VS Tank] game V5.98 · electric Gojo techniques');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -4661,6 +4661,44 @@ function drawSkillRune(z,t,p){
   ctx.beginPath();ctx.arc(0,0,r*.075,0,TAU);ctx.stroke();
   ctx.restore();
 }
+function drawElectricArc(x1,y1,x2,y2,color,width,seed,t,branches=2){
+  const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len;
+  const segments=Math.max(5,Math.min(14,Math.ceil(len/34))),phase=Math.floor(t*22+seed*7.31);
+  const points=[[x1,y1]];
+  for(let i=1;i<segments;i++){
+    const u=i/segments,hash=Math.sin((i+seed*13.17+phase*2.41)*91.733)*43758.5453;
+    const jitter=((hash-Math.floor(hash))*2-1)*Math.min(22,len*.085)*Math.sin(Math.PI*u);
+    points.push([x1+dx*u+nx*jitter,y1+dy*u+ny*jitter]);
+  }
+  points.push([x2,y2]);ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.globalAlpha*=.24;ctx.strokeStyle=color;ctx.lineWidth=width*5.2;ctx.beginPath();points.forEach((pt,i)=>i?ctx.lineTo(pt[0],pt[1]):ctx.moveTo(pt[0],pt[1]));ctx.stroke();
+  ctx.globalAlpha/=.24;ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();points.forEach((pt,i)=>i?ctx.lineTo(pt[0],pt[1]):ctx.moveTo(pt[0],pt[1]));ctx.stroke();
+  ctx.globalAlpha*=.88;ctx.strokeStyle='rgba(255,255,255,.92)';ctx.lineWidth=Math.max(.65,width*.30);ctx.beginPath();points.forEach((pt,i)=>i?ctx.lineTo(pt[0],pt[1]):ctx.moveTo(pt[0],pt[1]));ctx.stroke();ctx.globalAlpha/=.88;
+  for(let b=0;b<branches;b++){
+    const u=.28+((Math.sin(seed*19.1+b*12.7+phase)*.5+.5)*.46),side=b%2?1:-1;
+    const pi=Math.max(1,Math.min(points.length-2,Math.round(u*(points.length-1)))),bx=points[pi][0],by=points[pi][1],branchLen=Math.min(54,len*.24)*(1-.12*b),ba=Math.atan2(dy,dx)+side*(.62+.24*Math.sin(seed+b+t*3));
+    const mx=bx+Math.cos(ba)*branchLen*.48+nx*side*7,my=by+Math.sin(ba)*branchLen*.48+ny*side*7,ex=bx+Math.cos(ba)*branchLen,ey=by+Math.sin(ba)*branchLen;
+    ctx.globalAlpha*=.25;ctx.strokeStyle=color;ctx.lineWidth=width*3.2;ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(mx,my);ctx.lineTo(ex,ey);ctx.stroke();ctx.globalAlpha/=.25;
+    ctx.globalAlpha*=.78;ctx.lineWidth=Math.max(.8,width*.58);ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(mx,my);ctx.lineTo(ex,ey);ctx.stroke();ctx.globalAlpha/=.78;
+  }
+  ctx.restore();
+}
+function drawElectricCrown(cx,cy,r,color,t,count=8,seed=0){
+  for(let k=0;k<count;k++){
+    const a=k*TAU/count+t*(k%2?.9:-.75)+seed,span=.42+.16*Math.sin(t*7+k),a2=a+span;
+    drawElectricArc(cx+Math.cos(a)*r*.72,cy+Math.sin(a)*r*.72,cx+Math.cos(a2)*r*1.08,cy+Math.sin(a2)*r*1.08,color,1.7+(k%3)*.45,seed+k*.73,t,1);
+  }
+}
+function drawPlasmaSparks(cx,cy,r,colors,t,count=18,seed=0,stretch=1){
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  for(let k=0;k<count;k++){
+    const phase=t*(2.2+(k%5)*.19)+seed+k*2.117,orbit=r*(.68+(k%7)*.085),a=phase*(k%2?1:-1)+k*TAU/count;
+    const pulse=.35+.65*(.5+.5*Math.sin(t*(11+k%4)+k*1.73)),x=cx+Math.cos(a)*orbit*stretch,y=cy+Math.sin(a)*orbit,sz=(1.2+(k%4)*.85)*pulse;
+    ctx.shadowColor=colors[k%colors.length];ctx.shadowBlur=9+sz*3;ctx.fillStyle=k%4===0?'#ffffff':colors[k%colors.length];ctx.beginPath();ctx.arc(x,y,sz,0,TAU);ctx.fill();
+    if(k%3===0){ctx.strokeStyle=colors[(k+1)%colors.length];ctx.lineWidth=.8+sz*.25;ctx.beginPath();ctx.moveTo(x-Math.cos(a)*sz*5,y-Math.sin(a)*sz*5);ctx.lineTo(x+Math.cos(a)*sz*2,y+Math.sin(a)*sz*2);ctx.stroke()}
+  }
+  ctx.restore();
+}
 function drawSkillZones(){
   const t=performance.now()*.001;
   for(const z of skillZones){
@@ -4673,18 +4711,20 @@ function drawSkillZones(){
       const elapsed=z.maxLife-z.life,progress=clamp(elapsed/(z.data.flight||z.maxLife),0,1),head=z.length*progress,tail=Math.max(0,head-520),orb=72+Math.sin(t*26)*9;
       ctx.rotate(z.angle);ctx.lineCap='round';ctx.shadowColor='#ff365f';ctx.shadowBlur=48;
       for(let k=0;k<13;k++){const spread=(k-6)*8,wave=Math.sin(t*15+k*.91)*24;ctx.strokeStyle=k%3?'rgba(255,70,101,.35)':'rgba(255,205,214,.62)';ctx.lineWidth=5+(k%4)*3;ctx.beginPath();ctx.moveTo(tail,spread*.25);ctx.bezierCurveTo(tail+(head-tail)*.36,wave+spread,tail+(head-tail)*.74,-wave+spread*.4,head-18,spread*.08);ctx.stroke()}
-      const wake=ctx.createLinearGradient(tail,0,head,0);wake.addColorStop(0,'rgba(110,0,25,0)');wake.addColorStop(.5,'rgba(255,32,76,.28)');wake.addColorStop(1,'rgba(255,208,218,.95)');ctx.strokeStyle=wake;ctx.lineWidth=58;ctx.beginPath();ctx.moveTo(tail,0);ctx.lineTo(head,0);ctx.stroke();const g=ctx.createRadialGradient(head-14,-14,3,head,0,orb);g.addColorStop(0,'#fff');g.addColorStop(.16,'#ffe4e9');g.addColorStop(.43,'#ff4168');g.addColorStop(.74,'#b5002f');g.addColorStop(1,'rgba(92,0,28,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(head,0,orb,0,TAU);ctx.fill();ctx.shadowBlur=0;
+      const wake=ctx.createLinearGradient(tail,0,head,0);wake.addColorStop(0,'rgba(110,0,25,0)');wake.addColorStop(.5,'rgba(255,32,76,.28)');wake.addColorStop(1,'rgba(255,208,218,.95)');ctx.strokeStyle=wake;ctx.lineWidth=58;ctx.beginPath();ctx.moveTo(tail,0);ctx.lineTo(head,0);ctx.stroke();
+      ctx.shadowColor='#fff0f3';ctx.shadowBlur=18;for(let k=0;k<5;k++){const start=Math.max(tail,head-110-k*54),off=Math.sin(t*19+k*2.2)*22;drawElectricArc(start,off,head-orb*.35,Math.sin(t*25+k)*orb*.42,k%2?'rgba(255,238,242,.96)':'rgba(255,66,104,.92)',2.2+(k%2),k+3.4,t,2)}
+      const g=ctx.createRadialGradient(head-14,-14,3,head,0,orb);g.addColorStop(0,'#fff');g.addColorStop(.16,'#ffe4e9');g.addColorStop(.43,'#ff4168');g.addColorStop(.74,'#b5002f');g.addColorStop(1,'rgba(92,0,28,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(head,0,orb,0,TAU);ctx.fill();drawElectricCrown(head,0,orb,'rgba(255,226,232,.94)',t,12,1.7);drawPlasmaSparks(head,0,orb,['#fff0f4','#ff5576','#ff9aac'],t,22,2.6,1.15);ctx.shadowBlur=0;
     }else if(z.type==='gojoPurpleProjectile'){
       const elapsed=z.maxLife-z.life,charge=z.data.charge||.72,flight=z.data.flight||.78,charging=elapsed<charge;
       ctx.rotate(z.angle);ctx.lineCap='round';ctx.shadowColor='#9c5cff';ctx.shadowBlur=34;
       if(charging){
         const merge=clamp(elapsed/charge,0,1),ease=1-Math.pow(1-merge,3),side=235*(1-ease),forward=70+ease*50;
         for(const sign of [-1,1]){const blue=sign<0,ox=forward,oy=side*sign,wobble=Math.sin(t*17+sign)*8*(1-merge);ctx.strokeStyle=blue?'rgba(88,176,255,.65)':'rgba(255,88,120,.65)';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(4,sign*165);ctx.bezierCurveTo(35,sign*120+wobble,65,sign*55-wobble,ox,oy);ctx.stroke();const g=ctx.createRadialGradient(ox-5,oy-5,2,ox,oy,26);g.addColorStop(0,'#fff');g.addColorStop(.22,blue?'#c9efff':'#ffd0d8');g.addColorStop(.6,blue?'#248cff':'#ff3159');g.addColorStop(1,blue?'rgba(20,66,210,0)':'rgba(150,0,32,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(ox,oy,26,0,TAU);ctx.fill()}
-        const core=18+merge*92,g=ctx.createRadialGradient(112,-12,2,112,0,core);g.addColorStop(0,'#fff');g.addColorStop(.18,'#f6e5ff');g.addColorStop(.48,'#b355f1');g.addColorStop(.76,'#5a167d');g.addColorStop(1,'rgba(45,3,80,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(112,0,core,0,TAU);ctx.fill();
+        const core=18+merge*92,g=ctx.createRadialGradient(112,-12,2,112,0,core);g.addColorStop(0,'#fff');g.addColorStop(.18,'#f6e5ff');g.addColorStop(.48,'#b355f1');g.addColorStop(.76,'#5a167d');g.addColorStop(1,'rgba(45,3,80,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(112,0,core,0,TAU);ctx.fill();drawElectricCrown(112,0,core,'rgba(231,205,255,.96)',t,14,4.2);for(let k=0;k<5;k++)drawElectricArc(112-core*1.5,Math.sin(t*14+k)*core*.7,112+core*1.4,Math.cos(t*17+k)*core*.65,k%2?'rgba(255,103,158,.8)':'rgba(100,185,255,.86)',2.2,k+8,t,3);drawPlasmaSparks(112,0,core,['#ff6f9f','#72beff','#dfb8ff','#ffffff'],t,26,5.5,1.22);
       }else{
         const progress=clamp((elapsed-charge)/flight,0,1),head=z.length*progress,tail=Math.max(0,head-760);
         for(let k=0;k<17;k++){const spread=(k-8)*13,wave=Math.sin(t*11+k*.73)*38*(1-progress*.25);ctx.strokeStyle=k%3===0?'rgba(255,68,139,.40)':k%3===1?'rgba(55,153,255,.40)':'rgba(193,103,255,.50)';ctx.lineWidth=7+(k%5)*4;ctx.beginPath();ctx.moveTo(tail,spread*.3);ctx.bezierCurveTo(tail+(head-tail)*.35,wave+spread,tail+(head-tail)*.72,-wave+spread*.45,head-24,spread*.1);ctx.stroke()}
-        const trail=ctx.createLinearGradient(tail,0,head,0);trail.addColorStop(0,'rgba(48,10,91,0)');trail.addColorStop(.45,'rgba(118,42,191,.34)');trail.addColorStop(1,'rgba(240,205,255,.98)');ctx.strokeStyle=trail;ctx.lineWidth=120;ctx.beginPath();ctx.moveTo(tail,0);ctx.lineTo(head,0);ctx.stroke();const orb=142+Math.sin(t*28)*13,g=ctx.createRadialGradient(head-22,-22,4,head,0,orb);g.addColorStop(0,'#fff');g.addColorStop(.16,'#f7e7ff');g.addColorStop(.42,'#b158ee');g.addColorStop(.72,'#57127c');g.addColorStop(1,'rgba(30,2,53,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(head,0,orb,0,TAU);ctx.fill()
+        const trail=ctx.createLinearGradient(tail,0,head,0);trail.addColorStop(0,'rgba(48,10,91,0)');trail.addColorStop(.45,'rgba(118,42,191,.34)');trail.addColorStop(1,'rgba(240,205,255,.98)');ctx.strokeStyle=trail;ctx.lineWidth=120;ctx.beginPath();ctx.moveTo(tail,0);ctx.lineTo(head,0);ctx.stroke();const orb=142+Math.sin(t*28)*13;ctx.shadowColor='#e2c2ff';ctx.shadowBlur=26;for(let k=0;k<10;k++){const start=Math.max(tail,head-210-k*48),off=(k-4.5)*17+Math.sin(t*16+k)*30;drawElectricArc(start,off,head-orb*.38,Math.sin(t*23+k*1.7)*orb*.66,k%3===0?'rgba(255,91,158,.88)':k%3===1?'rgba(91,181,255,.9)':'rgba(226,190,255,.98)',2.4+(k%3)*.7,k+12,t,3)}const g=ctx.createRadialGradient(head-22,-22,4,head,0,orb);g.addColorStop(0,'#fff');g.addColorStop(.16,'#f7e7ff');g.addColorStop(.42,'#b158ee');g.addColorStop(.72,'#57127c');g.addColorStop(1,'rgba(30,2,53,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(head,0,orb,0,TAU);ctx.fill();drawElectricCrown(head,0,orb,'rgba(238,217,255,.98)',t,18,6.1);drawPlasmaSparks(head,0,orb,['#ff5d9b','#5cafff','#c977ff','#ffffff'],t,34,7.3,1.18)
       }
       ctx.shadowBlur=0;
     }else if(z.type==='gojoAo'||z.type==='gojoAka'||z.type==='gojoAkaImpact'){
@@ -4702,7 +4742,10 @@ function drawSkillZones(){
           ctx.strokeStyle=k%3?'rgba(177,228,255,.72)':'rgba(89,167,255,.92)';ctx.lineWidth=1.4+(k%4)*.5;
           ctx.beginPath();ctx.moveTo(ex,ey);ctx.quadraticCurveTo(Math.cos(a-.9)*outer*.50,Math.sin(a-.9)*outer*.36,Math.cos(a-1.55)*core,Math.sin(a-1.55)*core);ctx.stroke();
         }
+        ctx.shadowColor='#bceaff';ctx.shadowBlur=17;
+        for(let k=0;k<12;k++){const a=k*TAU/12-t*(1.3+(k%3)*.15),outer=z.radius*(.54+(k%4)*.09);drawElectricArc(Math.cos(a)*outer,Math.sin(a)*outer*.72,Math.cos(a-.72)*core,Math.sin(a-.72)*core,k%3?'rgba(136,207,255,.9)':'rgba(235,252,255,.98)',1.8+(k%3)*.45,k+21,t,2)}
         ctx.fillStyle='#eefcff';ctx.beginPath();ctx.arc(0,0,core,0,TAU);ctx.fill();
+        drawElectricCrown(0,0,core*1.35,'rgba(220,247,255,.98)',t,12,9.4);drawPlasmaSparks(0,0,z.radius*.72,['#eafdff','#62b8ff','#2b77ff'],t,28,10.8,.9);
       }else{
         const blast=z.radius*(.18+.75*q),core=25+8*Math.sin(t*24);
         const flare=ctx.createRadialGradient(0,0,2,0,0,Math.max(core,blast));
