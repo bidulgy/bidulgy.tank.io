@@ -483,7 +483,7 @@ function escapeHtml(value){
     "'":'&#39;'
   })[ch]);
 }
-const IRON_CELL_EMAIL_DOMAIN = 'players.example.com';
+const IRON_CELL_EMAIL_DOMAIN = 'players.bidulgy-tank.com';
 const IRON_CELL_EMAIL_PREFIX = 'ic_';
 const IRON_CELL_NAMESPACE = 'iron-cell-arena';
 
@@ -494,7 +494,7 @@ function isIronCellUser(user){
   const email = String(user?.email || '').trim().toLowerCase();
   const namespace = String(user?.user_metadata?.game_namespace || '').trim().toLowerCase();
   return namespace === IRON_CELL_NAMESPACE
-    || /^ic_[a-z0-9_]{3,20}@players\.example\.com$/.test(email);
+    || /^ic_[a-z0-9_]{3,20}@(players\.bidulgy-tank\.com|players\.example\.com)$/.test(email);
 }
 async function ensureActiveIronCellSession(){
   let session = null;
