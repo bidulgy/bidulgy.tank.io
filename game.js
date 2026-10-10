@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.03 · fresh Supabase backend and 20-player AWS shards');
+console.info('[Sworder VS Tank] game V6.05 · stable aim and distinct area sigils');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -40,6 +40,12 @@ const MAX_PARTICLES=360;
 const MAX_COMBAT_FX=170;
 const MAX_BULLETS=650;
 const MAX_SKILL_ZONES=120;
+// Keep combat visuals intact while limiting physics work to nearby polygons.
+// Each shape belongs to one cell, so queries return stable object references
+// without allocating a full filtered copy of the world on every bullet tick.
+const SHAPE_SPATIAL_CELL=256;
+const SHAPE_MAX_RADIUS=34;
+const shapeSpatialGrid=new Map();
 let localRebalanceTimer=0,normalSpawnAnchorCursor=0;
 let worldHostId='',worldSnapshotSeq=0,lastWorldSnapshotSend=0,lastWorldSnapshotReceive=0,shapeSerial=0;
 const processedDamageIds=new Set();
@@ -429,9 +435,40 @@ function spawnShape(type=null,preferLocal=true,forcedAnchor=null){
   return shape;
 }
 function centralPentagonPoint(slot){
+  const cache=centralPentagonPoint.cache||(centralPentagonPoint.cache=[]);
+  const cached=cache[slot];
+  if(cached)return cached;
   const angle=slot*2.399963229728653;
   const radius=42*Math.sqrt(slot+.5);
-  return{x:WORLD/2+Math.cos(angle)*radius,y:WORLD/2+Math.sin(angle)*radius};
+  const point={x:WORLD/2+Math.cos(angle)*radius,y:WORLD/2+Math.sin(angle)*radius};
+  cache[slot]=point;
+  return point;
+}
+function rebuildShapeSpatialGrid(){
+  shapeSpatialGrid.clear();
+  for(const shape of shapes){
+    if(!shape||shape.hp<=0)continue;
+    const cellX=Math.floor(shape.x/SHAPE_SPATIAL_CELL);
+    const cellY=Math.floor(shape.y/SHAPE_SPATIAL_CELL);
+    const key=cellX+','+cellY;
+    let bucket=shapeSpatialGrid.get(key);
+    if(!bucket){bucket=[];shapeSpatialGrid.set(key,bucket)}
+    bucket.push(shape);
+  }
+}
+function nearbyShapes(x,y,radius){
+  const found=[];
+  const minX=Math.floor((x-radius)/SHAPE_SPATIAL_CELL);
+  const maxX=Math.floor((x+radius)/SHAPE_SPATIAL_CELL);
+  const minY=Math.floor((y-radius)/SHAPE_SPATIAL_CELL);
+  const maxY=Math.floor((y+radius)/SHAPE_SPATIAL_CELL);
+  for(let cellY=minY;cellY<=maxY;cellY++){
+    for(let cellX=minX;cellX<=maxX;cellX++){
+      const bucket=shapeSpatialGrid.get(cellX+','+cellY);
+      if(bucket)for(const shape of bucket)if(shape.hp>0)found.push(shape);
+    }
+  }
+  return found;
 }
 function spawnCentralPentagon(slot){
   const shape=spawnShape('pentagon',false);
@@ -1647,14 +1684,15 @@ function skillProjectile(cannon,angle,opts={}){
 }
 function skillAreaDamage(x,y,radius,damage,color){
   const r2=radius*radius;
-  for(let i=shapes.length-1;i>=0;i--){
-    const s=shapes[i],dx=s.x-x,dy=s.y-y,d2=dx*dx+dy*dy;
+  for(const s of nearbyShapes(x,y,radius)){
+    const dx=s.x-x,dy=s.y-y,d2=dx*dx+dy*dy;
     if(d2>r2)continue;
     const scale=.35+.65*(1-Math.sqrt(d2)/radius);
     applyShapeDamage(s,damage*scale);
     burst(s.x,s.y,color,4);
     if(s.hp<=0){
-      gainPolygonXp(s.xp);burst(s.x,s.y,colorForShape(s.type),11);shapes.splice(i,1);
+      gainPolygonXp(s.xp);burst(s.x,s.y,colorForShape(s.type),11);
+      const shapeIndex=shapes.indexOf(s);if(shapeIndex>=0)shapes.splice(shapeIndex,1);
     }
   }
   for(const enemy of remotePlayers.values()){
@@ -3076,15 +3114,15 @@ function applySplashDamage(b,x,y){
   if(!b.splashRadius||b.team!=='player')return;
   if(b.basicAttack&&['rocket','inferno'].includes(cannonBaseBehavior(b.cannon)))createRocketBurnZone(b,x,y);
   const baseCannon=cannonBaseBehavior(b.cannon),radius=b.splashRadius,r2=radius*radius,base=b.damage*(baseCannon==='rocket'?.72:.58);
-  for(let i=shapes.length-1;i>=0;i--){
-    const s=shapes[i],dx=s.x-x,dy=s.y-y,d2=dx*dx+dy*dy;if(d2>r2)continue;
+  for(const s of nearbyShapes(x,y,radius)){
+    const dx=s.x-x,dy=s.y-y,d2=dx*dx+dy*dy;if(d2>r2)continue;
     const scale=1-Math.sqrt(d2)/radius;
     const[nx,ny]=norm(dx||1,dy||0);
     applyShapeDamage(s,base*(.35+.65*scale),nx*110*scale,ny*110*scale);
     if(s.hp<=0){
       if(b.owner===player)gainPolygonXp(s.xp);
       burst(s.x,s.y,colorForShape(s.type),10);
-      shapes.splice(i,1);
+      const shapeIndex=shapes.indexOf(s);if(shapeIndex>=0)shapes.splice(shapeIndex,1);
     }
   }
   for(const enemy of remotePlayers.values()){
@@ -3109,7 +3147,7 @@ function handleShapeContact(){
   const now=performance.now();
   let hitShape=null,hitDamage=0;
 
-  for(const s of shapes){
+  for(const s of nearbyShapes(player.x,player.y,player.r+SHAPE_MAX_RADIUS)){
     const dx=player.x-s.x,dy=player.y-s.y;
     const minDist=player.r+s.r;
     const d2=dx*dx+dy*dy;
@@ -3167,7 +3205,7 @@ function getRewindState(msAgo=4000){
 }
 
 function updatePlayer(dt){if(!player.alive)return;player.survivalSeconds=(player.survivalSeconds||0)+dt;if(!player.gojoSurvivalAwarded&&player.survivalSeconds>=1800){player.gojoSurvivalAwarded=true;window.IronCellAuth?.unlockLocalGojo?.()}refreshRealTimeSkillCooldowns();player.shapeContactCd=Math.max(0,(player.shapeContactCd||0)-dt);const p=playerParams(),stunned=performance.now()<(player.stunUntil||0);let mx=stunned?0:input.moveX,my=stunned?0:input.moveY;if(input.keys.has('KeyA')||input.keys.has('ArrowLeft'))mx-=1;if(input.keys.has('KeyD')||input.keys.has('ArrowRight'))mx+=1;if(input.keys.has('KeyW')||input.keys.has('ArrowUp'))my-=1;if(input.keys.has('KeyS')||input.keys.has('ArrowDown'))my+=1;if(mx||my){[mx,my]=norm(mx,my);player.vx+=mx*p.move*dt*5.2;player.vy+=my*p.move*dt*5.2}const aimWorld=screenToWorldPoint(input.mouseX,input.mouseY),normalAimAngle=Math.atan2(aimWorld[1]-player.y,aimWorld[0]-player.x);
-player.angle=heldSkillAim.active&&Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:normalAimAngle;let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);if(!stunned&&(input.firing||input.keys.has('Space')))fire(player);handleShapeContact();if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}recordPlayerHistory()
+player.angle=heldSkillAim.active&&Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:normalAimAngle;let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);if(!heldSkillAim.active){const postMoveAim=screenToWorldPoint(input.mouseX,input.mouseY);player.angle=Math.atan2(postMoveAim[1]-player.y,postMoveAim[0]-player.x)}player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);if(!stunned&&(input.firing||input.keys.has('Space')))fire(player);handleShapeContact();if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}recordPlayerHistory()
 function updateShapes(dt){
   const host=isWorldHost();
 
@@ -3560,8 +3598,9 @@ function updateBullets(dt){
 
     let remove=false;
 
-    for(let j=shapes.length-1;j>=0&&!remove;j--){
-      const s=shapes[j];
+    const collisionShapes=nearbyShapes(b.x,b.y,b.r+SHAPE_MAX_RADIUS);
+    for(let j=collisionShapes.length-1;j>=0&&!remove;j--){
+      const s=collisionShapes[j];
       if(b.hitTargets?.has(s))continue;
       const rr=b.r+s.r;
       if((b.x-s.x)**2+(b.y-s.y)**2<rr*rr){
@@ -3578,7 +3617,7 @@ function updateBullets(dt){
         if(b.basicAttack&&cannonFamily(b.cannon)==='error')errorGlitchImpact(b,b.x,b.y,s,'');
         if(s.hp<=0){
           if(b.owner===player)gainPolygonXp(s.xp);
-          shapes.splice(j,1);
+          const shapeIndex=shapes.indexOf(s);if(shapeIndex>=0)shapes.splice(shapeIndex,1);
           burst(s.x,s.y,colorForShape(s.type),10);
         }
         if(b.splashRadius){applySplashDamage(b,b.x,b.y);if(cannonBaseBehavior(b.cannon)!=='sniper'){remove=true;continue}}
@@ -4667,54 +4706,43 @@ function skillRuneColor(z){
 }
 function drawSkillRune(z,t,p){
   const r=Number(z.radius)||0;
-  if(r<70||r>760||z.type==='gojoAo'||z.type==='gojoAka'||z.type==='gojoAkaImpact'||z.type==='gojoAkaProjectile'||z.type==='gojoPurpleProjectile'||z.type==='dekuSmoke'||z.type==='glitchWarpTrail'||z.type==='earthFissure'||z.type==='flameWall'||z.type==='cometTrail')return;
+  // Only persistent supernatural fields receive a magic circle. Physical
+  // walls, projectiles, dashes, mines, artillery and weapon buffs already
+  // communicate their shape through their own effect.
+  if(r<70||r>760||!['thunderStorm','timeField','gravity','polarityCrush','abyssCollapse','antiMatter','absoluteZero','constellation','supernovaCore','threeFates','sanctuary','frostPrison','plasmaCage','vortexPrison'].includes(z.type))return;
   const color=skillRuneColor(z),highDetail=renderPressure===0&&r>=125;
-  ctx.save();ctx.globalAlpha*=Math.min(.88,p*.95);ctx.strokeStyle=color;ctx.fillStyle=color;
+  ctx.save();ctx.globalAlpha*=Math.min(.82,p*.92);ctx.strokeStyle=color;ctx.fillStyle=color;
   if(renderPressure===0){ctx.shadowColor=color;ctx.shadowBlur=8}
-  ctx.lineWidth=2.2;
-  for(const radius of [.96,.89,.66]){ctx.beginPath();ctx.arc(0,0,r*radius,0,TAU);ctx.stroke()}
-  ctx.lineWidth=1;
-  ctx.beginPath();ctx.arc(0,0,r*.83,0,TAU);ctx.stroke();
-  const marks=renderPressure>=2?12:24;
-  ctx.rotate(t*(z.networkRemote?-.10:.10));
-  for(let k=0;k<marks;k++){
-    const a=k*TAU/marks,ca=Math.cos(a),sa=Math.sin(a),inner=k%3===0?.84:.87;
-    ctx.lineWidth=k%3===0?2:1;
-    ctx.beginPath();ctx.moveTo(ca*r*inner,sa*r*inner);ctx.lineTo(ca*r*.95,sa*r*.95);ctx.stroke();
+  ctx.lineWidth=2.2;ctx.beginPath();ctx.arc(0,0,r*.96,0,TAU);ctx.stroke();
+  const type=z.type;
+  if(type==='timeField'){
+    ctx.beginPath();ctx.arc(0,0,r*.78,0,TAU);ctx.stroke();
+    for(let k=0;k<12;k++){const a=k*TAU/12,major=k%3===0,ri=r*(major?.64:.69),ro=r*.88;ctx.lineWidth=major?4:1.5;ctx.beginPath();ctx.moveTo(Math.cos(a)*ri,Math.sin(a)*ri);ctx.lineTo(Math.cos(a)*ro,Math.sin(a)*ro);ctx.stroke()}
+    ctx.rotate(-t*.35);ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-r*.56);ctx.moveTo(0,0);ctx.lineTo(r*.36,r*.20);ctx.stroke();ctx.beginPath();ctx.arc(0,0,r*.10,0,TAU);ctx.stroke();
+  }else if(type==='gravity'||type==='polarityCrush'||type==='abyssCollapse'||type==='antiMatter'){
+    ctx.rotate(t*(z.networkRemote?-.32:.32));
+    for(let k=0;k<4;k++){ctx.save();ctx.rotate(k*Math.PI/4);ctx.lineWidth=1.5+k*.55;ctx.beginPath();ctx.ellipse(0,0,r*(.30+k*.15),r*(.10+k*.035),0,0,TAU);ctx.stroke();ctx.restore()}
+    for(let k=0;k<6;k++){const a=k*TAU/6+t*.7,ri=r*.18,ro=r*.88;ctx.lineWidth=highDetail?2.6:1.7;ctx.beginPath();ctx.moveTo(Math.cos(a)*ri,Math.sin(a)*ri);ctx.quadraticCurveTo(Math.cos(a+.85)*r*.52,Math.sin(a+.85)*r*.52,Math.cos(a+1.5)*ro,Math.sin(a+1.5)*ro);ctx.stroke()}
+    ctx.beginPath();ctx.arc(0,0,r*.13,0,TAU);ctx.stroke();
+  }else if(type==='frostPrison'||type==='absoluteZero'){
+    ctx.rotate(t*.06);ctx.lineWidth=3;
+    for(let k=0;k<6;k++){const a=k*TAU/6;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*r*.84,Math.sin(a)*r*.84);for(const d of [.38,.58,.76]){const x=Math.cos(a)*r*d,y=Math.sin(a)*r*d,s=r*.10;ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(a+2.35)*s,y+Math.sin(a+2.35)*s);ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(a-2.35)*s,y+Math.sin(a-2.35)*s)}ctx.stroke()}
+    ctx.beginPath();for(let k=0;k<=6;k++){const a=-Math.PI/2+k*TAU/6,x=Math.cos(a)*r*.58,y=Math.sin(a)*r*.58;k?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.stroke();
+  }else if(type==='thunderStorm'||type==='plasmaCage'){
+    const sides=type==='thunderStorm'?8:6;ctx.rotate(t*.13);ctx.lineWidth=2.5;
+    for(let ring=0;ring<3;ring++){const rr=r*(.34+ring*.24);ctx.beginPath();for(let k=0;k<=sides;k++){const a=-Math.PI/2+k*TAU/sides,x=Math.cos(a)*rr,y=Math.sin(a)*rr;k?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.stroke()}
+    ctx.lineWidth=highDetail?3:2;for(let k=0;k<sides;k++){const a=k*TAU/sides,ri=r*.18,ro=r*.90,mid=r*(k%2?.48:.57);ctx.beginPath();ctx.moveTo(Math.cos(a)*ri,Math.sin(a)*ri);ctx.lineTo(Math.cos(a+.18)*mid,Math.sin(a+.18)*mid);ctx.lineTo(Math.cos(a-.10)*ro,Math.sin(a-.10)*ro);ctx.stroke()}
+  }else if(type==='vortexPrison'){
+    ctx.rotate(t*.75);ctx.lineWidth=2.5;for(let arm=0;arm<5;arm++){ctx.beginPath();for(let k=0;k<=18;k++){const u=k/18,a=arm*TAU/5+u*TAU*1.3,rr=r*(.10+u*.78),x=Math.cos(a)*rr,y=Math.sin(a)*rr;k?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.stroke()}
+    ctx.beginPath();ctx.arc(0,0,r*.12,0,TAU);ctx.stroke();
+  }else{
+    const points=type==='constellation'?3:type==='threeFates'?6:type==='sanctuary'?8:10,step=type==='constellation'?1:type==='threeFates'?2:3;
+    ctx.rotate(t*(z.networkRemote?-.10:.10));ctx.lineWidth=highDetail?2.8:1.8;ctx.beginPath();
+    for(let k=0;k<=points;k++){const a=-Math.PI/2+(k*step%points)*TAU/points,x=Math.cos(a)*r*.68,y=Math.sin(a)*r*.68;k?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.stroke();
+    for(let k=0;k<points;k++){const a=-Math.PI/2+k*TAU/points,x=Math.cos(a)*r*.82,y=Math.sin(a)*r*.82;ctx.beginPath();ctx.arc(x,y,highDetail?5:3,0,TAU);ctx.fill()}
+    ctx.beginPath();ctx.arc(0,0,r*.24,0,TAU);ctx.stroke();ctx.beginPath();ctx.arc(0,0,r*.08,0,TAU);ctx.fill();
   }
-  ctx.rotate(-t*(z.networkRemote?-.18:.18));
-  const points=7,step=2,starRadius=r*.61;
-  ctx.lineWidth=highDetail?2.3:1.6;ctx.beginPath();
-  for(let k=0;k<=points;k++){
-    const a=-Math.PI/2+(k*step%points)*TAU/points;
-    const xx=Math.cos(a)*starRadius,yy=Math.sin(a)*starRadius;
-    k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);
-  }
-  ctx.stroke();
-  if(highDetail){
-    ctx.lineWidth=1.2;
-    for(const offset of [0,Math.PI]){
-      ctx.beginPath();
-      for(let k=0;k<3;k++){
-        const a=-Math.PI/2+offset+k*TAU/3;
-        const xx=Math.cos(a)*r*.47,yy=Math.sin(a)*r*.47;
-        k?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);
-      }
-      ctx.closePath();ctx.stroke();
-    }
-    for(let k=0;k<12;k++){
-      const a=k*TAU/12+t*.04,rr=r*.75;
-      ctx.save();ctx.translate(Math.cos(a)*rr,Math.sin(a)*rr);ctx.rotate(a+Math.PI/2);
-      const glyph=Math.max(3,Math.min(8,r*.027));
-      ctx.lineWidth=1.4;ctx.beginPath();
-      ctx.moveTo(-glyph*.5,-glyph);ctx.lineTo(glyph*.5,glyph);
-      ctx.moveTo(glyph*.5,-glyph);ctx.lineTo(-glyph*.5,glyph);
-      if(k%2===0){ctx.moveTo(-glyph,0);ctx.lineTo(glyph,0)}
-      ctx.stroke();ctx.restore();
-    }
-  }
-  ctx.shadowBlur=0;ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,r*.20,0,TAU);ctx.stroke();
-  ctx.beginPath();ctx.arc(0,0,r*.075,0,TAU);ctx.stroke();
+  ctx.shadowBlur=0;
   ctx.restore();
 }
 const electricX=new Float32Array(16),electricY=new Float32Array(16),electricJitterCache=new Map();let electricCacheTick=-1;
@@ -5949,6 +5977,10 @@ function drawSkillAimGuide(){
 }
 function drawAimGuides(){drawBasicAimGuide();drawSkillAimGuide();}
 function update(dt){
+  rebuildShapeSpatialGrid();
+  // Aim and rendering must use the same camera position. Updating the camera
+  // after calculating aim caused the barrel to oscillate while the tank moved.
+  cameraUpdate();
   if(heldSkillAim.active&&heldSkillAim.slot===4&&player?.cannonType!=='deku')cancelHeldSkillAim();
   updatePlayer(dt);
   updateRemotePlayers(dt);
@@ -5968,7 +6000,6 @@ function update(dt){
   updatePhantomMarkState();
   const hudNow=performance.now();
   if(hudNow-lastSkillHudFrameUpdate>90){lastSkillHudFrameUpdate=hudNow;updateSkillHud()}
-  cameraUpdate();
   broadcastLocalState();
   maintainWorldSync();
 
