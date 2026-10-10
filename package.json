@@ -1,0 +1,14 @@
+{
+  "name": "sworder-vs-tank-arena-server",
+  "version": "6.3.0",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check game.js && node visual-regression.cjs && node server-shard-test.cjs"
+  },
+  "dependencies": {
+    "express": "4.21.2",
+    "ws": "8.18.3"
+  }
+}

@@ -3,15 +3,16 @@
 const express = require('express');
 const { WebSocketServer, WebSocket } = require('ws');
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://gomwkcqkslaoypdbebid.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://navqhzaliypajwjvhivt.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY =
   process.env.SUPABASE_PUBLISHABLE_KEY ||
-  'sb_publishable_iuGd7i15GSv3nszxJhQt0Q_OkNbGbm7';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hdnFoemFsaXlwYWp3anZoaXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1NTAzMzQsImV4cCI6MjEwNzEyNjMzNH0.v9KnsTe0OS8RxnzcxH4HuuL8Vzvt7AwsTvilOUnfC4M';
 
 const PORT = Number(process.env.PORT || 3000);
-const HOST = process.env.HOST || '127.0.0.1';
+const HOST = process.env.HOST || '0.0.0.0';
 const ARENA_ID = 'iron-cell-arena-global-v1';
-const MAX_ARENA_PLAYERS = Number(process.env.MAX_ARENA_PLAYERS || 64);
+const MAX_ARENA_PLAYERS = Math.max(2, Number(process.env.MAX_ARENA_PLAYERS || 20));
+const MAX_ARENA_SHARDS = Math.max(1, Number(process.env.MAX_ARENA_SHARDS || 100));
 const MAX_MESSAGES_PER_SECOND = 180;
 const MAX_STATE_MESSAGES_PER_SECOND = 25;
 const MAX_PAYLOAD_BYTES = 1024 * 1024;
@@ -38,6 +39,38 @@ const arenas = new Map(); // arenaId -> Map<userId, socket>
 function arenaSockets(arenaId) {
   if (!arenas.has(arenaId)) arenas.set(arenaId, new Map());
   return arenas.get(arenaId);
+}
+
+function shardArenaId(index) {
+  return `${ARENA_ID}-room-${index}`;
+}
+
+function selectAvailableArena() {
+  let bestId = '';
+  let bestSize = -1;
+  for (let index = 1; index <= MAX_ARENA_SHARDS; index += 1) {
+    const arenaId = shardArenaId(index);
+    const size = arenas.get(arenaId)?.size || 0;
+    if (size >= MAX_ARENA_PLAYERS) continue;
+    // 기존 인원이 있는 방부터 채워 플레이어가 지나치게 흩어지지 않게 합니다.
+    if (size > bestSize) {
+      bestId = arenaId;
+      bestSize = size;
+    }
+  }
+  return bestId;
+}
+
+function removeExistingUser(userId) {
+  for (const [arenaId, room] of arenas) {
+    const existing = room.get(userId);
+    if (!existing) continue;
+    existing.__manualServerClose = true;
+    room.delete(userId);
+    try { existing.close(4000, 'replaced'); } catch (_) {}
+    cleanupArena(arenaId);
+    if (arenas.has(arenaId)) broadcastPresence(arenaId);
+  }
 }
 
 function safeSend(socket, payload, { droppable = false } = {}) {
@@ -141,10 +174,10 @@ function normalizeUsername(value) {
 }
 
 async function joinArena(socket, message) {
-  const arenaId = String(message.arenaId || '').trim();
+  const requestedArenaId = String(message.arenaId || '').trim();
   const accessToken = String(message.accessToken || '').trim();
 
-  if (arenaId !== ARENA_ID) {
+  if (requestedArenaId !== ARENA_ID) {
     safeSend(socket, { type: 'error', code: 'ARENA_NOT_ALLOWED' });
     socket.close(4003, 'arena_not_allowed');
     return;
@@ -164,20 +197,15 @@ async function joinArena(socket, message) {
     return;
   }
 
-  const room = arenaSockets(arenaId);
-  const existing = room.get(user.id);
-  if (existing && existing !== socket) {
-    existing.__manualServerClose = true;
-    room.delete(user.id);
-    try { existing.close(4000, 'replaced'); } catch (_) {}
-  }
-
-  if (room.size >= MAX_ARENA_PLAYERS) {
+  removeExistingUser(String(user.id));
+  const arenaId = selectAvailableArena();
+  if (!arenaId) {
     safeSend(socket, { type: 'error', code: 'ARENA_FULL' });
     socket.close(4004, 'arena_full');
     return;
   }
 
+  const room = arenaSockets(arenaId);
   socket.arenaId = arenaId;
   socket.userId = String(user.id);
   socket.username = normalizeUsername(message.username || user?.user_metadata?.username);
@@ -208,7 +236,7 @@ function normalizeRelayPayload(eventName, payload, socket) {
 }
 
 app.get('/', (_req, res) => {
-  res.type('text/plain').send('Sworder VS Tank t3.small arena server OK');
+  res.type('text/plain').send('Sworder VS Tank sharded arena server OK');
 });
 
 app.get('/health', (_req, res) => {
@@ -217,6 +245,8 @@ app.get('/health', (_req, res) => {
   res.json({
     ok: true,
     arena: ARENA_ID,
+    maxPlayersPerArena: MAX_ARENA_PLAYERS,
+    maxArenaShards: MAX_ARENA_SHARDS,
     arenas: arenas.size,
     players,
     websocketClients: wss.clients.size,

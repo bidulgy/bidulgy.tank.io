@@ -1,8 +1,8 @@
 (() => {
 'use strict';
 
-const SUPABASE_URL = 'https://gomwkcqkslaoypdbebid.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_iuGd7i15GSv3nszxJhQt0Q_OkNbGbm7';
+const SUPABASE_URL = 'https://navqhzaliypajwjvhivt.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hdnFoemFsaXlwYWp3anZoaXZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1NTAzMzQsImV4cCI6MjEwNzEyNjMzNH0.v9KnsTe0OS8RxnzcxH4HuuL8Vzvt7AwsTvilOUnfC4M';
 
 const client = window.supabase.createClient(
   SUPABASE_URL,
@@ -402,7 +402,7 @@ const CANNONS=Object.freeze({
   }
 });
 
-const AUTH_BUILD='V5.98';
+const AUTH_BUILD='V6.03';
 console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · 47-cannon registry`);
 const CANNON_DISPLAY_ORDER=Object.freeze([
   'standard','scout','bastion',
@@ -540,6 +540,16 @@ function setBusy(busy){
   authBusy = !!busy;
   if(els.login) els.login.disabled = authBusy;
   if(els.signup) els.signup.disabled = authBusy;
+}
+function authFriendlyError(error,action='로그인'){
+  const status=Number(error?.status||error?.statusCode||0),msg=String(error?.message||error||'').toLowerCase();
+  if(status===402||msg.includes('exceed_db_size_quota')||msg.includes('service for this project is restricted')){
+    return '서버 데이터 용량 한도로 계정 서비스가 일시 중단되었습니다. 운영자가 Supabase 용량 제한을 해제하는 중입니다.';
+  }
+  if(status===429||msg.includes('rate limit')||msg.includes('too many requests'))return '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.';
+  if(status===540||msg.includes('project is paused')||msg.includes('project paused'))return '계정 서버가 일시 정지되었습니다. 운영자가 서버를 복구해야 합니다.';
+  if(msg.includes('invalid login credentials'))return '아이디 또는 비밀번호를 확인하세요. 처음이라면 회원가입을 먼저 해주세요.';
+  return `${action} 실패: ${error?.message||'계정 서버에 연결하지 못했습니다.'}`;
 }
 function validUsername(username){
   return /^[a-z0-9_]{3,20}$/.test(username);
@@ -1415,7 +1425,7 @@ async function signup(){
       if(msg.includes('already') || msg.includes('registered')){
         setMessage('이미 사용 중인 아이디입니다.', 'error');
       }else{
-        setMessage(`회원가입 실패: ${error.message}`, 'error');
+        setMessage(authFriendlyError(error,'회원가입'), 'error');
       }
       return;
     }
@@ -1428,7 +1438,7 @@ async function signup(){
     await enterSession(data.user);
   }catch(error){
     console.error(error);
-    setMessage('회원가입 중 오류가 발생했습니다.', 'error');
+    setMessage(authFriendlyError(error,'회원가입'), 'error');
   }finally{
     setBusy(false);
   }
@@ -1458,14 +1468,14 @@ async function login(){
     });
 
     if(error || !data?.user){
-      setMessage('sworder VS tank 아이디 또는 비밀번호를 확인하세요. 처음이라면 회원가입을 먼저 해주세요.', 'error');
+      setMessage(authFriendlyError(error||new Error('계정 정보를 확인할 수 없습니다.'),'로그인'), 'error');
       return;
     }
 
     await enterSession(data.user);
   }catch(error){
     console.error(error);
-    setMessage('로그인 중 오류가 발생했습니다.', 'error');
+    setMessage(authFriendlyError(error,'로그인'), 'error');
   }finally{
     setBusy(false);
   }

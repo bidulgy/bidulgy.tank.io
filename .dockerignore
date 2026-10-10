@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log
+.git
+.github
+*.md
+*.sql
+auth.js
+game.js
+index.html
+style.css
+visual-regression.cjs
