@@ -6,6 +6,7 @@ const source = fs.readFileSync(__dirname + '/game.js', 'utf8');
 const authSource = fs.readFileSync(__dirname + '/auth.js', 'utf8');
 const unlockSql = fs.readFileSync(__dirname + '/singularity_unlock.sql', 'utf8');
 const gojoRewardSql = fs.readFileSync(__dirname + '/gojo_reward_fix.sql', 'utf8');
+const bossSql = fs.readFileSync(__dirname + '/amalgam_boss_v606.sql', 'utf8');
 const section = (start, end) => {
   const a = source.indexOf(start);
   const b = source.indexOf(end, a + start.length);
@@ -41,7 +42,7 @@ const data = vm.runInContext(`({
   evolutions: Object.keys(DIEP_EVOLUTION_INFO),
   barrels: Object.fromEntries(Object.keys(DIEP_EVOLUTION_INFO).map(id => [id, evolutionBarrelSpecs(id, 27)]))
 })`, context);
-assert.equal(data.themes.length, 47, 'all 47 cannon themes must remain');
+assert.equal(data.themes.length, 48, 'all 48 cannon themes must remain');
 assert(data.themes.includes('gojo'),'Gojo needs a dedicated tank theme');
 assert(authSource.includes("id:'gojo',name:'고죠',rarity:'singularity'"),'Gojo must be Singularity');
 assert(authSource.includes("c.id==='gojo'?'한 전투 생존 30분 해금 · 뽑기 제외'"),'Gojo must not appear as a gacha drop');
@@ -123,7 +124,8 @@ vm.runInContext("drawSkillRune({type:'barrier',radius:180},1,1)",context);
 assert.equal(runeTrace.length,0,'physical walls must not receive a magic circle');
 assert(source.includes("drawCannonSignature(f.cannon,t+q*2"));
 assert(source.includes("spawnCombatFx('gojoInfinityShot'"),'Gojo basic attacks need their own visible cast effect');
-assert(authSource.includes("displayCannons().filter(c=>c.id!=='gojo'||owned.has('gojo'))"),'Gojo must stay hidden until earned');
+assert(authSource.includes("visibleCannons.filter(c=>c.id!=='gojo'||owned.has('gojo'))"),'Gojo must stay hidden until earned');
+assert(authSource.includes("displayCannons().filter(c=>c.id!=='amalgam'||owned.has('amalgam'))"),'Amalgam must be invisible until earned');
 assert(authSource.includes("client.rpc('iron_cell_admin_set_cannon_v2'"),'admin grants must use the verified Gojo-aware RPC');
 assert(authSource.includes('async function reportGojoDeath(')&&authSource.includes('async function confirmGojoKill('),'Gojo kill attestation client hooks are missing');
 assert(source.includes("victimCannon:defeatedCannon")&&source.includes('confirmGojoKill?.'),'Gojo PvP reward handshake is missing');
@@ -136,6 +138,10 @@ assert(!source.includes("damageSkillLine(player.x,player.y,a,length,78,p.damage*
 assert(source.includes("if(elapsed<charge)continue"),'Purple damage must wait until its merge animation completes');
 assert(source.includes("if(slot===1&&player?.cannonType==='gojo')startGojoAoHold()"),'Blue must start while Q is held');
 assert(source.includes("const [tx,ty]=gojoAimPoint(480);z.x=tx;z.y=ty"),'Held Blue must follow the cursor');
+assert(source.includes('const AMALGAM_BOSS_HP=1000000')&&source.includes('const BOSS_SLOT_MS=30*60*1000'),'Amalgam must use 1M HP and half-hour slots');
+assert(source.includes('s.hp=1;')&&source.includes('bossContributions:'),'boss death and host transfer safeguards are missing');
+assert(bossSql.includes('v_stones bigint:=greatest(0,least(1000000,v_damage))')&&bossSql.includes('random() < (v_damage::numeric/1000000.0)*0.10'),'boss rewards must scale with contribution');
+assert(bossSql.includes('primary key (user_id,boss_slot)'),'boss rewards must be idempotent per player and slot');
 const twinContext = vm.createContext({TAU:Math.PI*2, TANK_THEMES:{standard:{glow:'#fff'}}, drawPlayerCannon:(cannon,r)=>twinDraws.push([cannon,r]), twinDraws:[]});
 const twinDraws = twinContext.twinDraws;
 vm.runInContext(section('function evolutionBarrelSpecs(', 'function evolutionHasNoBasicGun(')+section('function drawEvolutionChassis(', 'function drawEvolutionAutoTurretCaps('),twinContext);
@@ -147,13 +153,13 @@ assert.deepEqual(twinOffsets,[[0,-10],[0,10]],'Twin visuals must follow both fir
 context.WORLD = 12600;
 const central = [];
 context.spawnShape = type => { const shape = {type}; central.push(shape); return shape; };
-for (let slot=0;slot<200;slot++) vm.runInContext(`spawnCentralPentagon(${slot})`, context);
-assert.equal(central.length, 200);
-assert.equal(new Set(central.map(s=>s.centralSlot)).size, 200);
+for (let slot=0;slot<120;slot++) vm.runInContext(`spawnCentralPentagon(${slot})`, context);
+assert.equal(central.length, 120);
+assert.equal(new Set(central.map(s=>s.centralSlot)).size, 120);
 for (const s of central) {
   assert.equal(s.type, 'pentagon');
   assert.equal(s.centralCluster, true);
-  assert(Math.hypot(s.x-6300,s.y-6300)<600, 'pentagon escaped central cluster');
+  assert(Math.hypot(s.x-6300,s.y-6300)<900, 'pentagon escaped expanded central cluster');
 }
 context.running = true;
 context.player = {alive:true,x:6300,y:6300,r:27,angle:0,errorSwordMode:false,overclockUntil:0};
@@ -174,4 +180,4 @@ for (const id of data.themes) {
     assert(previewTrace.length>before,`${id} slot ${slot} rendered no range guide`);
   }
 }
-console.log(`Coverage OK: ${data.themes.length} cannons, ${data.evolutions.length} evolution bodies, 200 central pentagons`);
+console.log(`Coverage OK: ${data.themes.length} cannons, ${data.evolutions.length} evolution bodies, 120 central pentagons`);

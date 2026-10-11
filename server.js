@@ -30,7 +30,8 @@ const RELAY_EVENTS = new Set([
   'worldSnapshot',
   'worldRequest',
   'shapeDamage',
-  'shapeImpulse'
+  'shapeImpulse',
+  'bossDefeated'
 ]);
 
 const app = express();

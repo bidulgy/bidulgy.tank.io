@@ -50,6 +50,7 @@ const els = {
   backLobby: document.querySelector('#backLobbyBtn'),
   lobbyUsername: document.querySelector('#lobbyUsername'),
   lobbyGemText: document.querySelector('#lobbyGemText'),
+  lobbySummonStoneText: document.querySelector('#lobbySummonStoneText'),
   lobbyCannonName: document.querySelector('#lobbyCannonName'),
   lobbyCannonRarity: document.querySelector('#lobbyCannonRarity'),
   lobbyCannonDesc: document.querySelector('#lobbyCannonDesc'),
@@ -386,6 +387,12 @@ const CANNONS=Object.freeze({
     skill:'Q 아오 · 지정 지점에 푸른 인력장 전개',
     skill2:'E 아카 · 지정 지점에 붉은 척력 폭발 · Q+E 무라사키 합성 광선'
   },
+  amalgam:{
+    id:'amalgam',name:'집합체 탱크',rarity:'singularity',rarityLabel:'SINGULARITY',chance:0,
+    desc:'정각·30분 집합체 보스에서만 극소수에게 귀속되는 융합 탱크입니다.',
+    passive:'평타 · 융합 핵: 성운 코어가 충돌 시 파편 에너지를 방출',
+    skill:'Q 집합 붕괴 · 초신성 핵을 응축해 넓은 범위를 붕괴'
+  },
   sniper:{
     id:'sniper',name:'스나이퍼',rarity:'divine',rarityLabel:'디바인',chance:.000033333,
     desc:'전장을 멀리 내려다보며 한 발에 큰 피해를 주는 초장거리 디바인 저격 탱크입니다.',
@@ -402,8 +409,8 @@ const CANNONS=Object.freeze({
   }
 });
 
-const AUTH_BUILD='V6.03';
-console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · 47-cannon registry`);
+const AUTH_BUILD='V6.06';
+console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · hidden boss reward registry`);
 const CANNON_DISPLAY_ORDER=Object.freeze([
   'standard','scout','bastion',
   'rapid','dual','needle','blaster','ranger',
@@ -414,11 +421,11 @@ const CANNON_DISPLAY_ORDER=Object.freeze([
   'ring','chrono','void','mirror','lancer',
   'nova','comet','stellar','leviathan','valkyrie',
   'error','glitch','zero','berserker','oracle',
-  'deku','gojo','sniper','bloodlust'
+  'deku','gojo','sniper','bloodlust','amalgam'
 ]);
 const MISSING_CANNONS=CANNON_DISPLAY_ORDER.filter(id=>!CANNONS[id]);
 if(MISSING_CANNONS.length)console.error('[Sworder VS Tank] missing cannon definitions:',MISSING_CANNONS);
-if(Object.keys(CANNONS).length!==47)console.warn('[Sworder VS Tank] expected 47 cannons, got',Object.keys(CANNONS).length);
+if(Object.keys(CANNONS).length!==48)console.warn('[Sworder VS Tank] expected 48 cannons, got',Object.keys(CANNONS).length);
 function displayCannons(){return CANNON_DISPLAY_ORDER.map(id=>CANNONS[id]).filter(Boolean)}
 
 window.IronCellCannons=CANNONS;
@@ -637,7 +644,8 @@ function renderCannonGarage(){
   if(els.deployCannonDesc)els.deployCannonDesc.textContent=equipped.desc;
   if(els.equippedCannonRarity){els.equippedCannonRarity.textContent=equipped.rarityLabel;els.equippedCannonRarity.className=`rarity ${equipped.rarity}`}
   if(els.miniCannon)els.miniCannon.className=`mini-cannon cannon-${equipped.id}`;
-  if(els.cannonCount)els.cannonCount.textContent=`${owned.size} / ${Object.keys(CANNONS).length}`;
+  const visibleCannons=displayCannons().filter(c=>c.id!=='amalgam'||owned.has('amalgam'));
+  if(els.cannonCount)els.cannonCount.textContent=`${visibleCannons.filter(c=>owned.has(c.id)).length} / ${visibleCannons.length}`;
   if(els.multiPullButtons?.length){
     const gems=Number(profile.gems||0);
     for(const button of els.multiPullButtons){
@@ -649,7 +657,7 @@ function renderCannonGarage(){
     }
   }
   if(els.collection){
-    els.collection.innerHTML=displayCannons().filter(c=>c.id!=='gojo'||owned.has('gojo')).map(c=>{
+    els.collection.innerHTML=visibleCannons.filter(c=>c.id!=='gojo'||owned.has('gojo')).map(c=>{
       const own=owned.has(c.id),eq=equipped.id===c.id;
       const available=own;
       const chance=c.id==='standard'?'기본 지급':c.id==='gojo'?'한 전투 생존 30분 해금 · 뽑기 제외':`뽑기 ${c.chance}%`;
@@ -675,6 +683,7 @@ function renderProfile(){
   const equipped=currentCannon();
   if(els.lobbyUsername)els.lobbyUsername.textContent=currentUsername||'PLAYER';
   if(els.lobbyGemText)els.lobbyGemText.textContent=Number(profile.gems||0).toLocaleString();
+  if(els.lobbySummonStoneText)els.lobbySummonStoneText.textContent=Number(profile.summon_stones||0).toLocaleString();
   if(els.lobbyBestLevel)els.lobbyBestLevel.textContent=Number(profile.best_level||1).toLocaleString();
   if(els.lobbyBestScore)els.lobbyBestScore.textContent=Number(profile.best_score||0).toLocaleString();
   if(els.lobbyBestKills)els.lobbyBestKills.textContent=Number(profile.best_kills||0).toLocaleString();
@@ -706,7 +715,7 @@ function adminFriendlyError(error){
 }
 function renderAdminCannons(){
   if(!els.adminCannonGrid)return;
-  els.adminCannonGrid.innerHTML=displayCannons().map(c=>`
+  els.adminCannonGrid.innerHTML=displayCannons().filter(c=>c.id!=='amalgam').map(c=>`
     <div class="admin-cannon-item">
       <strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span> ${c.name}</strong>
       <div class="admin-cannon-buttons">
@@ -1602,6 +1611,19 @@ async function refreshProfile(){
   renderProfile();
   return profile;
 }
+async function claimAmalgamBossReward(slot,damage){
+  if(!currentUser)return null;
+  const response=await client.rpc('iron_cell_claim_amalgam_boss_v1',{
+    p_slot:Math.floor(Number(slot)||0),p_damage:Math.max(0,Math.floor(Number(damage)||0))
+  });
+  if(response.error){console.warn('Amalgam boss reward failed:',response.error);return null}
+  const result=response.data||{};
+  if(result.profile)profile=result.profile;else await refreshProfile();
+  renderProfile();
+  const stones=Number(result.summon_stones_awarded||0),won=result.amalgam_unlocked===true;
+  setGachaMessage(`집합체 보상 · 소환석 ${stones.toLocaleString()}개${won?' · 집합체 탱크 획득!':''}`,'good');
+  return result;
+}
 
 async function boot(){
   lockAdminUi();
@@ -1729,6 +1751,7 @@ window.IronCellAuth = {
   reportGojoDeath,
   confirmGojoKill,
   unlockLocalGojo,
+  claimAmalgamBossReward,
   savePilotName,
   refreshProfile,
   showLobby,

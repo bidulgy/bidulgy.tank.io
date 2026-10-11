@@ -3,12 +3,15 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.05 · stable aim and distinct area sigils');
+console.info('[Sworder VS Tank] game V6.06 · Amalgam world boss');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
-const CENTER_PENTAGON_TARGET=200;
-const CENTER_PENTAGON_REFILL_BATCH=8;
+const CENTER_PENTAGON_TARGET=120;
+const CENTER_PENTAGON_REFILL_BATCH=6;
+const AMALGAM_BOSS_HP=1000000;
+const BOSS_SLOT_MS=30*60*1000;
+const BOSS_SPAWN_GRACE_MS=90*1000;
 const WORLD_SNAPSHOT_INTERVAL=650;
 const SUPABASE_WORLD_SNAPSHOT_INTERVAL=5000;
 
@@ -48,6 +51,7 @@ const SHAPE_MAX_RADIUS=34;
 const shapeSpatialGrid=new Map();
 let localRebalanceTimer=0,normalSpawnAnchorCursor=0;
 let worldHostId='',worldSnapshotSeq=0,lastWorldSnapshotSend=0,lastWorldSnapshotReceive=0,shapeSerial=0;
+let lastBossSpawnSlot=-1;
 const processedDamageIds=new Set();
 const input={keys:new Set(),mouseX:innerWidth/2,mouseY:innerHeight/2,firing:false,moveX:0,moveY:0,mobileAimActive:false};
 const heldSkillAim={active:false,slot:0,source:'',pointerId:null,startX:0,startY:0,angle:null,distance:null,moved:false};
@@ -65,19 +69,19 @@ const CANNON_FAMILY=Object.freeze({
   blaster:'standard',ranger:'standard',ricochet:'spread',mortar:'standard',
   shredder:'piercer',seeker:'piercer',frost:'ring',magnet:'nova',
   cyclone:'piercer',juggernaut:'rocket',mirror:'ring',lancer:'piercer',
-  leviathan:'rocket',valkyrie:'nova',berserker:'rapid',oracle:'ring',gojo:'ring'
+  leviathan:'rocket',valkyrie:'nova',berserker:'rapid',oracle:'ring',gojo:'ring',amalgam:'nova'
 });
 const CANNON_BASE_BEHAVIOR=Object.freeze({
   blaster:'standard',ranger:'scout',ricochet:'burst',mortar:'bastion',
   shredder:'drill',seeker:'piercer',frost:'chrono',magnet:'void',
   cyclone:'laser',juggernaut:'titan',mirror:'ring',lancer:'piercer',
-  leviathan:'titan',valkyrie:'comet',berserker:'rapid',oracle:'chrono',gojo:'chrono'
+  leviathan:'titan',valkyrie:'comet',berserker:'rapid',oracle:'chrono',gojo:'chrono',amalgam:'nova'
 });
 const CANNON_Q_BEHAVIOR=Object.freeze({
   blaster:'blaster',ranger:'ranger',ricochet:'ricochet',mortar:'mortar',
   shredder:'shredder',seeker:'seeker',frost:'frost',magnet:'magnet',
   cyclone:'cyclone',juggernaut:'juggernaut',mirror:'mirror',lancer:'lancer',
-  leviathan:'leviathan',valkyrie:'valkyrie',berserker:'berserker',oracle:'oracle'
+  leviathan:'leviathan',valkyrie:'valkyrie',berserker:'berserker',oracle:'oracle',amalgam:'nova'
 });
 const CANNON_R_BEHAVIOR=Object.freeze({
   cyclone:'cyclone',juggernaut:'juggernaut',mirror:'mirror',lancer:'lancer',
@@ -91,7 +95,7 @@ const CANNON_STAT_MODS=Object.freeze({
   cyclone:{damage:1.18,reload:.82,move:1.04},juggernaut:{damage:1.22,reload:1.12,move:.92},
   mirror:{damage:1.15,bulletSpeed:1.08},lancer:{damage:1.25,bulletSpeed:1.18,reload:1.15},
   leviathan:{damage:1.20,reload:1.12,move:.92},valkyrie:{damage:1.10,reload:.82,move:1.14},
-  berserker:{damage:1.20,reload:.68,move:1.08},oracle:{damage:1.32,bulletSpeed:1.12,reload:1.12},gojo:{damage:1.26,bulletSpeed:1.08,reload:1.08}
+  berserker:{damage:1.20,reload:.68,move:1.08},oracle:{damage:1.32,bulletSpeed:1.12,reload:1.12},gojo:{damage:1.26,bulletSpeed:1.08,reload:1.08},amalgam:{damage:1.55,bulletSpeed:1.18,reload:.82,move:1.05}
 });
 function cannonBaseBehavior(id){return CANNON_BASE_BEHAVIOR[id]||id}
 function cannonQBehavior(id){return CANNON_Q_BEHAVIOR[id]||id}
@@ -111,7 +115,7 @@ const PROJECTILE_SHAPE=Object.freeze({
   blaster:'standardSlug',ranger:'scoutArrow',ricochet:'burstDisc',mortar:'bastionShell',
   shredder:'drillBit',seeker:'piercerLance',frost:'chronoRing',magnet:'voidOrb',
   cyclone:'laserRay',juggernaut:'titanShell',mirror:'dimensionRing',lancer:'piercerLance',
-  leviathan:'titanShell',valkyrie:'cometCore',berserker:'rapidTracer',oracle:'chronoRing',gojo:'chronoRing'
+  leviathan:'titanShell',valkyrie:'cometCore',berserker:'rapidTracer',oracle:'chronoRing',gojo:'chronoRing',amalgam:'stellarStar'
 });
 function projectileShapeForCannon(cannon){return PROJECTILE_SHAPE[cannon]||'standardSlug'}
 
@@ -164,7 +168,8 @@ const CANNON_SKILLS=Object.freeze({
   valkyrie:{name:'천익 돌파',cooldown:21,color:'#8deaff'},
   berserker:{name:'BLOOD CLEAVE',cooldown:18,color:'#ff8a70'},
   oracle:{name:'FUTURE EYE',cooldown:21,color:'#f4e9a8'},
-  gojo:{name:'아오',cooldown:15,color:'#54aaff'}
+  gojo:{name:'아오',cooldown:15,color:'#54aaff'},
+  amalgam:{name:'집합 붕괴',cooldown:18,color:'#ff4fe1'}
 });
 const CANNON_SKILLS_2=Object.freeze({
   rocket:{name:'IRON DOME',cooldown:28,color:'#ffc06a',kind:'fortress'},
@@ -242,7 +247,8 @@ const TANK_THEMES=Object.freeze({
   mirror:{body:'#8065a8',edge:'#443661',glow:'#f0d0ff'},lancer:{body:'#667ca7',edge:'#354563',glow:'#dae7ff'},
   leviathan:{body:'#385f77',edge:'#1d3648',glow:'#9feaff'},valkyrie:{body:'#477d8f',edge:'#27505e',glow:'#a2f2ff'},
   berserker:{body:'#8d3e34',edge:'#4e201b',glow:'#ff9a78'},oracle:{body:'#8a8151',edge:'#4d472b',glow:'#fff2ae'},
-  gojo:{body:'#eaf3ff',edge:'#5571a8',glow:'#a596ff'}
+  gojo:{body:'#eaf3ff',edge:'#5571a8',glow:'#a596ff'},
+  amalgam:{body:'#34223f',edge:'#ff4fd8',glow:'#7cf7ff'}
 });
 // Every equipped cannon has its own compact visual grammar. Existing projectile
 // silhouettes stay intact; this adds a readable signature even for shared shapes.
@@ -439,7 +445,7 @@ function centralPentagonPoint(slot){
   const cached=cache[slot];
   if(cached)return cached;
   const angle=slot*2.399963229728653;
-  const radius=42*Math.sqrt(slot+.5);
+  const radius=72*Math.sqrt(slot+.5);
   const point={x:WORLD/2+Math.cos(angle)*radius,y:WORLD/2+Math.sin(angle)*radius};
   cache[slot]=point;
   return point;
@@ -476,6 +482,37 @@ function spawnCentralPentagon(slot){
   shape.x=pos.x;shape.y=pos.y;
   shape.centralCluster=true;shape.centralSlot=slot;
   return shape;
+}
+function currentBossSlot(){return Math.floor(Date.now()/BOSS_SLOT_MS)}
+function spawnAmalgamBoss(slot=currentBossSlot()){
+  if(shapes.some(s=>s.isBoss))return null;
+  const boss={id:makeShapeId(),type:'amalgamBoss',x:WORLD/2,y:WORLD/2,r:165,hp:AMALGAM_BOSS_HP,maxHp:AMALGAM_BOSS_HP,xp:0,sides:12,angle:0,spin:.18,vx:0,vy:0,spawnAge:0,isBoss:true,bossSlot:slot,damageBy:new Map()};
+  shapes.push(boss);lastBossSpawnSlot=slot;lastWorldSnapshotSend=0;
+  return boss;
+}
+function maintainBossSchedule(){
+  if(!running||!isWorldHost())return;
+  const now=Date.now(),slot=Math.floor(now/BOSS_SLOT_MS),into=now%BOSS_SLOT_MS;
+  const existing=shapes.find(s=>s.isBoss);
+  if(existing){lastBossSpawnSlot=Math.max(lastBossSpawnSlot,Number(existing.bossSlot)||slot);return}
+  if(slot!==lastBossSpawnSlot&&into<=BOSS_SPAWN_GRACE_MS)spawnAmalgamBoss(slot);
+}
+function finishAmalgamBoss(s){
+  if(!s?.isBoss||s.defeated)return;
+  s.defeated=true;
+  const rewards=[...(s.damageBy||new Map()).entries()].map(([userId,damage])=>({userId,damage:Math.max(0,Math.min(AMALGAM_BOSS_HP,Math.round(damage)))})).filter(v=>v.damage>0);
+  const payload={hostId:onlineSelfId,slot:Number(s.bossSlot)||currentBossSlot(),rewards};
+  receiveBossDefeated(payload);sendOnline('bossDefeated',payload);
+  const idx=shapes.indexOf(s);if(idx>=0)shapes.splice(idx,1);
+  // Callers often check hp after this function and splice by their old index.
+  // Keep this detached object alive so they cannot remove the next polygon too.
+  s.hp=1;
+  burst(s.x,s.y,'#ff63df',90);shake=Math.max(shake,28);lastWorldSnapshotSend=0;
+}
+function receiveBossDefeated(payload){
+  const reward=(payload?.rewards||[]).find(v=>String(v.userId||'')===onlineSelfId);
+  if(!reward)return;
+  void window.IronCellAuth?.claimAmalgamBossReward?.(Number(payload.slot),Number(reward.damage));
 }
 
 function minDistanceToActiveAnchors(shape,anchors){
@@ -633,7 +670,9 @@ function serializeShape(s){
     angle:s.angle,spin:s.spin,
     centralCluster:s.centralCluster===true,
     centralSlot:s.centralCluster===true?s.centralSlot:-1,
-    spawnAge:s.spawnAge||0
+    spawnAge:s.spawnAge||0,
+    isBoss:s.isBoss===true,bossSlot:Number(s.bossSlot)||0,
+    bossContributions:s.isBoss?[...(s.damageBy||new Map()).entries()].map(([userId,damage])=>[String(userId),Math.max(0,Math.min(AMALGAM_BOSS_HP,Number(damage)||0))]):undefined
   };
 }
 function sendWorldSnapshot(force=false){
@@ -679,6 +718,9 @@ function applyWorldSnapshot(payload){
     s.centralCluster=raw.centralCluster===true&&s.type==='pentagon';
     s.centralSlot=s.centralCluster?clamp(Math.floor(safeRemoteNumber(raw.centralSlot,-1)),0,CENTER_PENTAGON_TARGET-1):-1;
     s.spawnAge=Math.max(0,safeRemoteNumber(raw.spawnAge,s.spawnAge||0));
+    s.isBoss=raw.isBoss===true||s.type==='amalgamBoss';
+    s.bossSlot=s.isBoss?Math.floor(safeRemoteNumber(raw.bossSlot,0)):0;
+    s.damageBy=s.isBoss?new Map((Array.isArray(raw.bossContributions)?raw.bossContributions:[]).map(v=>[String(v?.[0]||''),Math.max(0,Math.min(AMALGAM_BOSS_HP,safeRemoteNumber(v?.[1],0))) ]).filter(v=>v[0]&&v[1]>0)):undefined;
     next.push(s);
   }
   shapes=next;
@@ -704,11 +746,18 @@ function applyShapeDamage(s,amount,pushX=0,pushY=0){
   }
 
   // V5.38: enemy HP can never become negative.
+  const dealt=Math.min(amount,before);
   s.hp=Math.max(0,before-amount);
+  if(s.isBoss&&isWorldHost()&&onlineSelfId){
+    s.damageBy ||= new Map();s.damageBy.set(onlineSelfId,(s.damageBy.get(onlineSelfId)||0)+dealt);
+  }
 
   if(pushX)s.vx=(s.vx||0)+pushX;
   if(pushY)s.vy=(s.vy||0)+pushY;
   reportShapeDamage(s,Math.min(amount,before),pushX,pushY);
+  if(s.isBoss&&s.hp<=0){
+    if(isWorldHost())finishAmalgamBoss(s);else s.hp=1;
+  }
   return s.hp<=0;
 }
 function reportShapeImpulse(s,dvx,dvy){
@@ -729,10 +778,12 @@ function receiveShapeDamage(payload){
   if(!s)return;
   const amount=Math.max(0,Math.min(100000,safeRemoteNumber(payload.amount,0)));
   if(amount<=0)return;
-  s.hp=Math.max(0,(Number(s.hp)||0)-amount);
+  const before=Math.max(0,Number(s.hp)||0),dealt=Math.min(before,amount);
+  s.hp=Math.max(0,before-amount);
+  if(s.isBoss){s.damageBy ||= new Map();const source=String(payload?.sourceId||'');if(source)s.damageBy.set(source,(s.damageBy.get(source)||0)+dealt)}
   s.vx+=(safeRemoteNumber(payload.pushX,0));
   s.vy+=(safeRemoteNumber(payload.pushY,0));
-  if(s.hp<=0){
+  if(s.isBoss&&s.hp<=0){finishAmalgamBoss(s)}else if(s.hp<=0){
     const idx=shapes.indexOf(s);
     if(idx>=0)shapes.splice(idx,1);
   }
@@ -1112,6 +1163,7 @@ function dispatchArenaEvent(event,payload){
   }
   if(event==='shapeDamage')return receiveShapeDamage(payload);
   if(event==='shapeImpulse')return receiveShapeImpulse(payload);
+  if(event==='bossDefeated')return receiveBossDefeated(payload);
 }
 function applyArenaPresence(players){
   const previous=new Set(onlinePresenceIds);
@@ -1231,6 +1283,7 @@ async function connectOnlineArena(preserveRemotes=false){
   });
   ch.on('broadcast',{event:'shapeDamage'},({payload})=>receiveShapeDamage(payload));
   ch.on('broadcast',{event:'shapeImpulse'},({payload})=>receiveShapeImpulse(payload));
+  ch.on('broadcast',{event:'bossDefeated'},({payload})=>receiveBossDefeated(payload));
   ch.on('presence',{event:'sync'},()=>{refreshPresenceCache();updateOnlineCount();electWorldHost()});
   ch.on('presence',{event:'join'},()=>{refreshPresenceCache();updateOnlineCount();setTimeout(()=>electWorldHost(),0)});
   ch.on('presence',{event:'leave'},({key})=>{
@@ -4005,7 +4058,7 @@ function cameraUpdate(){const tx=player.x-innerWidth/2,ty=player.y-innerHeight/2
 const worldToScreen=(x,y)=>[x-camera.x,y-camera.y];
 const frameViewBounds={left:0,right:0,top:0,bottom:0};
 function refreshFrameViewBounds(){const s=sniperViewScale(),hw=innerWidth/(2*s),hh=innerHeight/(2*s),cx=innerWidth/2,cy=innerHeight/2;frameViewBounds.left=cx-hw;frameViewBounds.right=cx+hw;frameViewBounds.top=cy-hh;frameViewBounds.bottom=cy+hh}
-function drawGrid(){const b=frameViewBounds,pad=80,left=b.left-pad,right=b.right+pad,top=b.top-pad,bottom=b.bottom+pad;ctx.fillStyle='#152235';ctx.fillRect(left,top,right-left,bottom-top);let sx=-(camera.x%GRID),sy=-(camera.y%GRID);while(sx>left)sx-=GRID;while(sy>top)sy-=GRID;ctx.strokeStyle='rgba(255,255,255,.045)';ctx.lineWidth=1;ctx.beginPath();for(let x=sx;x<right;x+=GRID){ctx.moveTo(x,top);ctx.lineTo(x,bottom)}for(let y=sy;y<bottom;y+=GRID){ctx.moveTo(left,y);ctx.lineTo(right,y)}ctx.stroke()}
+function drawGrid(){const b=frameViewBounds,pad=80,left=b.left-pad,right=b.right+pad,top=b.top-pad,bottom=b.bottom+pad;ctx.fillStyle='#ffffff';ctx.fillRect(left,top,right-left,bottom-top);let sx=-(camera.x%GRID),sy=-(camera.y%GRID);while(sx>left)sx-=GRID;while(sy>top)sy-=GRID;ctx.strokeStyle='rgba(31,61,88,.09)';ctx.lineWidth=1;ctx.beginPath();for(let x=sx;x<right;x+=GRID){ctx.moveTo(x,top);ctx.lineTo(x,bottom)}for(let y=sy;y<bottom;y+=GRID){ctx.moveTo(left,y);ctx.lineTo(right,y)}ctx.stroke()}
 function polygon(x,y,r,sides,a){ctx.beginPath();for(let i=0;i<sides;i++){const q=a+i*TAU/sides,px=x+Math.cos(q)*r,py=y+Math.sin(q)*r;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)}ctx.closePath()}
 let renderPressure=0;
 function updateRenderPressure(){
@@ -4024,7 +4077,19 @@ function segmentMayTouchScreen(x1,y1,x2,y2,pad=120){
   if(ay>b.bottom+pad&&by>b.bottom+pad)return false;
   return true;
 }
-function drawShape(s){const x=s.x-camera.x,y=s.y-camera.y,vb=frameViewBounds;if(x<vb.left-80||y<vb.top-80||x>vb.right+80||y>vb.bottom+80)return;const spawnP=clamp((s.spawnAge||0)/.34,0,1),ease=1-Math.pow(1-spawnP,3),rr=s.r*(.35+.65*ease);ctx.save();ctx.globalAlpha=.28+.72*ease;ctx.shadowColor='rgba(0,0,0,.25)';ctx.shadowBlur=renderPressure||s.centralCluster?0:10;ctx.shadowOffsetY=renderPressure||s.centralCluster?0:4;polygon(x,y,rr,s.sides,s.angle);ctx.fillStyle=colorForShape(s.type);ctx.fill();ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.strokeStyle=edgeForShape(s.type);ctx.lineWidth=5;ctx.stroke();if(s.hp<s.maxHp){const w=s.r*1.6;ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(x-w/2,y+s.r+8,w,4);ctx.fillStyle='#7ee787';ctx.fillRect(x-w/2,y+s.r+8,w*(s.hp/s.maxHp),4)}ctx.restore()}
+function drawShape(s){
+  const x=s.x-camera.x,y=s.y-camera.y,vb=frameViewBounds,pad=s.isBoss?230:80;
+  if(x<vb.left-pad||y<vb.top-pad||x>vb.right+pad||y>vb.bottom+pad)return;
+  const spawnP=clamp((s.spawnAge||0)/.34,0,1),ease=1-Math.pow(1-spawnP,3),rr=s.r*(.35+.65*ease);
+  ctx.save();ctx.globalAlpha=.28+.72*ease;
+  if(s.isBoss){
+    const t=performance.now()*.001;ctx.translate(x,y);ctx.rotate(s.angle);ctx.shadowColor='#ff42dd';ctx.shadowBlur=28;
+    for(let k=0;k<9;k++){const a=k*TAU/9+t*(k%2?.18:-.14),orbit=rr*(.42+(k%3)*.18),sr=rr*(.27+(k%2)*.06);polygon(Math.cos(a)*orbit,Math.sin(a)*orbit,sr,5,a+t*.35);ctx.fillStyle=k%3===0?'#6ff4ff':k%3===1?'#ff52d9':'#7b5cff';ctx.fill();ctx.strokeStyle='#25122f';ctx.lineWidth=6;ctx.stroke()}
+    ctx.rotate(-s.angle);ctx.shadowColor='#ffffff';ctx.shadowBlur=22;ctx.fillStyle='#21132d';ctx.beginPath();ctx.arc(0,0,rr*.43,0,TAU);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=5;ctx.stroke();ctx.fillStyle='#ffecff';ctx.font='900 18px system-ui';ctx.textAlign='center';ctx.fillText('집합체',0,6);ctx.shadowBlur=0;
+    const w=Math.min(420,rr*2.6),ratio=clamp(s.hp/s.maxHp,0,1);ctx.fillStyle='rgba(20,25,38,.72)';ctx.fillRect(-w/2,rr+24,w,15);const grad=ctx.createLinearGradient(-w/2,0,w/2,0);grad.addColorStop(0,'#6fefff');grad.addColorStop(.5,'#a25cff');grad.addColorStop(1,'#ff4fcf');ctx.fillStyle=grad;ctx.fillRect(-w/2,rr+24,w*ratio,15);ctx.fillStyle='#182033';ctx.font='800 13px system-ui';ctx.fillText(`${Math.ceil(s.hp).toLocaleString()} / 1,000,000` ,0,rr+55);ctx.restore();return;
+  }
+  ctx.shadowColor='rgba(0,0,0,.25)';ctx.shadowBlur=renderPressure||s.centralCluster?0:10;ctx.shadowOffsetY=renderPressure||s.centralCluster?0:4;polygon(x,y,rr,s.sides,s.angle);ctx.fillStyle=colorForShape(s.type);ctx.fill();ctx.shadowBlur=0;ctx.shadowOffsetY=0;ctx.strokeStyle=edgeForShape(s.type);ctx.lineWidth=5;ctx.stroke();if(s.hp<s.maxHp){const w=s.r*1.6;ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(x-w/2,y+s.r+8,w,4);ctx.fillStyle='#7ee787';ctx.fillRect(x-w/2,y+s.r+8,w*(s.hp/s.maxHp),4)}ctx.restore()
+}
 function drawCharacterMark(cannon,r){
   const marks={
     scout:['chevron','#bdf7ff'],bastion:['shield','#d8ecff'],
@@ -5453,6 +5518,13 @@ function drawVariantProjectile(b,time){
       for(let k=0;k<4;k++){const a=time*5+k*TAU/4;ctx.fillStyle=k%2?'#ff839b':'#8ad6ff';ctx.beginPath();ctx.arc(Math.cos(a)*17,Math.sin(a)*12,3,0,TAU);ctx.fill()}
       ctx.strokeStyle='rgba(190,160,255,.8)';ctx.beginPath();ctx.moveTo(-37,-10);ctx.quadraticCurveTo(-22,-4,-13,0);ctx.quadraticCurveTo(-22,4,-37,10);ctx.stroke();
       ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,0,8,0,TAU);ctx.fill();break;
+    case 'amalgam':
+      ctx.rotate(spin*.8);ctx.shadowBlur=28;ctx.fillStyle='#fff';ctx.strokeStyle='#ff67dc';ctx.lineWidth=2.5;
+      ctx.beginPath();for(let k=0;k<10;k++){const a=-Math.PI/2+k*TAU/10,rr=k%2?8:20;k?ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr):ctx.moveTo(Math.cos(a)*rr,Math.sin(a)*rr)}ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.rotate(-spin*1.7);ctx.strokeStyle='#64eaff';ctx.lineWidth=3;ctx.beginPath();for(let k=0;k<5;k++){const a=-Math.PI/2+k*TAU/5;ctx.moveTo(Math.cos(a)*25,Math.sin(a)*25);ctx.lineTo(Math.cos(a+Math.PI)*11,Math.sin(a+Math.PI)*11)}ctx.stroke();
+      ctx.fillStyle='#492080';ctx.beginPath();ctx.arc(0,0,6,0,TAU);ctx.fill();
+      ctx.strokeStyle='rgba(108,238,255,.75)';ctx.lineWidth=2;for(let k=0;k<3;k++){const a=time*3+k*TAU/3;ctx.beginPath();ctx.arc(Math.cos(a)*25,Math.sin(a)*16,3.5,0,TAU);ctx.stroke()}
+      break;
     default:return false;
   }
   ctx.shadowBlur=0;return true;
@@ -5905,7 +5977,7 @@ function skillAimSpec(cannon,slot){
       blaster:{type:'target',distance:760,radius:185},ranger:{type:'dash',distance:720,width:72,end:72},ricochet:{type:'cone',distance:500,half:.30},mortar:{type:'barrage',distance:650,radius:125,spacing:105,count:5},
       shredder:{type:'cone',distance:700,half:.20},seeker:{type:'line',distance:900,width:25},frost:{type:'target',distance:470,radius:280},magnet:{type:'target',distance:500,radius:330},
       cyclone:{type:'cone',distance:720,half:.24},juggernaut:{type:'dash',distance:580,width:72,end:150},mirror:{type:'cone',distance:520,half:.34},lancer:{type:'line',distance:1180,width:28},
-      leviathan:{type:'cone',distance:650,half:.66},valkyrie:{type:'dash',distance:700,width:58,end:105},berserker:{type:'cone',distance:520,half:.50},oracle:{type:'autoTarget',distance:1350,radius:90},gojo:{type:'target',distance:480,radius:210}
+      leviathan:{type:'cone',distance:650,half:.66},valkyrie:{type:'dash',distance:700,width:58,end:105},berserker:{type:'cone',distance:520,half:.50},oracle:{type:'autoTarget',distance:1350,radius:90},gojo:{type:'target',distance:480,radius:210},amalgam:{type:'target',distance:520,radius:420}
     }[cannon]||null;
   }
   if(slot===2){
@@ -5985,6 +6057,7 @@ function update(dt){
   updatePlayer(dt);
   updateRemotePlayers(dt);
   updateShapes(dt);
+  maintainBossSchedule();
   updateBullets(dt);
   updateParticles(dt);
   updateCombatFx(dt);
