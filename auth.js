@@ -644,7 +644,14 @@ function renderCannonGarage(){
   if(els.deployCannonDesc)els.deployCannonDesc.textContent=equipped.desc;
   if(els.equippedCannonRarity){els.equippedCannonRarity.textContent=equipped.rarityLabel;els.equippedCannonRarity.className=`rarity ${equipped.rarity}`}
   if(els.miniCannon)els.miniCannon.className=`mini-cannon cannon-${equipped.id}`;
-  const visibleCannons=displayCannons().filter(c=>c.id!=='amalgam'||owned.has('amalgam'));
+  const singularityPriority={gojo:0,amalgam:1};
+  const visibleCannons=displayCannons()
+    .filter(c=>c.id!=='amalgam'||owned.has('amalgam'))
+    .sort((a,b)=>{
+      const ap=owned.has(a.id)&&singularityPriority[a.id]!==undefined?singularityPriority[a.id]:99;
+      const bp=owned.has(b.id)&&singularityPriority[b.id]!==undefined?singularityPriority[b.id]:99;
+      return ap-bp;
+    });
   if(els.cannonCount)els.cannonCount.textContent=`${visibleCannons.filter(c=>owned.has(c.id)).length} / ${visibleCannons.length}`;
   if(els.multiPullButtons?.length){
     const gems=Number(profile.gems||0);
@@ -662,7 +669,7 @@ function renderCannonGarage(){
       const available=own;
       const chance=c.id==='standard'?'기본 지급':c.id==='gojo'?'한 전투 생존 30분 해금 · 뽑기 제외':`뽑기 ${c.chance}%`;
       return `<button type="button" class="cannon-card rarity-card-${c.rarity} ${available?'':'locked'} ${eq?'equipped':''}" data-cannon="${c.id}" ${available?'':'disabled'}>
-        <div class="cannon-card-head"><strong>${c.name}${c.id==='sniper'?' · NEW':''}</strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span></div>
+        <div class="cannon-card-head"><strong>${c.name}${c.id==='sniper'?' · NEW':''}${['gojo','amalgam'].includes(c.id)?' · 보유 특수 탱크':''}</strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span></div>
         <small class="cannon-chance">${chance}</small>
         <p>${available?c.desc:c.id==='gojo'?'한 전투에서 죽지 않고 30분 이상 생존하면 해금됩니다.':'아직 획득하지 않은 대포입니다.'}</p>${available&&c.passive?`<div class="cannon-passive-line">● ${c.passive}</div>`:''}${available&&c.skill?`<div class="cannon-skill-line">⚡ ${c.skill}</div>`:''}${available&&c.skill2?`<div class="cannon-skill-line second">◆ ${c.skill2}</div>`:''}${available&&c.skill3?`<div class="cannon-skill-line third">✦ ${c.skill3}</div>`:''}${available&&c.skill4?`<div class="cannon-skill-line fourth">◆ ${c.skill4}</div>`:''}
         <div class="equip-label">${eq?'장착 중':own?'눌러서 장착':'미보유'}</div>
