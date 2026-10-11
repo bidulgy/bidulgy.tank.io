@@ -7,6 +7,7 @@ const authSource = fs.readFileSync(__dirname + '/auth.js', 'utf8');
 const unlockSql = fs.readFileSync(__dirname + '/singularity_unlock.sql', 'utf8');
 const gojoRewardSql = fs.readFileSync(__dirname + '/gojo_reward_fix.sql', 'utf8');
 const bossSql = fs.readFileSync(__dirname + '/amalgam_boss_v606.sql', 'utf8');
+const rewardSql = fs.readFileSync(__dirname + '/run_reward_v608.sql', 'utf8');
 const section = (start, end) => {
   const a = source.indexOf(start);
   const b = source.indexOf(end, a + start.length);
@@ -143,6 +144,8 @@ assert(source.includes('const AMALGAM_BOSS_HP=1000000')&&source.includes('const 
 assert(source.includes('s.hp=1;')&&source.includes('bossContributions:'),'boss death and host transfer safeguards are missing');
 assert(bossSql.includes('v_stones bigint:=greatest(0,least(1000000,v_damage))')&&bossSql.includes('random() < (v_damage::numeric/1000000.0)*0.10'),'boss rewards must scale with contribution');
 assert(bossSql.includes('primary key (user_id,boss_slot)'),'boss rewards must be idempotent per player and slot');
+assert(rewardSql.match(/v_award:=v_score\*5/g)?.length===2,'finished runs must award five gems per reported EXP/score');
+assert(source.includes('(player.score*5).toLocaleString()'),'death reward preview must match the server 1:5 rate');
 const twinContext = vm.createContext({TAU:Math.PI*2, TANK_THEMES:{standard:{glow:'#fff'}}, drawPlayerCannon:(cannon,r)=>twinDraws.push([cannon,r]), twinDraws:[]});
 const twinDraws = twinContext.twinDraws;
 vm.runInContext(section('function evolutionBarrelSpecs(', 'function evolutionHasNoBasicGun(')+section('function drawEvolutionChassis(', 'function drawEvolutionAutoTurretCaps('),twinContext);
