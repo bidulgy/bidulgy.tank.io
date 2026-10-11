@@ -1282,6 +1282,8 @@ function showGarage(){
   setAdminPanelOpen(false);
   els.garageScreen?.classList.add('show');
   renderProfile();
+  // Pull server-side admin rewards before drawing the final selection list.
+  if(currentUser)void refreshProfile().catch(error=>console.warn('Garage profile refresh failed:',error));
 }
 function showDeploy(){
   els.garageScreen?.classList.remove('show');
