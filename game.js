@@ -3,11 +3,11 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.06 · Amalgam world boss');
+console.info('[Sworder VS Tank] game V6.07 · Amalgam world boss');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
-const CENTER_PENTAGON_TARGET=120;
+const CENTER_PENTAGON_TARGET=200;
 const CENTER_PENTAGON_REFILL_BATCH=6;
 const AMALGAM_BOSS_HP=1000000;
 const BOSS_SLOT_MS=30*60*1000;
@@ -445,7 +445,7 @@ function centralPentagonPoint(slot){
   const cached=cache[slot];
   if(cached)return cached;
   const angle=slot*2.399963229728653;
-  const radius=72*Math.sqrt(slot+.5);
+  const radius=42*Math.sqrt(slot+.5);
   const point={x:WORLD/2+Math.cos(angle)*radius,y:WORLD/2+Math.sin(angle)*radius};
   cache[slot]=point;
   return point;
@@ -2987,6 +2987,21 @@ function splitBasicCarrier(parent){
   return true;
 }
 
+function updateAuto5Aim(e){
+  if(!e||e.classType!=='auto5'){if(e){e.auto5AimAngles=null;e.auto5HasTarget=false}return false}
+  const specs=evolutionBarrelSpecs('auto5',e.r),angles=[];
+  let found=false;
+  for(const spec of specs){
+    const mountAngle=e.angle+(spec.a||0);
+    const tx=e.x+Math.cos(mountAngle)*e.r*.62,ty=e.y+Math.sin(mountAngle)*e.r*.62;
+    const target=nearestSkillTarget(tx,ty,1100);
+    if(target){angles.push(Math.atan2(target.y-ty,target.x-tx));found=true}
+    else angles.push(mountAngle);
+  }
+  e.auto5AimAngles=angles;e.auto5HasTarget=found;
+  return found;
+}
+
 function fire(e){
   if(e!==player||e.fireCd>0)return;
   const a=e.angle,p=playerParams();e.fireCd=p.reload;
@@ -3111,6 +3126,8 @@ function fire(e){
     shot={angle:a,side:0,curve:0,damageMul:1,special:''};
   }
 
+  if(evoType==='auto5')shot.autoAimAngles=Array.isArray(e.auto5AimAngles)?e.auto5AimAngles:null;
+
   // V5.79: 진화체는 Diep.io의 실제 포신 수/방향/동시 또는 교대 발사 방식으로 발사한다.
   const volley=evolutionShotsFromBase(evoType,e.r,shotNo,shot,a);
   const baseRecoil={
@@ -3125,9 +3142,10 @@ function fire(e){
     const vs=volley[vi],sa=Number.isFinite(vs.angle)?vs.angle:a;
     const px=-Math.sin(sa)*(vs.side||0),py=Math.cos(sa)*(vs.side||0);
     const muzzleDistance=Number(vs.evoMuzzleDistance)||e.r+18;
+    const turretX=Number(vs.evoTurretOffsetX)||0,turretY=Number(vs.evoTurretOffsetY)||0;
     const speedScale=Math.max(.1,Number(vs.evoSpeedScale)||1);
     const b={
-      x:e.x+Math.cos(sa)*muzzleDistance+px,y:e.y+Math.sin(sa)*muzzleDistance+py,
+      x:e.x+turretX+Math.cos(sa)*muzzleDistance+px,y:e.y+turretY+Math.sin(sa)*muzzleDistance+py,
       vx:Math.cos(sa)*p.bulletSpeed*speedScale+e.vx*.18,vy:Math.sin(sa)*p.bulletSpeed*speedScale+e.vy*.18,
       r:6,damage:p.damage*(Number(vs.damageMul)||1)*(Number(vs.evoDamageScale)||1),life:1.65,
       owner:e,ownerId:onlineSelfId,team:'player',cannon,shape:projectileShapeForCannon(cannon),
@@ -3258,7 +3276,7 @@ function getRewindState(msAgo=4000){
 }
 
 function updatePlayer(dt){if(!player.alive)return;player.survivalSeconds=(player.survivalSeconds||0)+dt;if(!player.gojoSurvivalAwarded&&player.survivalSeconds>=1800){player.gojoSurvivalAwarded=true;window.IronCellAuth?.unlockLocalGojo?.()}refreshRealTimeSkillCooldowns();player.shapeContactCd=Math.max(0,(player.shapeContactCd||0)-dt);const p=playerParams(),stunned=performance.now()<(player.stunUntil||0);let mx=stunned?0:input.moveX,my=stunned?0:input.moveY;if(input.keys.has('KeyA')||input.keys.has('ArrowLeft'))mx-=1;if(input.keys.has('KeyD')||input.keys.has('ArrowRight'))mx+=1;if(input.keys.has('KeyW')||input.keys.has('ArrowUp'))my-=1;if(input.keys.has('KeyS')||input.keys.has('ArrowDown'))my+=1;if(mx||my){[mx,my]=norm(mx,my);player.vx+=mx*p.move*dt*5.2;player.vy+=my*p.move*dt*5.2}const aimWorld=screenToWorldPoint(input.mouseX,input.mouseY),normalAimAngle=Math.atan2(aimWorld[1]-player.y,aimWorld[0]-player.x);
-player.angle=heldSkillAim.active&&Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:normalAimAngle;let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);if(!heldSkillAim.active){const postMoveAim=screenToWorldPoint(input.mouseX,input.mouseY);player.angle=Math.atan2(postMoveAim[1]-player.y,postMoveAim[0]-player.x)}player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);if(!stunned&&(input.firing||input.keys.has('Space')))fire(player);handleShapeContact();if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}recordPlayerHistory()
+player.angle=heldSkillAim.active&&Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:normalAimAngle;let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);if(!heldSkillAim.active){const postMoveAim=screenToWorldPoint(input.mouseX,input.mouseY);player.angle=Math.atan2(postMoveAim[1]-player.y,postMoveAim[0]-player.x)}player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);const auto5Hunting=!stunned&&updateAuto5Aim(player);if(!stunned&&(input.firing||input.keys.has('Space')||auto5Hunting))fire(player);handleShapeContact();if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}recordPlayerHistory()
 function updateShapes(dt){
   const host=isWorldHost();
 
@@ -4530,12 +4548,17 @@ function evolutionShotsFromBase(type,r,shotNo,baseShot,baseAngle){
   if(volley.length===1&&volley[0]===null)return[{...baseShot}];
   const originalAngle=Number.isFinite(baseShot.angle)?baseShot.angle:baseAngle;
   const localShotOffset=originalAngle-baseAngle;
-  return volley.map((m)=>{
+  return volley.map((m,index)=>{
     const shot={...baseShot};
     if(Array.isArray(baseShot.splitPattern))shot.splitPattern=baseShot.splitPattern.map(v=>({...v}));
     shot.angle=baseAngle+(m.a||0)+localShotOffset;
+    if(type==='auto5'&&Number.isFinite(baseShot.autoAimAngles?.[index])){
+      shot.angle=baseShot.autoAimAngles[index];
+      shot.evoTurretOffsetX=Math.cos(baseAngle+(m.a||0))*r*.62;
+      shot.evoTurretOffsetY=Math.sin(baseAngle+(m.a||0))*r*.62;
+    }
     shot.side=(Number(baseShot.side)||0)+(Number(m.side)||0);
-    if(m.kind==='rimAuto')shot.evoMuzzleDistance=r*1.12;
+    if(m.kind==='rimAuto')shot.evoMuzzleDistance=type==='auto5'?r*.82:r*1.12;
     else if(m.kind==='centerAuto')shot.evoMuzzleDistance=r*.72;
     else shot.evoMuzzleDistance=r*(1.02+.78*(m.len||1))+3;
     shot.evoDamageScale=Number(m.damageScale)||1;
@@ -4575,13 +4598,14 @@ function drawEvolutionChassis(e,r){
     ctx.globalAlpha=barrelAlpha;
     ctx.restore();
   };
-  const drawRimAuto=(spec)=>{
-    const a=spec.a||0,tx=Math.cos(a)*r*.58,ty=Math.sin(a)*r*.58;
-    ctx.save();ctx.translate(tx,ty);ctx.rotate(a);
+  const drawRimAuto=(spec,index)=>{
+    const a=spec.a||0,tx=Math.cos(a)*r*.62,ty=Math.sin(a)*r*.62;
+    const tracked=Number.isFinite(e.auto5AimAngles?.[index])?e.auto5AimAngles[index]-e.angle:a;
+    ctx.save();ctx.translate(tx,ty);ctx.rotate(tracked);
     ctx.fillStyle='#cfd9e1';ctx.strokeStyle='#536273';ctx.lineWidth=2;
-    ctx.beginPath();ctx.arc(0,0,7.5,0,TAU);ctx.fill();ctx.stroke();
-    ctx.fillRect(2,-3,r*.52,6);ctx.strokeRect(2,-3,r*.52,6);
-    ctx.fillStyle=glow;ctx.fillRect(r*.46,-2,4,4);
+    ctx.fillRect(1,-4,r*.88,8);ctx.strokeRect(1,-4,r*.88,8);
+    ctx.fillStyle=glow;ctx.fillRect(r*.76,-2.5,r*.12,5);
+    ctx.beginPath();ctx.arc(0,0,8.5,0,TAU);ctx.fillStyle='#cfd9e1';ctx.fill();ctx.stroke();
     ctx.restore();
   };
   const drawCenterAuto=(a=0)=>{
@@ -4593,7 +4617,7 @@ function drawEvolutionChassis(e,r){
     ctx.restore();
   };
 
-  for(const spec of evolutionBarrelSpecs(type,r)){
+  for(const [specIndex,spec] of evolutionBarrelSpecs(type,r).entries()){
     if(type==='twin'){
       // Keep both evolved firing lanes, but repeat the equipped cannon's own
       // silhouette instead of replacing it with two generic gray barrels.
@@ -4602,7 +4626,7 @@ function drawEvolutionChassis(e,r){
       ctx.restore();
       continue;
     }
-    if(spec.kind==='rimAuto')drawRimAuto(spec);
+    if(spec.kind==='rimAuto')drawRimAuto(spec,specIndex);
     else if(spec.kind==='centerAuto')drawCenterAuto(spec.a||0);
     else drawBarrel(spec);
   }
@@ -4616,7 +4640,7 @@ function drawEvolutionAutoTurretCaps(e,r){
   const specs=evolutionBarrelSpecs(type,r);
   const cap=(x,y)=>{ctx.fillStyle='#d8e1e8';ctx.strokeStyle='#526171';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,7.5,0,TAU);ctx.fill();ctx.stroke()};
   for(const spec of specs){
-    if(spec.kind==='rimAuto')cap(Math.cos(spec.a||0)*r*.58,Math.sin(spec.a||0)*r*.58);
+    if(spec.kind==='rimAuto')cap(Math.cos(spec.a||0)*r*.62,Math.sin(spec.a||0)*r*.62);
     else if(spec.kind==='centerAuto')cap(0,0);
   }
   if(type==='autoGunner'||type==='autoTrapper')cap(0,0);

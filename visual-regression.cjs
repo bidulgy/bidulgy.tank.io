@@ -22,6 +22,7 @@ vm.runInContext([
   section('const DIEP_EVOLUTION_INFO=', 'const DIEP_EVOLUTION_CHILDREN='),
   section('function evolutionBarrelSpecs(', 'function evolutionHasNoBasicGun('),
   section('function evolutionVolleySpecs(', 'function evolutionShotsFromBase('),
+  section('function evolutionShotsFromBase(', 'function drawEvolutionChassis('),
   section('function drawVariantProjectile(', 'function drawUniqueProjectile('),
   section('function drawProjectileEnergy(', 'function drawBullets('),
   section('function skillAimSpec(', 'function aimPal('),
@@ -153,14 +154,19 @@ assert.deepEqual(twinOffsets,[[0,-10],[0,10]],'Twin visuals must follow both fir
 context.WORLD = 12600;
 const central = [];
 context.spawnShape = type => { const shape = {type}; central.push(shape); return shape; };
-for (let slot=0;slot<120;slot++) vm.runInContext(`spawnCentralPentagon(${slot})`, context);
-assert.equal(central.length, 120);
-assert.equal(new Set(central.map(s=>s.centralSlot)).size, 120);
+for (let slot=0;slot<200;slot++) vm.runInContext(`spawnCentralPentagon(${slot})`, context);
+assert.equal(central.length, 200);
+assert.equal(new Set(central.map(s=>s.centralSlot)).size, 200);
 for (const s of central) {
   assert.equal(s.type, 'pentagon');
   assert.equal(s.centralCluster, true);
-  assert(Math.hypot(s.x-6300,s.y-6300)<900, 'pentagon escaped expanded central cluster');
+  assert(Math.hypot(s.x-6300,s.y-6300)<610, 'pentagon escaped restored dense central cluster');
 }
+const auto5Volley=vm.runInContext("evolutionShotsFromBase('auto5',27,1,{angle:0,side:0,damageMul:1,autoAimAngles:[.1,.2,.3,.4,.5]},0)",context);
+assert.equal(auto5Volley.length,5,'Auto 5 must fire all five turrets');
+assert.deepEqual(Array.from(auto5Volley,v=>v.angle),[.1,.2,.3,.4,.5],'Auto 5 turrets must use tracked target angles');
+assert(auto5Volley.every(v=>Number.isFinite(v.evoTurretOffsetX)&&Number.isFinite(v.evoTurretOffsetY)),'Auto 5 bullets must originate at turret mounts');
+assert(source.includes("input.keys.has('Space')||auto5Hunting"),'Auto 5 must fire without manual input while a target exists');
 context.running = true;
 context.player = {alive:true,x:6300,y:6300,r:27,angle:0,errorSwordMode:false,overclockUntil:0};
 context.worldToScreen = (x,y) => [x-5800,y-5800];
@@ -180,4 +186,4 @@ for (const id of data.themes) {
     assert(previewTrace.length>before,`${id} slot ${slot} rendered no range guide`);
   }
 }
-console.log(`Coverage OK: ${data.themes.length} cannons, ${data.evolutions.length} evolution bodies, 120 central pentagons`);
+console.log(`Coverage OK: ${data.themes.length} cannons, ${data.evolutions.length} evolution bodies, 200 central pentagons, Auto 5 tracking`);
