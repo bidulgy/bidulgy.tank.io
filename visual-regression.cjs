@@ -130,7 +130,9 @@ assert(authSource.includes("visibleCannons.filter(c=>c.id!=='gojo'||owned.has('g
 assert(authSource.includes(".filter(c=>c.id!=='amalgam'||owned.has('amalgam'))"),'Amalgam must be invisible until earned');
 assert(authSource.includes('els.adminCannonGrid.innerHTML=displayCannons().map'),'Admins must be able to grant and revoke Amalgam');
 assert(authSource.includes("if(currentUser)void refreshProfile().catch"),'Garage must refresh server-side admin grants before rendering choices');
-assert(authSource.includes('const singularityPriority={gojo:0,amalgam:1}'),'Owned singularity tanks must be pinned to the top of the garage');
+assert(authSource.includes("adminEnabled&&String(currentUsername).toLowerCase()==='bidulgy'"),'Verified owner must retain singularity choices while the profile cache refreshes');
+assert(authSource.includes('setAdminButtonVisible(true);\n        renderProfile();'),'Garage must rerender as soon as owner admin verification finishes');
+assert(!authSource.includes('const singularityPriority='),'Singularity tanks must remain at the bottom of the garage');
 assert(authSource.includes("client.rpc('iron_cell_admin_set_cannon_v2'"),'admin grants must use the verified Gojo-aware RPC');
 assert(authSource.includes('async function reportGojoDeath(')&&authSource.includes('async function confirmGojoKill('),'Gojo kill attestation client hooks are missing');
 assert(source.includes("victimCannon:defeatedCannon")&&source.includes('confirmGojoKill?.'),'Gojo PvP reward handshake is missing');

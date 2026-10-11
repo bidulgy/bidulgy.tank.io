@@ -623,6 +623,12 @@ function ownedCannons(){
   if(!owned&&typeof raw==='string'){try{const p=JSON.parse(raw);if(Array.isArray(p))owned=p}catch(_){}}
   owned=owned||['standard'];
   if(localGojoOwned()&&!owned.includes('gojo'))owned.push('gojo');
+  // The verified owner account has these grants in the database. Keep its
+  // singularity choices visible even while an older profile response is cached.
+  if(adminEnabled&&String(currentUsername).toLowerCase()==='bidulgy'){
+    if(!owned.includes('gojo'))owned.push('gojo');
+    if(!owned.includes('amalgam'))owned.push('amalgam');
+  }
   return owned;
 }
 function localGojoKey(){return `sworder_vs_tank_gojo_survival:${currentUser?.id||currentUsername||'guest'}`}
@@ -644,14 +650,8 @@ function renderCannonGarage(){
   if(els.deployCannonDesc)els.deployCannonDesc.textContent=equipped.desc;
   if(els.equippedCannonRarity){els.equippedCannonRarity.textContent=equipped.rarityLabel;els.equippedCannonRarity.className=`rarity ${equipped.rarity}`}
   if(els.miniCannon)els.miniCannon.className=`mini-cannon cannon-${equipped.id}`;
-  const singularityPriority={gojo:0,amalgam:1};
   const visibleCannons=displayCannons()
-    .filter(c=>c.id!=='amalgam'||owned.has('amalgam'))
-    .sort((a,b)=>{
-      const ap=owned.has(a.id)&&singularityPriority[a.id]!==undefined?singularityPriority[a.id]:99;
-      const bp=owned.has(b.id)&&singularityPriority[b.id]!==undefined?singularityPriority[b.id]:99;
-      return ap-bp;
-    });
+    .filter(c=>c.id!=='amalgam'||owned.has('amalgam'));
   if(els.cannonCount)els.cannonCount.textContent=`${visibleCannons.filter(c=>owned.has(c.id)).length} / ${visibleCannons.length}`;
   if(els.multiPullButtons?.length){
     const gems=Number(profile.gems||0);
@@ -781,6 +781,7 @@ async function refreshAdminAccess(){
 
       if(adminEnabled){
         setAdminButtonVisible(true);
+        renderProfile();
         return true;
       }
 
