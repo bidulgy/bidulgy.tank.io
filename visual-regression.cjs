@@ -154,6 +154,9 @@ const twinOffsets=[];
 vm.runInContext("drawEvolutionChassis({classType:'twin',cannonType:'scout'},27)",twinContext);
 assert.deepEqual(twinDraws,[['scout',27],['scout',27]],'Twin must retain two copies of the equipped cannon');
 assert.deepEqual(twinOffsets,[[0,-10],[0,10]],'Twin visuals must follow both firing lanes');
+twinDraws.length=0;twinOffsets.length=0;
+vm.runInContext("drawEvolutionChassis({classType:'tripleShot',cannonType:'scout'},27)",twinContext);
+assert.deepEqual(twinDraws,[['scout',27],['scout',27],['scout',27]],'Tier 2/3 evolution barrels must retain the equipped cannon appearance');
 context.WORLD = 12600;
 const central = [];
 context.spawnShape = type => { const shape = {type}; central.push(shape); return shape; };
@@ -165,11 +168,16 @@ for (const s of central) {
   assert.equal(s.centralCluster, true);
   assert(Math.hypot(s.x-6300,s.y-6300)<610, 'pentagon escaped restored dense central cluster');
 }
-const auto5Volley=vm.runInContext("evolutionShotsFromBase('auto5',27,1,{angle:0,side:0,damageMul:1,autoAimAngles:[.1,.2,.3,.4,.5]},0)",context);
+const auto5Volley=vm.runInContext("evolutionShotsFromBase('auto5',27,1,{angle:0,side:0,damageMul:1,autoAimAngles:[.1,.2,.3,.4,.5],autoAimReady:[true,true,true,true,true]},0)",context);
 assert.equal(auto5Volley.length,5,'Auto 5 must fire all five turrets');
 assert.deepEqual(Array.from(auto5Volley,v=>v.angle),[.1,.2,.3,.4,.5],'Auto 5 turrets must use tracked target angles');
 assert(auto5Volley.every(v=>Number.isFinite(v.evoTurretOffsetX)&&Number.isFinite(v.evoTurretOffsetY)),'Auto 5 bullets must originate at turret mounts');
+const auto5AlignedVolley=vm.runInContext("evolutionShotsFromBase('auto5',27,1,{angle:0,side:0,damageMul:1,autoAimAngles:[.1,.2,.3,.4,.5],autoAimReady:[true,false,false,false,false]},0)",context);
+assert.equal(auto5AlignedVolley.length,1,'Auto 5 must only fire turrets that have turned onto their target');
 assert(source.includes("input.keys.has('Space')||auto5Hunting"),'Auto 5 must fire without manual input while a target exists');
+assert(source.includes('angleLerp(current,desired')&&source.includes('updateAuto5Aim(player,dt)'),'Auto 5 turrets must rotate gradually instead of snapping');
+assert(source.includes('angles.push(current);ready.push(false)'),'Auto 5 turrets must hold position while no target is nearby');
+assert(source.includes("auto5AimAngles:player.classType==='auto5'"),'Auto 5 turret directions must sync to other players');
 context.running = true;
 context.player = {alive:true,x:6300,y:6300,r:27,angle:0,errorSwordMode:false,overclockUntil:0};
 context.worldToScreen = (x,y) => [x-5800,y-5800];

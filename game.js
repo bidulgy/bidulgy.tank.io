@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.08 · Amalgam world boss');
+console.info('[Sworder VS Tank] game V6.09 · inherited evolution cannons and smooth Auto 5');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -847,6 +847,7 @@ function upsertRemotePlayer(payload){
   r.name=String(payload.name||r.name||'PLAYER').slice(0,14);
   r.cannonType=String(payload.cannonType||r.cannonType||'standard');
   r.classType=String(payload.classType||r.classType||'basic');r.evolutionTier=Math.max(0,Math.floor(safeRemoteNumber(payload.evolutionTier,r.evolutionTier||0)));
+  r.auto5AimAngles=Array.isArray(payload.auto5AimAngles)?payload.auto5AimAngles.slice(0,5).map((value,index)=>safeRemoteNumber(value,r.auto5AimAngles?.[index]??r.angle)):null;
   r.fortress=payload.fortress===true;
   r.overclock=payload.overclock===true;
   r.swordMode=payload.swordMode===true;
@@ -895,7 +896,8 @@ function localNetworkState(){
     cloakUntilWall:performance.now()<(player.cloakUntil||0)?Date.now()+Math.max(0,(player.cloakUntil||0)-performance.now()):0,
     dekuSmokeUntilWall:performance.now()<(player.dekuSmokeUntil||0)?Date.now()+Math.max(0,(player.dekuSmokeUntil||0)-performance.now()):0,
     dekuFaJin:performance.now()<(player.dekuFaJinUntil||0),dekuGearshift:performance.now()<(player.dekuGearshiftUntil||0),
-    swordMode:player.cannonType==='error'&&player.errorSwordMode===true
+    swordMode:player.cannonType==='error'&&player.errorSwordMode===true,
+    auto5AimAngles:player.classType==='auto5'&&Array.isArray(player.auto5AimAngles)?player.auto5AimAngles.slice(0,5):null
   };
 }
 function sendOnline(event,payload){
@@ -2987,19 +2989,26 @@ function splitBasicCarrier(parent){
   return true;
 }
 
-function updateAuto5Aim(e){
-  if(!e||e.classType!=='auto5'){if(e){e.auto5AimAngles=null;e.auto5HasTarget=false}return false}
-  const specs=evolutionBarrelSpecs('auto5',e.r),angles=[];
-  let found=false;
-  for(const spec of specs){
+function updateAuto5Aim(e,dt=1/60){
+  if(!e||e.classType!=='auto5'){if(e){e.auto5AimAngles=null;e.auto5AimReady=null;e.auto5HasTarget=false}return false}
+  const specs=evolutionBarrelSpecs('auto5',e.r),previous=Array.isArray(e.auto5AimAngles)?e.auto5AimAngles:[],angles=[],ready=[];
+  let found=false,canFire=false;
+  for(const [index,spec] of specs.entries()){
     const mountAngle=e.angle+(spec.a||0);
     const tx=e.x+Math.cos(mountAngle)*e.r*.62,ty=e.y+Math.sin(mountAngle)*e.r*.62;
     const target=nearestSkillTarget(tx,ty,1100);
-    if(target){angles.push(Math.atan2(target.y-ty,target.x-tx));found=true}
-    else angles.push(mountAngle);
+    const current=Number.isFinite(previous[index])?previous[index]:mountAngle;
+    if(target){
+      const desired=Math.atan2(target.y-ty,target.x-tx);
+      const next=angleLerp(current,desired,Math.min(1,dt*1.65));
+      const delta=Math.abs(((desired-next+Math.PI)%TAU+TAU)%TAU-Math.PI);
+      angles.push(next);ready.push(delta<.16);found=true;canFire=canFire||delta<.16;
+    }else{
+      angles.push(current);ready.push(false);
+    }
   }
-  e.auto5AimAngles=angles;e.auto5HasTarget=found;
-  return found;
+  e.auto5AimAngles=angles;e.auto5AimReady=ready;e.auto5HasTarget=found;
+  return canFire;
 }
 
 function fire(e){
@@ -3126,7 +3135,10 @@ function fire(e){
     shot={angle:a,side:0,curve:0,damageMul:1,special:''};
   }
 
-  if(evoType==='auto5')shot.autoAimAngles=Array.isArray(e.auto5AimAngles)?e.auto5AimAngles:null;
+  if(evoType==='auto5'){
+    shot.autoAimAngles=Array.isArray(e.auto5AimAngles)?e.auto5AimAngles:null;
+    shot.autoAimReady=Array.isArray(e.auto5AimReady)?e.auto5AimReady:null;
+  }
 
   // V5.79: 진화체는 Diep.io의 실제 포신 수/방향/동시 또는 교대 발사 방식으로 발사한다.
   const volley=evolutionShotsFromBase(evoType,e.r,shotNo,shot,a);
@@ -3276,7 +3288,7 @@ function getRewindState(msAgo=4000){
 }
 
 function updatePlayer(dt){if(!player.alive)return;player.survivalSeconds=(player.survivalSeconds||0)+dt;if(!player.gojoSurvivalAwarded&&player.survivalSeconds>=1800){player.gojoSurvivalAwarded=true;window.IronCellAuth?.unlockLocalGojo?.()}refreshRealTimeSkillCooldowns();player.shapeContactCd=Math.max(0,(player.shapeContactCd||0)-dt);const p=playerParams(),stunned=performance.now()<(player.stunUntil||0);let mx=stunned?0:input.moveX,my=stunned?0:input.moveY;if(input.keys.has('KeyA')||input.keys.has('ArrowLeft'))mx-=1;if(input.keys.has('KeyD')||input.keys.has('ArrowRight'))mx+=1;if(input.keys.has('KeyW')||input.keys.has('ArrowUp'))my-=1;if(input.keys.has('KeyS')||input.keys.has('ArrowDown'))my+=1;if(mx||my){[mx,my]=norm(mx,my);player.vx+=mx*p.move*dt*5.2;player.vy+=my*p.move*dt*5.2}const aimWorld=screenToWorldPoint(input.mouseX,input.mouseY),normalAimAngle=Math.atan2(aimWorld[1]-player.y,aimWorld[0]-player.x);
-player.angle=heldSkillAim.active&&Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:normalAimAngle;let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);if(!heldSkillAim.active){const postMoveAim=screenToWorldPoint(input.mouseX,input.mouseY);player.angle=Math.atan2(postMoveAim[1]-player.y,postMoveAim[0]-player.x)}player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);const auto5Hunting=!stunned&&updateAuto5Aim(player);if(!stunned&&(input.firing||input.keys.has('Space')||auto5Hunting))fire(player);handleShapeContact();if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}recordPlayerHistory()
+player.angle=heldSkillAim.active&&Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:normalAimAngle;let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);if(!heldSkillAim.active){const postMoveAim=screenToWorldPoint(input.mouseX,input.mouseY);player.angle=Math.atan2(postMoveAim[1]-player.y,postMoveAim[0]-player.x)}player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);const auto5Hunting=!stunned&&updateAuto5Aim(player,dt);if(!stunned&&(input.firing||input.keys.has('Space')||auto5Hunting))fire(player);handleShapeContact();if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}recordPlayerHistory()
 function updateShapes(dt){
   const host=isWorldHost();
 
@@ -4548,7 +4560,7 @@ function evolutionShotsFromBase(type,r,shotNo,baseShot,baseAngle){
   if(volley.length===1&&volley[0]===null)return[{...baseShot}];
   const originalAngle=Number.isFinite(baseShot.angle)?baseShot.angle:baseAngle;
   const localShotOffset=originalAngle-baseAngle;
-  return volley.map((m,index)=>{
+  const shots=volley.map((m,index)=>{
     const shot={...baseShot};
     if(Array.isArray(baseShot.splitPattern))shot.splitPattern=baseShot.splitPattern.map(v=>({...v}));
     shot.angle=baseAngle+(m.a||0)+localShotOffset;
@@ -4567,6 +4579,7 @@ function evolutionShotsFromBase(type,r,shotNo,baseShot,baseAngle){
     shot.evoRecoilScale=Number(m.recoilScale)||1;
     return shot;
   });
+  return type==='auto5'&&Array.isArray(baseShot.autoAimReady)?shots.filter((_,index)=>baseShot.autoAimReady[index]===true):shots;
 }
 function drawEvolutionChassis(e,r){
   const type=e.classType||'basic';if(type==='basic')return;
@@ -4598,18 +4611,24 @@ function drawEvolutionChassis(e,r){
     ctx.globalAlpha=barrelAlpha;
     ctx.restore();
   };
+  const drawInheritedBarrel=(spec)=>{
+    ctx.save();ctx.rotate(spec.a||0);ctx.translate(0,spec.side||0);
+    ctx.scale(Math.max(.68,Number(spec.len)||1),Math.max(.62,Number(spec.w)||1));
+    drawPlayerCannon(e.cannonType||'standard',r);
+    ctx.restore();
+  };
   const drawRimAuto=(spec,index)=>{
     const a=spec.a||0,tx=Math.cos(a)*r*.62,ty=Math.sin(a)*r*.62;
     const tracked=Number.isFinite(e.auto5AimAngles?.[index])?e.auto5AimAngles[index]-e.angle:a;
     ctx.save();ctx.translate(tx,ty);ctx.rotate(tracked);
+    ctx.save();ctx.scale(.58,.58);drawPlayerCannon(e.cannonType||'standard',r);ctx.restore();
     ctx.fillStyle='#cfd9e1';ctx.strokeStyle='#536273';ctx.lineWidth=2;
-    ctx.fillRect(1,-4,r*.88,8);ctx.strokeRect(1,-4,r*.88,8);
-    ctx.fillStyle=glow;ctx.fillRect(r*.76,-2.5,r*.12,5);
     ctx.beginPath();ctx.arc(0,0,8.5,0,TAU);ctx.fillStyle='#cfd9e1';ctx.fill();ctx.stroke();
     ctx.restore();
   };
   const drawCenterAuto=(a=0)=>{
     ctx.save();ctx.rotate(a);
+    ctx.save();ctx.scale(.56,.56);drawPlayerCannon(e.cannonType||'standard',r);ctx.restore();
     ctx.fillStyle='#d8e1e8';ctx.strokeStyle='#526171';ctx.lineWidth=2;
     ctx.beginPath();ctx.arc(0,0,8,0,TAU);ctx.fill();ctx.stroke();
     ctx.fillRect(2,-3,r*.64,6);ctx.strokeRect(2,-3,r*.64,6);
@@ -4628,7 +4647,7 @@ function drawEvolutionChassis(e,r){
     }
     if(spec.kind==='rimAuto')drawRimAuto(spec,specIndex);
     else if(spec.kind==='centerAuto')drawCenterAuto(spec.a||0);
-    else drawBarrel(spec);
+    else drawInheritedBarrel(spec);
   }
   // Auto Gunner / Auto Trapper have their normal weaponry plus exactly one center auto turret.
   if(type==='autoGunner'||type==='autoTrapper')drawCenterAuto(-.58);
