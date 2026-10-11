@@ -128,6 +128,7 @@ assert(source.includes("drawCannonSignature(f.cannon,t+q*2"));
 assert(source.includes("spawnCombatFx('gojoInfinityShot'"),'Gojo basic attacks need their own visible cast effect');
 assert(authSource.includes("visibleCannons.filter(c=>c.id!=='gojo'||owned.has('gojo'))"),'Gojo must stay hidden until earned');
 assert(authSource.includes("displayCannons().filter(c=>c.id!=='amalgam'||owned.has('amalgam'))"),'Amalgam must be invisible until earned');
+assert(authSource.includes('els.adminCannonGrid.innerHTML=displayCannons().map'),'Admins must be able to grant and revoke Amalgam');
 assert(authSource.includes("client.rpc('iron_cell_admin_set_cannon_v2'"),'admin grants must use the verified Gojo-aware RPC');
 assert(authSource.includes('async function reportGojoDeath(')&&authSource.includes('async function confirmGojoKill('),'Gojo kill attestation client hooks are missing');
 assert(source.includes("victimCannon:defeatedCannon")&&source.includes('confirmGojoKill?.'),'Gojo PvP reward handshake is missing');

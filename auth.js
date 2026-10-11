@@ -715,7 +715,7 @@ function adminFriendlyError(error){
 }
 function renderAdminCannons(){
   if(!els.adminCannonGrid)return;
-  els.adminCannonGrid.innerHTML=displayCannons().filter(c=>c.id!=='amalgam').map(c=>`
+  els.adminCannonGrid.innerHTML=displayCannons().map(c=>`
     <div class="admin-cannon-item">
       <strong><span class="rarity ${c.rarity}">${c.rarityLabel}</span> ${c.name}</strong>
       <div class="admin-cannon-buttons">
