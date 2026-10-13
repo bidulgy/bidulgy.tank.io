@@ -1,9 +1,9 @@
 (() => {
 'use strict';
-const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
+const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false,desynchronized:true});
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.28 · restored Reflective Gauntlet and unique defensive forms');
+console.info('[Sworder VS Tank] game V6.29 · skill fire isolation and low-latency canvas');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -2132,8 +2132,11 @@ function spawnErrorSwordWave(angle,damageMul=1,opts={}){
   bullets.push(b);broadcastShot(b);
   return b;
 }
+function suppressBasicAttack(ms=460){
+  if(player)player.basicAttackSuppressedUntil=Math.max(player.basicAttackSuppressedUntil||0,performance.now()+ms);
+}
 function activateSkill3(){
-  if(!running||paused||!player?.alive)return;const cannon=player.cannonType||'standard';if(cannon!=='error'&&cannon!=='deku')return;
+  if(!running||paused||!player?.alive)return;const cannon=player.cannonType||'standard';if(cannon!=='error'&&cannon!=='deku')return;suppressBasicAttack();
   refreshRealTimeSkillCooldowns();if(player.skill3Cd>0)return;const now=performance.now(),wallNow=Date.now(),a=player.angle,p=playerParams();
   if(cannon==='deku'){player.skill3Cd=DEKU_T_SKILL.cooldown;player.skill3Max=DEKU_T_SKILL.cooldown;player.skill3ReadyAt=wallNow+DEKU_T_SKILL.cooldown*1000;player.dekuFaJinUntil=now+7000;player.vx+=Math.cos(a)*190;player.vy+=Math.sin(a)*190;spawnCombatFx('dekuFaJin',player.x,player.y,{angle:a,color:'#baff70',life:1.35,radius:185,cannon:'deku'});burst(player.x,player.y,'#baff70',28);sendUniqueSkill(cannon,'dekuFaJin',{radius:185,life:1.35});broadcastLocalState(true);updateSkillHud();return}
   if(player.errorQCharging)cancelErrorQCharge();const ox=player.x,oy=player.y;
@@ -2176,7 +2179,7 @@ function activateSkill3(){
 
 
 function activateSkill4(){
-  if(!running||paused||!player?.alive||player.cannonType!=='deku')return;refreshRealTimeSkillCooldowns();if(player.skill4Cd>0)return;
+  if(!running||paused||!player?.alive||player.cannonType!=='deku')return;refreshRealTimeSkillCooldowns();if(player.skill4Cd>0)return;suppressBasicAttack();
   const now=performance.now(),wallNow=Date.now();player.skill4Cd=DEKU_Y_SKILL.cooldown;player.skill4Max=DEKU_Y_SKILL.cooldown;player.skill4ReadyAt=wallNow+DEKU_Y_SKILL.cooldown*1000;player.dekuGearshiftUntil=now+7000;
   spawnCombatFx('dekuGearshift',player.x,player.y,{angle:player.angle,color:'#80efff',life:1.55,radius:220,cannon:'deku'});burst(player.x,player.y,'#bffcff',32);sendUniqueSkill('deku','dekuGearshift',{radius:220,life:1.55});broadcastLocalState(true);updateSkillHud();
 }
@@ -2199,6 +2202,7 @@ function castAmalgamSkill(slot){
   if(!running||paused||!player?.alive||player.cannonType!=='amalgam')return false;
   const id=player.amalgamSkills?.[slot],def=AMALGAM_SKILLS[id];if(!def)return false;
   const now=Date.now();if(now<(player.amalgamSkillReadyAt?.[slot]||0))return false;
+  suppressBasicAttack();
   if(id==='phaseDash'&&!player.amalgamAnchor){
     player.amalgamAnchor={x:player.x,y:player.y,hp:player.hp};
     addSkillZone('phantomAssassinMark',{x:player.x,y:player.y,radius:105,life:999,damage:0,data:{mark:'origin',amalgamAnchor:true}});
@@ -2481,6 +2485,7 @@ function castGojoSkill(kind,target=null){
   refreshRealTimeSkillCooldowns();
   if((kind==='ao'||kind==='purple')&&player.skillCd>0)return false;
   if((kind==='aka'||kind==='purple')&&player.skill2Cd>0)return false;
+  suppressBasicAttack();
   const wall=Date.now(),p=playerParams(),a=player.angle;
   const qCd=kind==='purple'?30:CANNON_SKILLS.gojo.cooldown;
   const eCd=kind==='purple'?30:CANNON_SKILLS_2.gojo.cooldown;
@@ -2568,6 +2573,7 @@ function detonatePhantomMarks(){
 
 function activateSkill(errorChargeRatio=0,aimOverride=null){
   if(!running||paused||!player?.alive)return;
+  suppressBasicAttack();
   if(player.cannonType==='gojo'){castGojoSkill('ao');return}
   const cannon=player.cannonType||'standard',skillCannon=cannonQBehavior(cannon),def=CANNON_SKILLS[cannon];
   if(cannon==='phantom'&&phantomMarkCanReturn()){detonatePhantomMarks();return;}
@@ -2813,6 +2819,7 @@ function sniperAcquirePlayerTarget(angle,maxRange=3200){
 // V5.79: sniper basic homing helpers removed; only the R skill can home.
 function activateSkill2(){
   if(!running||paused||!player?.alive)return;
+  suppressBasicAttack();
   if(player.cannonType==='gojo'){castGojoSkill('aka');return}
   const cannon=player.cannonType||'standard',skill2Cannon=cannonRBehavior(cannon),def=CANNON_SKILLS_2[cannon];if(!def)return;
   refreshRealTimeSkillCooldowns();const now=performance.now(),wallNow=Date.now(),a=player.angle,p=playerParams();
@@ -3172,7 +3179,7 @@ function updateAuto5Aim(e,dt=1/60){
 }
 
 function fire(e){
-  if(e!==player||e.fireCd>0)return;
+  if(e!==player||e.fireCd>0||performance.now()<(e.basicAttackSuppressedUntil||0))return;
   const a=e.angle,p=playerParams();e.fireCd=p.reload;
   const cannon=e.cannonType||'standard';
   const baseCannon=cannonBaseBehavior(cannon);
@@ -3448,7 +3455,7 @@ function getRewindState(msAgo=4000){
 }
 
 function updatePlayer(dt){if(!player.alive)return;player.survivalSeconds=(player.survivalSeconds||0)+dt;if(!player.gojoSurvivalAwarded&&player.survivalSeconds>=1800){player.gojoSurvivalAwarded=true;window.IronCellAuth?.unlockLocalGojo?.()}refreshRealTimeSkillCooldowns();player.shapeContactCd=Math.max(0,(player.shapeContactCd||0)-dt);const p=playerParams(),stunned=performance.now()<(player.stunUntil||0);let mx=stunned?0:input.moveX,my=stunned?0:input.moveY;if(input.keys.has('KeyA')||input.keys.has('ArrowLeft'))mx-=1;if(input.keys.has('KeyD')||input.keys.has('ArrowRight'))mx+=1;if(input.keys.has('KeyW')||input.keys.has('ArrowUp'))my-=1;if(input.keys.has('KeyS')||input.keys.has('ArrowDown'))my+=1;if(mx||my){[mx,my]=norm(mx,my);player.vx+=mx*p.move*dt*5.2;player.vy+=my*p.move*dt*5.2}const aimWorld=screenToWorldPoint(input.mouseX,input.mouseY),normalAimAngle=Math.atan2(aimWorld[1]-player.y,aimWorld[0]-player.x);
-player.angle=heldSkillAim.active&&Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:normalAimAngle;let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);if(!heldSkillAim.active){const postMoveAim=screenToWorldPoint(input.mouseX,input.mouseY);player.angle=Math.atan2(postMoveAim[1]-player.y,postMoveAim[0]-player.x)}player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);const auto5Hunting=!stunned&&updateAuto5Aim(player,dt);if(!stunned&&(input.firing||input.keys.has('Space')||auto5Hunting))fire(player);handleShapeContact();if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}recordPlayerHistory()
+player.angle=heldSkillAim.active&&Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:normalAimAngle;let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);if(!heldSkillAim.active){const postMoveAim=screenToWorldPoint(input.mouseX,input.mouseY);player.angle=Math.atan2(postMoveAim[1]-player.y,postMoveAim[0]-player.x)}player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);const skillBlockingFire=performance.now()<(player.basicAttackSuppressedUntil||0),auto5Hunting=!stunned&&!skillBlockingFire&&updateAuto5Aim(player,dt);if(!stunned&&!skillBlockingFire&&(input.firing||input.keys.has('Space')||auto5Hunting))fire(player);handleShapeContact();if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}recordPlayerHistory()
 function updateShapes(dt){
   const host=isWorldHost();
 
@@ -4251,10 +4258,13 @@ const frameViewBounds={left:0,right:0,top:0,bottom:0};
 function refreshFrameViewBounds(){const s=sniperViewScale(),hw=innerWidth/(2*s),hh=innerHeight/(2*s),cx=innerWidth/2,cy=innerHeight/2;frameViewBounds.left=cx-hw;frameViewBounds.right=cx+hw;frameViewBounds.top=cy-hh;frameViewBounds.bottom=cy+hh}
 function drawGrid(){const b=frameViewBounds,pad=80,left=b.left-pad,right=b.right+pad,top=b.top-pad,bottom=b.bottom+pad;ctx.fillStyle='#ffffff';ctx.fillRect(left,top,right-left,bottom-top);let sx=-(camera.x%GRID),sy=-(camera.y%GRID);while(sx>left)sx-=GRID;while(sy>top)sy-=GRID;ctx.strokeStyle='rgba(31,61,88,.09)';ctx.lineWidth=1;ctx.beginPath();for(let x=sx;x<right;x+=GRID){ctx.moveTo(x,top);ctx.lineTo(x,bottom)}for(let y=sy;y<bottom;y+=GRID){ctx.moveTo(left,y);ctx.lineTo(right,y)}ctx.stroke()}
 function polygon(x,y,r,sides,a){ctx.beginPath();for(let i=0;i<sides;i++){const q=a+i*TAU/sides,px=x+Math.cos(q)*r,py=y+Math.sin(q)*r;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)}ctx.closePath()}
-let renderPressure=0;
+let renderPressure=0,frameWorkMs=0;
 function updateRenderPressure(){
   const load=bullets.length+particles.length*.70+combatFx.length*1.6+skillZones.length*2.2;
-  renderPressure=load>820?2:load>480?1:0;
+  // Object count alone missed costly full-screen blurs. Frame work time also
+  // activates the existing duplicate-particle/signature limiter while the
+  // core skill geometry, weapon models and animation remain intact.
+  renderPressure=load>820||frameWorkMs>27?2:load>480||frameWorkMs>18?1:0;
 }
 function screenVisibleWorld(x,y,pad=100){
   const sx=x-camera.x,sy=y-camera.y,b=frameViewBounds;
@@ -6490,6 +6500,7 @@ function logFrameRecovery(kind,error){
   }
 }
 function frame(now){
+  const workStarted=performance.now();
   const dt=Math.min(.032,(now-last)/1000||0);
   last=now;
 
@@ -6498,6 +6509,9 @@ function frame(now){
     try{update(dt)}catch(error){logFrameRecovery('update',error)}
   }
   try{render()}catch(error){logFrameRecovery('render',error)}
+
+  const workCost=performance.now()-workStarted;
+  frameWorkMs=frameWorkMs?frameWorkMs*.88+workCost*.12:workCost;
 
   requestAnimationFrame(frame);
 }

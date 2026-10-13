@@ -70,6 +70,9 @@ assert(source.includes("f.type==='amalgamWorldBlade'")&&source.includes("ctx.rot
 assert(source.includes("const motif=(CANNON_VISUAL_INDEX[f.cannon]??0)%6"),'Generic skill effects must split into cannon-specific motion families');
 assert(!source.includes("f.type==='uniqueSkill'){\n      ctx.strokeStyle=f.color;ctx.lineWidth=5*p+1"),'The old circle-and-cross-line skill effect must stay removed');
 assert(source.includes("e.code==='KeyG'||String(e.key||'').toLowerCase()==='g'"),'Desktop Amalgam fourth skill must use G');
+assert(source.includes('function suppressBasicAttack(ms=460)')&&source.includes('skillBlockingFire'),'Skill activation must suppress basic and Auto 5 fire');
+assert(source.includes("canvas.getContext('2d',{alpha:false,desynchronized:true})"),'Canvas should request the low-latency opaque rendering path');
+assert(source.includes('frameWorkMs>27')&&source.includes('frameWorkMs>18'),'Render pressure must detect expensive frames even with few effects');
 assert(source.includes("['Q','R','T','G'][i]"),'Amalgam HUD must label the fourth skill as G');
 assert(source.includes("keys=['Q','R','T','G']"),'Amalgam replacement choices must label the fourth slot as G');
 assert(source.includes("if(player?.cannonType==='amalgam'){castAmalgamSkill(slot-1);return}"),'Mobile Amalgam skill buttons must cast on pointer down');
