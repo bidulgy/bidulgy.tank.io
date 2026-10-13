@@ -27,7 +27,7 @@ vm.runInContext([
   section('function evolutionShotsFromBase(', 'function drawEvolutionChassis('),
   section('function drawVariantProjectile(', 'function drawUniqueProjectile('),
   section('function drawProjectileEnergy(', 'function drawBullets('),
-  section('function skillAimSpec(', 'function aimPal('),
+  section('function amalgamSkillAimSpec(', 'function aimPal('),
   section('function aimPal(', 'function drawAimGuides('),
   section('function skillRuneColor(', 'function drawSkillZones('),
   section('function centralPentagonPoint(', 'function minDistanceToActiveAnchors(')
@@ -49,10 +49,16 @@ assert.equal(data.themes.length, 48, 'all 48 cannon themes must remain');
 assert.equal(vm.runInContext('Object.keys(AMALGAM_SKILLS).length',context),15,'Amalgam needs fifteen draftable skills');
 assert.equal(vm.runInContext('Object.values(AMALGAM_SKILLS).every((_,i,a)=>true)&&Object.values(AMALGAM_SKILLS).filter(s=>s.rarity==="common").length',context),3,'Amalgam needs three common skills');
 for(const rarity of ['rare','epic','legendary','mythic'])assert.equal(vm.runInContext(`Object.values(AMALGAM_SKILLS).filter(s=>s.rarity===${JSON.stringify(rarity)}).length`,context),3,`Amalgam needs three ${rarity} skills`);
+assert.equal(vm.runInContext('AMALGAM_RARITY_POWER.mythic > AMALGAM_RARITY_POWER.legendary && AMALGAM_RARITY_POWER.legendary > AMALGAM_RARITY_POWER.epic && AMALGAM_RARITY_POWER.epic > AMALGAM_RARITY_POWER.rare && AMALGAM_RARITY_POWER.rare > AMALGAM_RARITY_POWER.common',context),true,'Amalgam skill power must rise at every rarity');
 assert(source.includes("if(player?.cannonType==='amalgam'){hideEvolutionPanel();return}"),'Amalgam must never open evolution choices');
 assert(source.includes('while((isAmalgam||player.level<45)'), 'Amalgam must have no level cap');
 assert(source.includes('if(isAmalgam)queueAmalgamDraft(player.level)'), 'Amalgam must draft a skill on level milestones');
 assert(source.includes("if(level<3||level%3!==0)return"),'Amalgam drafts must occur every three levels');
+assert(source.includes("!['deku','amalgam'].includes(player?.cannonType)"),'Amalgam Y aiming must not be cancelled by the Deku-only legacy guard');
+assert(source.includes("if(player?.cannonType==='amalgam')castAmalgamSkill(3)"),'Amalgam Y must activate directly from the keyboard');
+assert(source.includes("if(cannon==='amalgam')return amalgamSkillAimSpec(slot)"),'Every Amalgam skill slot must use its own aim preview');
+context.player.amalgamSkills=['shardVolley','gravityWell','thunderLance','worldSever'];
+assert.deepEqual([1,2,3,4].map(slot=>vm.runInContext(`skillAimSpec('amalgam',${slot}).type`,context)),['cone','target','line','line'],'Amalgam Q/R/T/Y need distinct active aim previews');
 assert(data.themes.includes('gojo'),'Gojo needs a dedicated tank theme');
 assert(authSource.includes("id:'gojo',name:'고죠',rarity:'singularity'"),'Gojo must be Singularity');
 assert(authSource.includes("c.id==='gojo'?'한 전투 생존 30분 해금 · 뽑기 제외'"),'Gojo must not appear as a gacha drop');
@@ -74,6 +80,7 @@ const variantTraces = new Set();
 for (const id of data.themes) {
   assert(data.shapes.includes(id), `${id} missing projectile shape`);
   assert(data.skills.includes(id), `${id} missing skill`);
+  if(id==='amalgam')context.player.amalgamSkills=['shardVolley','gravityWell','thunderLance','worldSever'];
   const qAim = vm.runInContext(`skillAimSpec(${JSON.stringify(id)},1)`, context);
   assert(qAim && qAim.type, `${id} missing Q skill range preview`);
   if (data.secondSkills.includes(id)) {
@@ -214,6 +221,7 @@ context.ctx = new Proxy({}, {
 });
 for (const id of data.themes) {
   context.player.cannonType=id;
+  if(id==='amalgam')context.player.amalgamSkills=['shardVolley','gravityWell','thunderLance','worldSever'];
   for (const slot of [1,...(data.secondSkills.includes(id)?[2]:[])]) {
     context.heldSkillAim={active:true,slot,angle:0};
     const before=previewTrace.length;

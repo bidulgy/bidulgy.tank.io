@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.18 · Amalgam infinite adaptive skill progression');
+console.info('[Sworder VS Tank] game V6.19 · distinct tier-scaled Amalgam skills and Y fix');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -218,6 +218,7 @@ const AMALGAM_SKILLS=Object.freeze({
   genesisShield:{name:'창세의 방패',rarity:'mythic',rarityLabel:'신화',cooldown:36,color:'#ffe99b',desc:'회복과 공격 강화를 주는 절대 보호막 전개'}
 });
 const AMALGAM_RARITY_ORDER=Object.freeze({common:0,rare:1,epic:2,legendary:3,mythic:4});
+const AMALGAM_RARITY_POWER=Object.freeze({common:1,rare:1.7,epic:2.8,legendary:4.5,mythic:7});
 const TANK_THEMES=Object.freeze({
   standard:{body:'#55a7ff',edge:'#2868ad',glow:'#68b8ff'},
   scout:{body:'#39bfe7',edge:'#19708b',glow:'#77ecff'},
@@ -1407,7 +1408,7 @@ function renderAmalgamDraft(){
     const actions=full
       ? `<div class="amalgam-replace">${keys.map((key,i)=>`<button type="button" data-skill="${id}" data-slot="${i}">${key} 교체</button>`).join('')}</div>`
       : `<button class="amalgam-learn" type="button" data-skill="${id}" data-slot="${player.amalgamSkills.length}">습득</button>`;
-    return `<article class="amalgam-choice rarity-${s.rarity}"><span>${s.rarityLabel}</span><strong>${s.name}</strong><p>${s.desc}</p>${actions}</article>`;
+    return `<article class="amalgam-choice rarity-${s.rarity}"><span>${s.rarityLabel} · POWER ×${AMALGAM_RARITY_POWER[s.rarity].toFixed(1)}</span><strong>${s.name}</strong><p>${s.desc}</p>${actions}</article>`;
   }).join('');
   panel.querySelectorAll('[data-skill][data-slot]').forEach(button=>button.onclick=()=>{
     const id=button.dataset.skill,slot=Number(button.dataset.slot);
@@ -1566,7 +1567,7 @@ function playerParams(){
     else player.bloodlustFrenzyUntil=0;
   }else player.bloodlustFrenzyUntil=0;
   if(now<(player.fortressUntil||0)){move*=.70}
-  if(now<(player.overclockUntil||0)){move*=1.85}
+  if(now<(player.overclockUntil||0)){move*=1.85;if(cannon==='amalgam'){damage*=1.65;bulletSpeed*=1.25;reload*=.58}}
   if(now<(player.siegeUntil||0)){damage*=1.55;reload*=.48;bulletSpeed*=1.12;move*=.34}
   if(cannon!=='sniper')player.sniperScopeUntil=0;
   if(cannon==='deku'){
@@ -2182,40 +2183,39 @@ function castAmalgamSkill(slot){
   const id=player.amalgamSkills?.[slot],def=AMALGAM_SKILLS[id];if(!def)return false;
   const now=Date.now();if(now<(player.amalgamSkillReadyAt?.[slot]||0))return false;
   player.amalgamSkillReadyAt[slot]=now+def.cooldown*1000;
-  const a=player.angle,p=playerParams(),[tx,ty]=skillAimPoint(560);
+  const a=player.angle,p=playerParams(),tier=AMALGAM_RARITY_POWER[def.rarity]||1,[tx,ty]=skillAimPoint(560);
   if(id==='shardVolley'){
-    for(let i=-3;i<=3;i++)skillProjectile('amalgam',a+i*.105,{damageMul:.72,speedMul:1.18,life:2.2,pierce:2,splashRadius:28});
+    for(let i=-3;i<=3;i++)skillProjectile('amalgam',a+i*.105,{damageMul:.72*tier,speedMul:1.18,life:2.2,pierce:2,splashRadius:28});spawnCombatFx('shotgunBlast',player.x,player.y,{angle:a,color:def.color,life:.48,radius:430,cannon:'amalgam'});
   }else if(id==='phaseDash'){
     const ox=player.x,oy=player.y,[dx,dy]=skillAimPoint(720),aa=Math.atan2(dy-oy,dx-ox),len=Math.hypot(dx-ox,dy-oy);
-    skillAreaDamage(ox,oy,120,p.damage*1.5,def.color);player.x=dx;player.y=dy;player.phaseUntil=performance.now()+520;skillAreaDamage(dx,dy,145,p.damage*2.2,def.color);spawnCombatFx('dimensionRift',ox,oy,{angle:aa,color:def.color,life:.75,radius:len,cannon:'amalgam'});broadcastLocalState(true);
+    skillAreaDamage(ox,oy,120,p.damage*1.5*tier,def.color);player.x=dx;player.y=dy;player.phaseUntil=performance.now()+520;skillAreaDamage(dx,dy,145,p.damage*2.2*tier,def.color);spawnCombatFx('dimensionRift',ox,oy,{angle:aa,color:def.color,life:.75,radius:len,cannon:'amalgam'});broadcastLocalState(true);
   }else if(id==='repairPulse'){
-    player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.30);skillAreaDamage(player.x,player.y,230,p.damage*1.25,def.color);burst(player.x,player.y,def.color,28);
+    player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.34);player.fortressUntil=performance.now()+2600;burst(player.x,player.y,def.color,36);spawnCombatFx('stellarRevive',player.x,player.y,{angle:0,color:def.color,life:1.2,radius:180,cannon:'amalgam'});
   }else if(id==='gravityWell'){
-    addSkillZone('gravity',{x:tx,y:ty,radius:360,life:5.2,damage:p.damage*.28,tick:0});
+    addSkillZone('gravity',{x:tx,y:ty,radius:390,life:5.8,damage:p.damage*.36*tier,tick:0});spawnCombatFx('abyssCast',tx,ty,{angle:0,color:def.color,life:1.1,radius:390,cannon:'amalgam'});
   }else if(id==='frostNova'){
-    addSkillZone('frostPrison',{x:tx,y:ty,radius:350,life:5.8,damage:p.damage*.55,tick:0});
+    for(let i=0;i<12;i++)skillProjectile('amalgam',i*TAU/12,{damageMul:.62*tier,speedMul:.72,life:1.45,pierce:4,r:11,special:'frostShard'});addSkillZone('frostPrison',{x:player.x,y:player.y,radius:310,life:4.8,damage:p.damage*.34*tier,tick:0});burst(player.x,player.y,def.color,42);
   }else if(id==='sentryRing'){
-    addSkillZone('twinDrones',{x:player.x,y:player.y,radius:155,life:8.0,tick:0,data:{next:0}});
+    addSkillZone('starOrbit',{x:player.x,y:player.y,radius:185,life:9.5,damage:p.damage*.54*tier,tick:0,data:{next:0}});spawnCombatFx('oracleEye',player.x,player.y,{angle:a,color:def.color,life:1,radius:210,cannon:'amalgam'});
   }else if(id==='thunderLance'){
-    damageSkillLine(player.x,player.y,a,1450,44,p.damage*8.0,def.color,160);spawnCombatFx('rail',player.x,player.y,{angle:a,color:def.color,life:.48,radius:1450,cannon:'amalgam'});
+    damageSkillLine(player.x,player.y,a,1650,48,p.damage*4.2*tier,def.color,190);for(let k=1;k<=5;k++){const x=player.x+Math.cos(a)*k*260,y=player.y+Math.sin(a)*k*260;spawnCombatFx('uniqueSkill',x,y,{angle:a,color:def.color,life:.35,radius:80,cannon:'thunder'})}spawnCombatFx('rail',player.x,player.y,{angle:a,color:def.color,life:.58,radius:1650,cannon:'amalgam'});
   }else if(id==='mirrorClones'){
-    for(let k=-1;k<=1;k++){const side=k*95,x=player.x-Math.sin(a)*side,y=player.y+Math.cos(a)*side;for(let j=-1;j<=1;j++)spawnSkillProjectileAt('amalgam',x,y,a+j*.07,{damageMul:1.35,speedMul:1.28,life:2.7,pierce:5,r:10,special:'mirrorPacket'})}
+    for(let k=-1;k<=1;k++){const side=k*110,x=player.x-Math.sin(a)*side,y=player.y+Math.cos(a)*side;spawnCombatFx('mirrorWorldCast',x,y,{angle:a,color:def.color,life:1.1,radius:90,cannon:'mirror'});for(let j=-2;j<=2;j++)spawnSkillProjectileAt('amalgam',x,y,a+j*.075,{damageMul:.70*tier,speedMul:1.30,life:3,pierce:7,r:10,special:'mirrorPacket'})}
   }else if(id==='meteorBrand'){
-    addSkillZone('missileRain',{x:tx,y:ty,radius:390,life:6.2,damage:p.damage*2.4,tick:0,data:{next:.10,count:0}});
+    addSkillZone('missileRain',{x:tx,y:ty,radius:420,life:6.8,damage:p.damage*.92*tier,tick:0,data:{next:.08,count:0}});spawnCombatFx('uniqueSkill',tx,ty,{angle:Math.PI/2,color:def.color,life:1.2,radius:420,cannon:'rocket'});
   }else if(id==='singularityCore'){
-    addSkillZone('polarityCrush',{x:tx,y:ty,radius:470,life:6.0,damage:p.damage*.62,tick:0});
+    addSkillZone('polarityCrush',{x:tx,y:ty,radius:520,life:7.0,damage:p.damage*.32*tier,tick:0});addSkillZone('supernovaCore',{x:tx,y:ty,radius:360,life:7.1,damage:p.damage*2.2*tier,data:{detonateAt:.12}});spawnCombatFx('abyssCast',tx,ty,{angle:0,color:def.color,life:1.6,radius:520,cannon:'void'});
   }else if(id==='chronoBreak'){
-    addSkillZone('timeField',{x:tx,y:ty,radius:420,life:6.0,damage:0,tick:0});for(let k=0;k<4;k++)addSkillZone('threeFates',{x:tx,y:ty,radius:145+k*70,life:.8+k*.55,damage:p.damage*(2.0+k*.6),data:{detonateAt:.10}});
+    addSkillZone('timeField',{x:tx,y:ty,radius:470,life:7.5,damage:0,tick:0});for(let k=0;k<5;k++)addSkillZone('threeFates',{x:tx,y:ty,radius:130+k*75,life:.65+k*.48,damage:p.damage*(.55+k*.16)*tier,data:{detonateAt:.10}});spawnCombatFx('fateCast',tx,ty,{angle:0,color:def.color,life:1.4,radius:470,cannon:'chrono'});
   }else if(id==='phoenixCore'){
-    player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.55);player.stellarReviveUntil=performance.now()+15000;player.stellarReviveReady=true;addSkillZone('secondStar',{x:player.x,y:player.y,radius:170,life:15,damage:0,tick:0});
+    player.hp=player.maxHp;player.stellarReviveUntil=performance.now()+20000;player.stellarReviveReady=true;player.overclockUntil=performance.now()+9000;addSkillZone('secondStar',{x:player.x,y:player.y,radius:190,life:20,damage:0,tick:0});spawnCombatFx('stellarRevive',player.x,player.y,{angle:0,color:def.color,life:2.1,radius:330,cannon:'stellar'});
   }else if(id==='worldSever'){
-    const length=distanceToWorldEdge(player.x,player.y,a,60);damageSkillLine(player.x,player.y,a,length,110,p.damage*15,def.color,0);spawnCombatFx('rail',player.x,player.y,{angle:a,color:def.color,life:.72,radius:length,cannon:'amalgam'});shake=Math.max(shake,24);
+    const length=distanceToWorldEdge(player.x,player.y,a,60);damageSkillLine(player.x,player.y,a,length,145,p.damage*3.4*tier,def.color,0);for(let k=-1;k<=1;k++)spawnSkillProjectileAt('amalgam',player.x,player.y,a+k*.035,{damageMul:2.4*tier,speedMul:2.0,life:4,pierce:99,r:18,special:'worldSever'});spawnCombatFx('rail',player.x,player.y,{angle:a,color:def.color,life:1.0,radius:length,cannon:'zero'});shake=Math.max(shake,30);
   }else if(id==='cosmicStorm'){
-    addSkillZone('einherjarRain',{x:tx,y:ty,radius:540,life:8.0,damage:p.damage*2.15,tick:0,data:{next:.05,count:0}});addSkillZone('thunderStorm',{x:tx,y:ty,radius:500,life:7.0,damage:p.damage*1.5,tick:0,data:{next:.08,strikes:0}});
+    addSkillZone('einherjarRain',{x:tx,y:ty,radius:620,life:10,damage:p.damage*.62*tier,tick:0,data:{next:.03,count:0}});addSkillZone('thunderStorm',{x:tx,y:ty,radius:580,life:9,damage:p.damage*.48*tier,tick:0,data:{next:.05,strikes:0}});for(let i=0;i<16;i++)skillProjectile('amalgam',i*TAU/16,{damageMul:.48*tier,speedMul:1.2,life:2.8,pierce:8,r:12,special:'cosmicStar'});spawnCombatFx('vortexCast',tx,ty,{angle:0,color:def.color,life:1.8,radius:620,cannon:'nova'});
   }else if(id==='genesisShield'){
-    player.fortressUntil=performance.now()+10000;player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.35);addSkillZone('ironDome',{x:player.x,y:player.y,radius:210,life:10,damage:0,tick:0});addSkillZone('constellation',{x:player.x,y:player.y,radius:260,life:10,damage:p.damage*.65,tick:0,data:{heal:player.maxHp*.025}});
+    player.fortressUntil=performance.now()+14000;player.overclockUntil=performance.now()+14000;player.hp=player.maxHp;addSkillZone('ironDome',{x:player.x,y:player.y,radius:250,life:14,damage:0,tick:0});addSkillZone('constellation',{x:player.x,y:player.y,radius:340,life:14,damage:p.damage*.18*tier,tick:0,data:{heal:player.maxHp*.055}});spawnCombatFx('oracleEye',player.x,player.y,{angle:0,color:def.color,life:2.0,radius:360,cannon:'stellar'});
   }
-  spawnCombatFx('uniqueSkill',id==='phaseDash'?player.x:tx,id==='phaseDash'?player.y:ty,{angle:a,color:def.color,life:1.05,radius:280,cannon:'amalgam'});
   sendUniqueSkill('amalgam',id,{targetX:tx,targetY:ty,zoneAngle:a,radius:420,life:1.2});updateSkillHud();return true;
 }
 
@@ -6176,7 +6176,18 @@ function basicAimSpec(cannon){
   if(cannon==='error'&&player.errorSwordMode)return{type:'cone',range:235,half:1.15};
   return cone[cannon]?{type:'cone',range:clamp(p.bulletSpeed*life,380,1750),half:cone[cannon]}:{type:'lane',range:clamp(p.bulletSpeed*life,380,1750),width:{bastion:34,dual:32,needle:15,piercer:20,laser:16,drill:29,plasma:34,inferno:38,rocket:38,titan:46,ring:34,void:38,error:38,zero:42,deku:24,sniper:12}[cannon]||24};
 }
+function amalgamSkillAimSpec(slot){
+  const id=player?.amalgamSkills?.[Math.max(0,slot-1)];
+  return{
+    shardVolley:{type:'cone',distance:820,half:.36},phaseDash:{type:'dash',distance:720,width:58,end:145},repairPulse:{type:'self',radius:180},
+    gravityWell:{type:'target',distance:560,radius:390},frostNova:{type:'self',radius:310},sentryRing:{type:'self',radius:185},
+    thunderLance:{type:'line',distance:1650,width:48},mirrorClones:{type:'cone',distance:980,half:.24},meteorBrand:{type:'barrage',distance:560,radius:105,spacing:82,count:5},
+    singularityCore:{type:'target',distance:560,radius:520},chronoBreak:{type:'target',distance:560,radius:470},phoenixCore:{type:'self',radius:190},
+    worldSever:{type:'line',distance:1800,width:145},cosmicStorm:{type:'target',distance:560,radius:620},genesisShield:{type:'self',radius:340}
+  }[id]||null;
+}
 function skillAimSpec(cannon,slot){
+  if(cannon==='amalgam')return amalgamSkillAimSpec(slot);
   if(slot===1){
     if(cannon==='error'){
       if(player.errorSwordMode){const c=player.errorQCharging?clamp((Date.now()-(player.errorQChargeStartAt||Date.now()))/5000,0,1):0;return{type:'blade',distance:900+c*420,width:62+c*48,arcRadius:155+55*c,half:.74}}
@@ -6263,7 +6274,7 @@ function update(dt){
   // Aim and rendering must use the same camera position. Updating the camera
   // after calculating aim caused the barrel to oscillate while the tank moved.
   cameraUpdate();
-  if(heldSkillAim.active&&heldSkillAim.slot===4&&player?.cannonType!=='deku')cancelHeldSkillAim();
+  if(heldSkillAim.active&&heldSkillAim.slot===4&&!['deku','amalgam'].includes(player?.cannonType))cancelHeldSkillAim();
   updatePlayer(dt);
   updateRemotePlayers(dt);
   updateShapes(dt);
@@ -6407,7 +6418,7 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyE'&&player?.cannonType==='gojo'&&!e.repeat){beginHeldSkillAim(2,'keyboard');e.preventDefault()}
   if(e.code==='KeyR'&&player?.cannonType!=='gojo'&&!e.repeat){beginHeldSkillAim(2,'keyboard');e.preventDefault()}
   if(e.code==='KeyT'&&!e.repeat){beginHeldSkillAim(3,'keyboard');e.preventDefault()}
-  if(e.code==='KeyY'&&!e.repeat){beginHeldSkillAim(4,'keyboard');e.preventDefault()}
+  if(e.code==='KeyY'&&!e.repeat){if(player?.cannonType==='amalgam')castAmalgamSkill(3);else beginHeldSkillAim(4,'keyboard');e.preventDefault()}
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()
 });
 addEventListener('keyup',e=>{
