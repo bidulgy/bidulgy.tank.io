@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false,desynchronized:true});
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.30 · contact-only World Sever and readable weapon silhouettes');
+console.info('[Sworder VS Tank] game V6.31 · rebuilt Amalgam skill arsenal');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -201,21 +201,21 @@ const ERROR_T_SKILL=Object.freeze({name:'GLITCH BLADE',cooldown:7,color:'#73ff45
 const DEKU_T_SKILL=Object.freeze({name:'발경',cooldown:20,color:'#baff70'});
 const DEKU_Y_SKILL=Object.freeze({name:'변속',cooldown:32,color:'#e7ff76'});
 const AMALGAM_SKILLS=Object.freeze({
-  shardVolley:{name:'관성 역전',rarity:'common',rarityLabel:'일반',cooldown:10,color:'#b7d7ff',desc:'근처의 적 탄환을 소유권과 진행 방향까지 뒤집어 되돌려 보냄'},
-  phaseDash:{name:'귀환 닻',rarity:'common',rarityLabel:'일반',cooldown:10,color:'#9de8ff',desc:'첫 사용 위치를 저장하고 다시 사용하면 저장 지점으로 귀환'},
-  repairPulse:{name:'응급 재구축',rarity:'common',rarityLabel:'일반',cooldown:14,color:'#8dffb0',desc:'공격 없이 체력 34% 회복과 짧은 피해 감소 획득'},
-  gravityWell:{name:'구속 사슬',rarity:'rare',rarityLabel:'희귀',cooldown:14,color:'#8d7dff',desc:'조준선에 가장 가까운 적 하나를 붙잡아 자신 앞으로 끌어옴'},
-  frostNova:{name:'절대 정지',rarity:'rare',rarityLabel:'희귀',cooldown:17,color:'#96ecff',desc:'주변의 적 탄환을 즉시 정지시키고 소멸시킴'},
-  sentryRing:{name:'반사 장갑',rarity:'rare',rarityLabel:'희귀',cooldown:18,color:'#66ffd1',desc:'일정 시간 적 탄환을 막고 가까운 공격을 반사하는 장갑 전개'},
-  thunderLance:{name:'천뢰 창',rarity:'epic',rarityLabel:'영웅',cooldown:18,color:'#fff176',desc:'하늘에서 실체화한 번개의 창 한 자루를 목표에 수직 낙하시킴'},
-  mirrorClones:{name:'허상 전환',rarity:'epic',rarityLabel:'영웅',cooldown:20,color:'#f1c5ff',desc:'5초간 투명화하고 충돌을 무시하며 이동 속도가 크게 증가'},
-  meteorBrand:{name:'종말 표식',rarity:'epic',rarityLabel:'영웅',cooldown:21,color:'#ffad68',desc:'적 하나를 표식해 잃은 체력에 비례하는 처형 피해 적용'},
-  singularityCore:{name:'과부하 거래',rarity:'legendary',rarityLabel:'전설',cooldown:28,color:'#d277ff',desc:'현재 체력 35%를 대가로 나머지 세 스킬의 대기시간 초기화'},
-  chronoBreak:{name:'시간 역행',rarity:'legendary',rarityLabel:'전설',cooldown:27,color:'#9fe8ff',desc:'4초 전 위치·체력·속도로 되돌아감'},
-  phoenixCore:{name:'불사조 핵',rarity:'legendary',rarityLabel:'전설',cooldown:32,color:'#ff7658',desc:'체력을 크게 회복하고 일정 시간 치명타를 한 번 무효화'},
-  worldSever:{name:'세계 절단',rarity:'mythic',rarityLabel:'신화',cooldown:31,color:'#ffffff',desc:'휘두르는 대검과 날아가는 검날에 직접 닿은 적만 절단'},
-  cosmicStorm:{name:'공간 도약',rarity:'mythic',rarityLabel:'신화',cooldown:24,color:'#72f4ff',desc:'장애와 공격을 무시하고 조준 위치로 즉시 이동한 뒤 은신'},
-  genesisShield:{name:'창세의 방패',rarity:'mythic',rarityLabel:'신화',cooldown:36,color:'#ffe99b',desc:'회복과 공격 강화를 주는 절대 보호막 전개'}
+  shardVolley:{name:'회귀 방패',rarity:'common',rarityLabel:'일반',cooldown:10,color:'#b7d7ff',desc:'적 탄환을 흡수해 세 개의 회전 방패로 되쏨'},
+  phaseDash:{name:'균열 닻',rarity:'common',rarityLabel:'일반',cooldown:11,color:'#9de8ff',desc:'위치를 고정하고 재사용 시 균열을 가르며 귀환'},
+  repairPulse:{name:'수복 대장간',rarity:'common',rarityLabel:'일반',cooldown:15,color:'#8dffb0',desc:'기계 장갑판이 결합하며 즉시 회복하고 잠시 재생'},
+  gravityWell:{name:'사슬 집행',rarity:'rare',rarityLabel:'희귀',cooldown:15,color:'#8d7dff',desc:'사슬 작살로 적 하나를 끌고 이동을 봉쇄'},
+  frostNova:{name:'빙정 감옥',rarity:'rare',rarityLabel:'희귀',cooldown:18,color:'#96ecff',desc:'육각 빙정이 닫히며 적과 탄환을 얼림'},
+  sentryRing:{name:'아이기스 자세',rarity:'rare',rarityLabel:'희귀',cooldown:18,color:'#66ffd1',desc:'실체 방패를 전개해 탄환을 막고 반사'},
+  thunderLance:{name:'천창 연대',rarity:'epic',rarityLabel:'영웅',cooldown:19,color:'#fff176',desc:'낙뢰 창과 다섯 자루의 투창을 동시에 소환'},
+  mirrorClones:{name:'유령 교대',rarity:'epic',rarityLabel:'영웅',cooldown:21,color:'#f1c5ff',desc:'네 잔상을 남겨 적을 향해 교차 사격'},
+  meteorBrand:{name:'심판 낙인',rarity:'epic',rarityLabel:'영웅',cooldown:22,color:'#ffad68',desc:'적에게 낙인을 새기고 잠시 후 거대한 검을 낙하시킴'},
+  singularityCore:{name:'무기 성좌',rarity:'legendary',rarityLabel:'전설',cooldown:27,color:'#d277ff',desc:'주변에 검과 창 여덟 자루를 펼쳐 차례로 발사'},
+  chronoBreak:{name:'시간 절단',rarity:'legendary',rarityLabel:'전설',cooldown:28,color:'#9fe8ff',desc:'시간의 검흔을 남기며 4초 전 상태로 역행'},
+  phoenixCore:{name:'불사조 무장',rarity:'legendary',rarityLabel:'전설',cooldown:33,color:'#ff7658',desc:'불꽃 날개와 부활 갑옷을 두르고 화염 검을 발사'},
+  worldSever:{name:'세계 절단',rarity:'mythic',rarityLabel:'신화',cooldown:33,color:'#ffffff',desc:'실체 대검과 비행 검날에 직접 닿은 적만 절단'},
+  cosmicStorm:{name:'별문 무기고',rarity:'mythic',rarityLabel:'신화',cooldown:28,color:'#72f4ff',desc:'조준 위치로 별문을 열고 검과 창을 연속 사출'},
+  genesisShield:{name:'창세 성채',rarity:'mythic',rarityLabel:'신화',cooldown:38,color:'#ffe99b',desc:'거대 방패와 여덟 탑이 연결된 반사 성채 전개'}
 });
 const AMALGAM_RARITY_ORDER=Object.freeze({common:0,rare:1,epic:2,legendary:3,mythic:4});
 const AMALGAM_RARITY_POWER=Object.freeze({common:1,rare:1.7,epic:2.8,legendary:4.5,mythic:7});
@@ -2211,35 +2211,35 @@ function castAmalgamSkill(slot){
   player.amalgamSkillReadyAt[slot]=now+def.cooldown*1000;
   const a=player.angle,p=playerParams(),tier=AMALGAM_RARITY_POWER[def.rarity]||1,[tx,ty]=skillAimPoint(560);
   if(id==='shardVolley'){
-    let reflected=0;for(const b of bullets){if(b.team!=='remote'||Math.hypot(b.x-player.x,b.y-player.y)>620)continue;b.team='player';b.owner=player;b.ownerId=onlineSelfId;b.vx*=-1.35;b.vy*=-1.35;b.damage*=1.15;b.cannon='amalgam';reflected++}burst(player.x,player.y,def.color,18+Math.min(30,reflected*3));spawnCombatFx('ringParryCast',player.x,player.y,{angle:0,color:def.color,life:.75,radius:620,cannon:'amalgam'});
+    let reflected=0;for(const b of bullets){if(b.team!=='remote'||Math.hypot(b.x-player.x,b.y-player.y)>620)continue;b.team='player';b.owner=player;b.ownerId=onlineSelfId;b.vx*=-1.35;b.vy*=-1.35;b.damage*=1.15;b.cannon='amalgam';reflected++}for(const off of [-.18,0,.18])spawnSkillProjectileAt('amalgam',player.x+Math.cos(a)*45,player.y+Math.sin(a)*45,a+off,{damageMul:.72+tier*.22,speedMul:1.22,life:2.8,pierce:3,r:18,special:'amalgamShieldDisc',curve:off*1.8});burst(player.x,player.y,def.color,18+Math.min(30,reflected*3));spawnCombatFx('ringParryCast',player.x,player.y,{angle:0,color:def.color,life:.75,radius:620,cannon:'amalgam'});
   }else if(id==='phaseDash'){
-    const anchor=player.amalgamAnchor,ox=player.x,oy=player.y;player.x=anchor.x;player.y=anchor.y;player.hp=Math.max(player.hp,Math.min(player.maxHp,anchor.hp));player.phaseUntil=performance.now()+650;player.amalgamAnchor=null;skillZones=skillZones.filter(z=>!z.data?.amalgamAnchor);spawnCombatFx('rewindBurst',ox,oy,{angle:Math.atan2(player.y-oy,player.x-ox),color:def.color,life:.85,radius:Math.hypot(player.x-ox,player.y-oy),cannon:'amalgam'});broadcastLocalState(true);
+    const anchor=player.amalgamAnchor,ox=player.x,oy=player.y,aa=Math.atan2(anchor.y-oy,anchor.x-ox),len=Math.hypot(anchor.x-ox,anchor.y-oy);damageSkillLine(ox,oy,aa,len,34,p.damage*1.35*tier,def.color,180);player.x=anchor.x;player.y=anchor.y;player.hp=Math.max(player.hp,Math.min(player.maxHp,anchor.hp));player.phaseUntil=performance.now()+650;player.amalgamAnchor=null;skillZones=skillZones.filter(z=>!z.data?.amalgamAnchor);spawnCombatFx('amalgamRiftCut',ox,oy,{angle:aa,color:def.color,life:.85,radius:len,cannon:'amalgam'});broadcastLocalState(true);
   }else if(id==='repairPulse'){
-    player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.34);player.fortressUntil=performance.now()+2600;burst(player.x,player.y,def.color,36);spawnCombatFx('amalgamRepairArmor',player.x,player.y,{angle:a,color:def.color,life:1.8,radius:120,cannon:'amalgam'});
+    player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.26);player.fortressUntil=performance.now()+2600;addSkillZone('sanctuary',{x:player.x,y:player.y,radius:125,life:5,damage:0,data:{heal:player.maxHp*.025}});burst(player.x,player.y,def.color,28);spawnCombatFx('amalgamRepairArmor',player.x,player.y,{angle:a,color:def.color,life:2.4,radius:125,cannon:'amalgam'});
   }else if(id==='gravityWell'){
-    const target=nearestSkillTarget(player.x,player.y,1050);if(target){const aa=Math.atan2(target.y-player.y,target.x-player.x),damage=p.damage*2.1*tier;if(target.kind==='shape'){applyShapeDamage(target.obj,damage,-Math.cos(aa)*920,-Math.sin(aa)*920)}else sendDamage(target.obj.id,damage);spawnCombatFx('harpoonCable',player.x,player.y,{angle:aa,color:def.color,life:.8,radius:Math.hypot(target.x-player.x,target.y-player.y),cannon:'amalgam'});player.vx+=Math.cos(aa)*120;player.vy+=Math.sin(aa)*120}
+    const target=nearestSkillTarget(player.x,player.y,1050);if(target){const aa=Math.atan2(target.y-player.y,target.x-player.x),damage=p.damage*2.1*tier;if(target.kind==='shape'){applyShapeDamage(target.obj,damage,-Math.cos(aa)*920,-Math.sin(aa)*920);target.obj.stunUntil=performance.now()+1250}else{sendDamage(target.obj.id,damage);sendOnline('status',{targetId:target.obj.id,type:'stun',durationMs:950})}spawnCombatFx('harpoonCable',player.x,player.y,{angle:aa,color:def.color,life:.95,radius:Math.hypot(target.x-player.x,target.y-player.y),cannon:'amalgam'});spawnCombatFx('amalgamChainSeal',target.x,target.y,{angle:aa,color:def.color,life:1.2,radius:90,cannon:'amalgam'});player.vx+=Math.cos(aa)*120;player.vy+=Math.sin(aa)*120}
   }else if(id==='frostNova'){
-    let erased=0;for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];if(b.team!=='remote'||Math.hypot(b.x-player.x,b.y-player.y)>900)continue;burst(b.x,b.y,def.color,4);bullets.splice(i,1);erased++}player.fortressUntil=performance.now()+2200+erased*45;spawnCombatFx('amalgamFrostStop',player.x,player.y,{angle:a,color:def.color,life:1.25,radius:360,cannon:'amalgam'});
+    let erased=0;for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];if(b.team!=='remote'||Math.hypot(b.x-player.x,b.y-player.y)>720)continue;burst(b.x,b.y,def.color,4);bullets.splice(i,1);erased++}for(const s of shapes){if(Math.hypot(s.x-player.x,s.y-player.y)<=360+s.r){s.stunUntil=performance.now()+1900;applyShapeDamage(s,p.damage*.75*tier)}}for(const enemy of remotePlayers.values()){if(enemy.alive&&Math.hypot(enemy.x-player.x,enemy.y-player.y)<=360)sendOnline('status',{targetId:enemy.id,type:'stun',durationMs:1400})}player.fortressUntil=performance.now()+1700+erased*35;spawnCombatFx('amalgamFrostStop',player.x,player.y,{angle:a,color:def.color,life:1.45,radius:360,cannon:'amalgam'});
   }else if(id==='sentryRing'){
     addSkillZone('ringParry',{x:player.x,y:player.y,radius:205,life:7.5,damage:p.damage*.92*tier,tick:0});spawnAmalgamShield(def,2.4);
   }else if(id==='thunderLance'){
-    const[sx,sy]=skillAimPoint(760),aa=Math.atan2(sy-player.y,sx-player.x);skillAreaDamage(sx,sy,92,p.damage*5.3*tier,def.color);spawnCombatFx('amalgamSkyLance',sx,sy,{angle:0,color:def.color,life:1.05,radius:520,cannon:'amalgam'});for(const off of [-.16,0,.16])spawnSkillProjectileAt('amalgam',player.x+Math.cos(aa)*46,player.y+Math.sin(aa)*46,aa+off,{damageMul:2.25*tier,speedMul:1.55,life:3.5,pierce:6,r:11,special:'amalgamThrownLance'});shake=Math.max(shake,18);
+    const[sx,sy]=skillAimPoint(820),aa=Math.atan2(sy-player.y,sx-player.x);skillAreaDamage(sx,sy,88,p.damage*3.8*tier,def.color);spawnCombatFx('amalgamSkyLance',sx,sy,{angle:0,color:def.color,life:1.05,radius:520,cannon:'amalgam'});for(const off of [-.28,-.14,0,.14,.28])spawnSkillProjectileAt('amalgam',player.x+Math.cos(aa)*46,player.y+Math.sin(aa)*46,aa+off,{damageMul:1.18*tier,speedMul:1.55,life:3.5,pierce:5,r:11,special:'amalgamThrownLance'});shake=Math.max(shake,16);
   }else if(id==='mirrorClones'){
-    player.cloakUntil=performance.now()+5000;player.phaseUntil=performance.now()+1700;player.overclockUntil=performance.now()+5000;spawnCombatFx('cloakBurst',player.x,player.y,{angle:a,color:def.color,life:.9,radius:180,cannon:'phantom'});broadcastLocalState(true);
+    player.cloakUntil=performance.now()+2800;player.phaseUntil=performance.now()+900;addSkillZone('cloneStorm',{x:player.x,y:player.y,radius:190,life:5.2,damage:0,tick:0,data:{next:0,amalgam:true}});spawnCombatFx('amalgamMirrorSquad',player.x,player.y,{angle:a,color:def.color,life:1.35,radius:210,cannon:'amalgam'});broadcastLocalState(true);
   }else if(id==='meteorBrand'){
-    const target=nearestSkillTarget(player.x,player.y,1500);if(target){const max=Math.max(1,target.obj.maxHp||target.obj.hp||100),missing=clamp(1-(target.obj.hp||max)/max,0,1),damage=p.damage*tier*(1.7+missing*4.5);if(target.kind==='shape'){applyShapeDamage(target.obj,damage);if(target.obj.hp<=0){gainPolygonXp(target.obj.xp);const i=shapes.indexOf(target.obj);if(i>=0)shapes.splice(i,1)}}else sendDamage(target.obj.id,damage);spawnCombatFx('oracleEye',target.x,target.y,{angle:0,color:def.color,life:1.2,radius:150,cannon:'oracle'});burst(target.x,target.y,def.color,24)}
+    const target=nearestSkillTarget(player.x,player.y,1500);if(target){addSkillZone('amalgamJudgment',{x:target.x,y:target.y,radius:105,life:1.15,damage:p.damage*3.1*tier,data:{targetKind:target.kind,targetId:target.kind==='player'?target.obj.id:'',targetShape:target.kind==='shape'?target.obj:null}});spawnCombatFx('amalgamJudgmentMark',target.x,target.y,{angle:0,color:def.color,life:1.15,radius:150,cannon:'amalgam'})}
   }else if(id==='singularityCore'){
-    player.hp=Math.max(1,player.hp-player.maxHp*.35);for(let i=0;i<4;i++)if(i!==slot)player.amalgamSkillReadyAt[i]=0;player.overclockUntil=performance.now()+6000;spawnCombatFx('glitchDriveCast',player.x,player.y,{angle:a,color:def.color,life:1.3,radius:230,cannon:'error'});burst(player.x,player.y,def.color,38);
+    const target=nearestSkillTarget(player.x,player.y,1400),base=target?Math.atan2(target.y-player.y,target.x-player.x):a;for(let k=0;k<8;k++){const q=k*TAU/8,x=player.x+Math.cos(q)*145,y=player.y+Math.sin(q)*145,aa=base+(k-3.5)*.055;spawnSkillProjectileAt('amalgam',x,y,aa,{damageMul:1.12*tier,speedMul:1.42,life:4,pierce:7,r:k%2?11:20,special:k%2?'amalgamThrownLance':'amalgamFlyingBlade',motionSeed:k})}player.overclockUntil=performance.now()+4500;spawnCombatFx('amalgamWeaponConstellation',player.x,player.y,{angle:a,color:def.color,life:1.5,radius:245,cannon:'amalgam'});
   }else if(id==='chronoBreak'){
-    const old=getRewindState(4000);if(old){const ox=player.x,oy=player.y;player.x=clamp(old.x,player.r,WORLD-player.r);player.y=clamp(old.y,player.r,WORLD-player.r);player.hp=clamp(old.hp,1,player.maxHp);player.vx=old.vx;player.vy=old.vy;player.phaseUntil=performance.now()+900;playerHistory=playerHistory.filter(item=>item.t<=old.t);camera.x=player.x-innerWidth/2;camera.y=player.y-innerHeight/2;spawnCombatFx('rewindBurst',ox,oy,{angle:Math.atan2(player.y-oy,player.x-ox),color:def.color,life:1.1,radius:Math.hypot(player.x-ox,player.y-oy),cannon:'chrono'});spawnCombatFx('chronoArrival',player.x,player.y,{angle:a,color:def.color,life:1.15,radius:150,cannon:'amalgam'});broadcastLocalState(true)}
+    const old=getRewindState(4000);if(old){const ox=player.x,oy=player.y,aa=Math.atan2(old.y-oy,old.x-ox),len=Math.hypot(old.x-ox,old.y-oy);damageSkillLine(ox,oy,aa,len,28,p.damage*1.45*tier,def.color,0);player.x=clamp(old.x,player.r,WORLD-player.r);player.y=clamp(old.y,player.r,WORLD-player.r);player.hp=clamp(old.hp,1,player.maxHp);player.vx=old.vx;player.vy=old.vy;player.phaseUntil=performance.now()+900;playerHistory=playerHistory.filter(item=>item.t<=old.t);camera.x=player.x-innerWidth/2;camera.y=player.y-innerHeight/2;spawnCombatFx('amalgamRiftCut',ox,oy,{angle:aa,color:def.color,life:1.1,radius:len,cannon:'amalgam'});spawnCombatFx('chronoArrival',player.x,player.y,{angle:a,color:def.color,life:1.15,radius:150,cannon:'amalgam'});broadcastLocalState(true)}
   }else if(id==='phoenixCore'){
-    player.hp=player.maxHp;player.stellarReviveUntil=performance.now()+20000;player.stellarReviveReady=true;player.overclockUntil=performance.now()+9000;addSkillZone('secondStar',{x:player.x,y:player.y,radius:190,life:20,damage:0,tick:0});spawnCombatFx('amalgamPhoenixAegis',player.x,player.y,{angle:a,color:def.color,life:2.8,radius:215,cannon:'amalgam'});
+    player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.55);player.stellarReviveUntil=performance.now()+18000;player.stellarReviveReady=true;player.overclockUntil=performance.now()+8000;addSkillZone('amalgamPhoenixVolley',{x:player.x,y:player.y,radius:190,life:8,damage:p.damage*.85*tier,tick:0,data:{next:0}});spawnCombatFx('amalgamPhoenixAegis',player.x,player.y,{angle:a,color:def.color,life:3.2,radius:235,cannon:'amalgam'});
   }else if(id==='worldSever'){
     const bladeLength=470;addSkillZone('amalgamWorldSweep',{x:player.x,y:player.y,angle:a,length:bladeLength,width:25,life:1.0,damage:p.damage*1.8*tier,data:{hitShapes:new Set(),hitPlayers:new Set()}});spawnCombatFx('amalgamWorldBlade',player.x,player.y,{angle:a,color:def.color,life:1.0,radius:bladeLength,cannon:'amalgam'});for(const off of [-.12,0,.12])spawnSkillProjectileAt('amalgam',player.x+Math.cos(a)*58,player.y+Math.sin(a)*58,a+off,{damageMul:1.15*tier,speedMul:1.32,life:4.2,pierce:8,r:22,special:'amalgamFlyingBlade'});shake=Math.max(shake,18);
   }else if(id==='cosmicStorm'){
-    const ox=player.x,oy=player.y,[dx,dy]=skillAimPoint(1150),aa=Math.atan2(dy-oy,dx-ox),len=Math.hypot(dx-ox,dy-oy);player.x=dx;player.y=dy;player.phaseUntil=performance.now()+1300;player.cloakUntil=performance.now()+4500;player.vx=0;player.vy=0;spawnCombatFx('dimensionRift',ox,oy,{angle:aa,color:def.color,life:1.2,radius:len,cannon:'void'});broadcastLocalState(true);
+    const ox=player.x,oy=player.y,[dx,dy]=skillAimPoint(1150),aa=Math.atan2(dy-oy,dx-ox),len=Math.hypot(dx-ox,dy-oy);player.x=dx;player.y=dy;player.phaseUntil=performance.now()+1200;player.vx=0;player.vy=0;spawnCombatFx('amalgamStarGate',ox,oy,{angle:aa,color:def.color,life:1.8,radius:150,cannon:'amalgam'});spawnCombatFx('amalgamStarGate',dx,dy,{angle:aa+Math.PI,color:def.color,life:1.8,radius:190,cannon:'amalgam'});for(let k=0;k<10;k++){const off=(k-4.5)*.075,special=k%2?'amalgamThrownLance':'amalgamFlyingBlade';spawnSkillProjectileAt('amalgam',dx-Math.cos(aa)*65+Math.cos(aa+Math.PI/2)*(k-4.5)*18,dy-Math.sin(aa)*65+Math.sin(aa+Math.PI/2)*(k-4.5)*18,aa+off,{damageMul:.82*tier,speedMul:1.55,life:4,pierce:6,r:k%2?11:20,special,motionSeed:k})}broadcastLocalState(true);
   }else if(id==='genesisShield'){
-    player.fortressUntil=performance.now()+14000;player.overclockUntil=performance.now()+14000;player.hp=player.maxHp;addSkillZone('ironDome',{x:player.x,y:player.y,radius:250,life:14,damage:0,tick:0});spawnCombatFx('amalgamGenesisCitadel',player.x,player.y,{angle:a,color:def.color,life:3.4,radius:275,cannon:'amalgam'});
+    player.fortressUntil=performance.now()+12000;player.overclockUntil=performance.now()+12000;player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.42);addSkillZone('ironDome',{x:player.x,y:player.y,radius:270,life:12,damage:0,tick:0});addSkillZone('ringParry',{x:player.x,y:player.y,radius:265,life:12,damage:p.damage*.5*tier,tick:0});spawnCombatFx('amalgamGenesisCitadel',player.x,player.y,{angle:a,color:def.color,life:4.2,radius:295,cannon:'amalgam'});for(let k=0;k<3;k++)spawnCombatFx('amalgamShield',player.x,player.y,{angle:a+(k-1)*.75,color:def.color,life:4.2,radius:150,cannon:'amalgam',variant:'mythic'});
   }
   spawnAmalgamRarityFx(def);sendUniqueSkill('amalgam',id,{targetX:tx,targetY:ty,zoneAngle:a,radius:420,life:1.2});updateSkillHud();return true;
 }
@@ -3940,6 +3940,13 @@ function updateSkillZones(dt){
       for(const enemy of remotePlayers.values()){if(!enemy.alive||hitPlayers.has(enemy.id))continue;const hit=pointToLineInfo(enemy.x,enemy.y,z.x,z.y,x2,y2);if(hit.d2>(width+(enemy.r||27))**2)continue;hitPlayers.add(enemy.id);sendDamage(enemy.id,z.damage);burst(hit.x,hit.y,'#dff8ff',7)}
       continue;
     }
+    if(z.type==='amalgamJudgment'){
+      if(!z.triggered&&z.life<=.22){z.triggered=true;const target=z.data.targetShape;if(target&&shapes.includes(target)){z.x=target.x;z.y=target.y;applyShapeDamage(target,z.damage,0,260);if(target.hp<=0){gainPolygonXp(target.xp);const i=shapes.indexOf(target);if(i>=0)shapes.splice(i,1)}}else if(z.data.targetId){const enemy=remotePlayers.get(z.data.targetId);if(enemy?.alive){z.x=enemy.x;z.y=enemy.y;sendDamage(enemy.id,z.damage)}}spawnCombatFx('amalgamJudgmentBlade',z.x,z.y,{angle:Math.PI/2,color:'#ffad68',life:.85,radius:310,cannon:'amalgam'});burst(z.x,z.y,'#ffcf8c',30);shake=Math.max(shake,12)}
+      continue;
+    }
+    if(z.type==='amalgamPhoenixVolley'){
+      z.x=player.x;z.y=player.y;z.data.next=(z.data.next||0)-dt;if(z.data.next<=0){z.data.next=.62;const target=nearestSkillTarget(z.x,z.y,1200),base=target?Math.atan2(target.y-z.y,target.x-z.x):player.angle;for(const off of [-.11,.11])spawnSkillProjectileAt('amalgam',z.x+Math.cos(base)*42,z.y+Math.sin(base)*42,base+off,{damageMul:z.damage/Math.max(1,playerParams().damage),speedMul:1.38,life:3,pierce:5,r:18,special:'amalgamPhoenixBlade'})}continue;
+    }
 
     if(z.type==='gojoAo'){
       if(z.data?.held&&player?.gojoAoHolding){
@@ -4156,7 +4163,7 @@ function updateSkillZones(dt){
       if(!z.triggered&&z.life<(z.data.returnAt||.15)){z.triggered=true;if(Number.isFinite(z.originX)&&Number.isFinite(z.originY)){player.x=z.originX;player.y=z.originY;player.phaseUntil=now+500;broadcastLocalState(true)}}continue;
     }
     if(z.type==='cloneStorm'){
-      z.x=player.x;z.y=player.y;z.data.next=(z.data.next||0)-dt;if(z.data.next<=0){z.data.next=.55;const target=nearestSkillTarget(player.x,player.y,800);for(let k=0;k<4;k++){const q=k*TAU/4+now*.001,x=player.x+Math.cos(q)*z.radius,y=player.y+Math.sin(q)*z.radius,aa=target?Math.atan2(target.y-y,target.x-x):player.angle;spawnSkillProjectileAt('glitch',x,y,aa,{damageMul:.38,speedMul:1.25,life:2.1,pierce:9,r:7,curve:k%2?-1:1})}}continue;
+      z.x=player.x;z.y=player.y;z.data.next=(z.data.next||0)-dt;if(z.data.next<=0){z.data.next=.55;const target=nearestSkillTarget(player.x,player.y,800);for(let k=0;k<4;k++){const q=k*TAU/4+now*.001,x=player.x+Math.cos(q)*z.radius,y=player.y+Math.sin(q)*z.radius,aa=target?Math.atan2(target.y-y,target.x-x):player.angle;if(z.data.amalgam)spawnSkillProjectileAt('amalgam',x,y,aa,{damageMul:.58,speedMul:1.30,life:2.5,pierce:4,r:k%2?10:17,special:k%2?'amalgamThrownLance':'amalgamFlyingBlade'});else spawnSkillProjectileAt('glitch',x,y,aa,{damageMul:.38,speedMul:1.25,life:2.1,pierce:9,r:7,curve:k%2?-1:1})}}continue;
     }
     if(z.type==='absoluteZero'){
       z.tick=(z.tick||0)-dt;if(z.tick<=0){z.tick=.24;for(const s of shapes){const dx=s.x-z.x,dy=s.y-z.y;if(dx*dx+dy*dy<=z.radius*z.radius){reportShapeImpulse(s,-(s.vx||0)*.85,-(s.vy||0)*.85);applyShapeDamage(s,z.damage)}}for(const b of bullets){if(b.team==='remote'&&(b.x-z.x)**2+(b.y-z.y)**2<=z.radius*z.radius){b.vx*=.08;b.vy*=.08}}}continue;
@@ -5286,6 +5293,11 @@ function drawAmalgamBladeModel(length=240,scale=1,accent='#8fdcff'){
   ctx.fillStyle='#6e3f91';ctx.strokeStyle='#ffe7ff';ctx.lineWidth=2.4*scale;ctx.beginPath();ctx.arc(-grip-5*scale,0,13*scale,0,TAU);ctx.fill();ctx.stroke();ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(-grip-8*scale,-3*scale,3*scale,0,TAU);ctx.fill();
   ctx.fillStyle='#bd75ff';ctx.strokeStyle='#ffffff';ctx.beginPath();ctx.moveTo(31*scale,-10*scale);ctx.lineTo(42*scale,0);ctx.lineTo(31*scale,10*scale);ctx.lineTo(20*scale,0);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
 }
+function drawAmalgamShieldModel(size=72,scale=1,accent='#66ffd1'){
+  const w=size*.68*scale,h=size*scale,g=ctx.createLinearGradient(-w/2,-h/2,w/2,h/2);g.addColorStop(0,'#111c2b');g.addColorStop(.34,'#dffaff');g.addColorStop(.58,accent);g.addColorStop(1,'#172f42');ctx.save();ctx.shadowColor=accent;ctx.shadowBlur=22*scale;ctx.fillStyle=g;ctx.strokeStyle='#f2ffff';ctx.lineWidth=3*scale;
+  ctx.beginPath();ctx.moveTo(0,-h*.55);ctx.bezierCurveTo(w*.48,-h*.52,w*.60,-h*.25,w*.52,h*.04);ctx.quadraticCurveTo(w*.38,h*.42,0,h*.62);ctx.quadraticCurveTo(-w*.38,h*.42,-w*.52,h*.04);ctx.bezierCurveTo(-w*.60,-h*.25,-w*.48,-h*.52,0,-h*.55);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.strokeStyle=accent;ctx.lineWidth=2.2*scale;ctx.beginPath();ctx.moveTo(0,-h*.39);ctx.lineTo(w*.30,-h*.12);ctx.lineTo(w*.20,h*.22);ctx.lineTo(0,h*.43);ctx.lineTo(-w*.20,h*.22);ctx.lineTo(-w*.30,-h*.12);ctx.closePath();ctx.stroke();ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(0,-h*.03,6*scale,0,TAU);ctx.fill();ctx.restore();
+}
 function drawCombatEffects(layer='base'){
   const t=performance.now()*.001;
   for(const f of combatFx){
@@ -5356,6 +5368,20 @@ function drawCombatEffects(layer='base'){
       ctx.rotate(q*2);ctx.strokeStyle='#e5ffff';ctx.lineWidth=4;ctx.shadowColor='#b8f9ff';ctx.shadowBlur=16;ctx.beginPath();ctx.moveTo(0,-f.radius*q);ctx.lineTo(f.radius*q*.866,f.radius*q*.5);ctx.lineTo(-f.radius*q*.866,f.radius*q*.5);ctx.closePath();ctx.stroke();ctx.shadowBlur=0;
     }else if(f.type==='portalPulse'){
       ctx.rotate(q*3);ctx.strokeStyle='#ddc7ff';ctx.lineWidth=5;ctx.beginPath();ctx.ellipse(0,0,f.radius*q,f.radius*q*.3,0,0,TAU);ctx.stroke();
+    }else if(f.type==='amalgamRiftCut'){
+      const head=f.radius*q,trail=ctx.createLinearGradient(0,0,head,0);trail.addColorStop(0,'rgba(100,220,255,0)');trail.addColorStop(.62,'rgba(145,231,255,.48)');trail.addColorStop(1,'#ffffff');ctx.strokeStyle=trail;ctx.shadowColor='#9de8ff';ctx.shadowBlur=25;ctx.lineWidth=9*p+3;ctx.beginPath();ctx.moveTo(0,0);ctx.bezierCurveTo(head*.32,-24,head*.68,24,head,0);ctx.stroke();ctx.save();ctx.translate(head,0);ctx.scale(.34,.34);drawAmalgamBladeModel(150,1,'#9de8ff');ctx.restore();ctx.shadowBlur=0;
+    }else if(f.type==='amalgamChainSeal'){
+      ctx.strokeStyle='#cabdff';ctx.shadowColor='#8d7dff';ctx.shadowBlur=20;ctx.lineWidth=5;for(let k=0;k<6;k++){const a=k*TAU/6-q*2,rr=f.radius*(.5+.35*q),x=Math.cos(a)*rr,y=Math.sin(a)*rr;ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.strokeRect(-16,-8,32,16);ctx.restore()}ctx.beginPath();ctx.moveTo(-f.radius,0);ctx.lineTo(f.radius,0);ctx.moveTo(0,-f.radius);ctx.lineTo(0,f.radius);ctx.stroke();ctx.shadowBlur=0;
+    }else if(f.type==='amalgamMirrorSquad'){
+      for(let k=0;k<4;k++){const a=k*TAU/4+q*.8,rr=f.radius*(.35+.35*q);ctx.save();ctx.translate(Math.cos(a)*rr,Math.sin(a)*rr);ctx.rotate(a);ctx.globalAlpha*=.45+.12*k;ctx.scale(.30,.30);k%2?drawAmalgamLanceModel(155,1,'#f1c5ff'):drawAmalgamBladeModel(165,1,'#f1c5ff');ctx.restore()}ctx.strokeStyle='rgba(244,222,255,.72)';ctx.setLineDash([12,9]);ctx.strokeRect(-f.radius*.42,-f.radius*.42,f.radius*.84,f.radius*.84);ctx.setLineDash([]);
+    }else if(f.type==='amalgamWeaponConstellation'){
+      ctx.globalCompositeOperation='lighter';for(let k=0;k<8;k++){const a=k*TAU/8-q*1.4,rr=f.radius*(.45+.25*Math.sin(q*Math.PI));ctx.save();ctx.translate(Math.cos(a)*rr,Math.sin(a)*rr);ctx.rotate(a);ctx.scale(.30,.30);k%2?drawAmalgamLanceModel(165,1,'#d277ff'):drawAmalgamBladeModel(175,1,'#d277ff');ctx.restore()}ctx.globalCompositeOperation='source-over';
+    }else if(f.type==='amalgamJudgmentMark'){
+      const drop=-f.radius*(1-q);ctx.strokeStyle='#ffcf8c';ctx.shadowColor='#ffad68';ctx.shadowBlur=24;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-55,35);ctx.lineTo(0,70);ctx.lineTo(55,35);ctx.lineTo(0,-10);ctx.closePath();ctx.stroke();ctx.save();ctx.translate(0,drop-105);ctx.rotate(Math.PI/2);ctx.scale(.42,.42);drawAmalgamBladeModel(210,1,'#ffad68');ctx.restore();ctx.shadowBlur=0;
+    }else if(f.type==='amalgamJudgmentBlade'){
+      const slam=1-Math.pow(p,2);ctx.save();ctx.translate(0,-f.radius*(1-slam));ctx.rotate(Math.PI/2);ctx.scale(.72,.72);drawAmalgamBladeModel(285,1,'#ffad68');ctx.restore();ctx.strokeStyle='rgba(255,198,105,.8)';ctx.lineWidth=7*p+2;ctx.beginPath();ctx.moveTo(-90,0);ctx.lineTo(90,0);ctx.stroke();
+    }else if(f.type==='amalgamStarGate'){
+      const rr=f.radius*(.35+.65*Math.sin(q*Math.PI)),grad=ctx.createLinearGradient(-rr,0,rr,0);grad.addColorStop(0,'rgba(30,120,180,.12)');grad.addColorStop(.5,'#eaffff');grad.addColorStop(1,'rgba(114,244,255,.12)');ctx.globalCompositeOperation='lighter';ctx.strokeStyle=grad;ctx.shadowColor='#72f4ff';ctx.shadowBlur=30;ctx.lineWidth=7;for(let k=0;k<3;k++){ctx.save();ctx.rotate(k*TAU/3+q*(k%2?2:-2));ctx.beginPath();ctx.ellipse(0,0,rr,rr*(.30+k*.08),0,0,TAU);ctx.stroke();ctx.restore()}for(let k=0;k<6;k++){const a=k*TAU/6-q*2.4;ctx.save();ctx.translate(Math.cos(a)*rr*.82,Math.sin(a)*rr*.82);ctx.rotate(a);ctx.scale(.22,.22);k%2?drawAmalgamLanceModel(150,1,'#72f4ff'):drawAmalgamBladeModel(160,1,'#72f4ff');ctx.restore()}ctx.globalCompositeOperation='source-over';ctx.shadowBlur=0;
     }else if(f.type==='amalgamSkillSig'){
       const rank=AMALGAM_RARITY_ORDER[f.variant]||0,r=f.radius*(.3+.7*q),s=f.skill;
       const sigIds=['shardVolley','phaseDash','repairPulse','gravityWell','frostNova','sentryRing','thunderLance','mirrorClones','meteorBrand','singularityCore','chronoBreak','phoenixCore','worldSever','cosmicStorm','genesisShield'],sigIndex=Math.max(0,sigIds.indexOf(s));
@@ -5426,7 +5452,7 @@ function drawCombatEffects(layer='base'){
     }else if(f.type==='amalgamShield'){
       const rank=AMALGAM_RARITY_ORDER[f.variant]||0,plates=3+rank,rr=f.radius*(.78+.12*Math.sin(q*Math.PI));
       ctx.shadowColor=f.color;ctx.shadowBlur=15+rank*6;ctx.lineWidth=3+rank*.45;
-      for(let k=0;k<plates;k++){const a=(-.72+k*(1.44/Math.max(1,plates-1))),cx=Math.cos(a)*rr,cy=Math.sin(a)*rr,w=42+rank*5,h=58+rank*7;ctx.save();ctx.translate(cx,cy);ctx.rotate(a);const g=ctx.createLinearGradient(-w/2,-h/2,w/2,h/2);g.addColorStop(0,'#162333');g.addColorStop(.38,'#d9f7ff');g.addColorStop(.62,f.color);g.addColorStop(1,'#20394a');ctx.fillStyle=g;ctx.strokeStyle='#eaffff';ctx.beginPath();ctx.moveTo(0,-h*.55);ctx.bezierCurveTo(w*.48,-h*.52,w*.60,-h*.25,w*.52,h*.04);ctx.quadraticCurveTo(w*.38,h*.42,0,h*.62);ctx.quadraticCurveTo(-w*.38,h*.42,-w*.52,h*.04);ctx.bezierCurveTo(-w*.60,-h*.25,-w*.48,-h*.52,0,-h*.55);ctx.closePath();ctx.fill();ctx.stroke();ctx.strokeStyle=f.color;ctx.lineWidth=2.2;ctx.beginPath();ctx.moveTo(0,-h*.39);ctx.lineTo(w*.30,-h*.12);ctx.lineTo(w*.20,h*.22);ctx.lineTo(0,h*.43);ctx.lineTo(-w*.20,h*.22);ctx.lineTo(-w*.30,-h*.12);ctx.closePath();ctx.stroke();ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(0,-h*.03,5+rank,0,TAU);ctx.fill();ctx.restore()}
+      for(let k=0;k<plates;k++){const a=(-.72+k*(1.44/Math.max(1,plates-1))),cx=Math.cos(a)*rr,cy=Math.sin(a)*rr;ctx.save();ctx.translate(cx,cy);ctx.rotate(a);drawAmalgamShieldModel(58+rank*7,1,f.color);ctx.restore()}
       if(rank>=3){ctx.strokeStyle='#ffffff';ctx.lineWidth=2;for(let k=0;k<rank;k++){const y=(k-(rank-1)/2)*15;ctx.beginPath();ctx.moveTo(rr*.30,y);ctx.lineTo(rr*.80,y*.55);ctx.stroke()}}ctx.shadowBlur=0;
     }else if(f.type==='amalgamSkyLance'){
       const fall=1-Math.pow(p,2.2),topX=-f.radius*.34,topY=-f.radius*1.18,tipY=-f.radius*(1-fall)*.82;
@@ -5907,6 +5933,13 @@ function drawUniqueProjectile(b,time,phase){
   const shape=b.shape;
   const playerColor=b.team==='player';
   const pulse=1+.10*Math.sin(time*8+(b.motionSeed||0));
+
+  if(b.special==='amalgamShieldDisc'){
+    ctx.save();ctx.rotate(time*6+(b.motionSeed||0));ctx.scale(.48,.48);drawAmalgamShieldModel(82,1,'#b7d7ff');ctx.restore();ctx.strokeStyle='rgba(210,240,255,.72)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-58,-7);ctx.lineTo(-34,0);ctx.lineTo(-58,7);ctx.stroke();return true;
+  }
+  if(b.special==='amalgamPhoenixBlade'){
+    ctx.save();ctx.translate(-18,0);ctx.scale(.42,.42);drawAmalgamBladeModel(165,1,'#ff7658');ctx.restore();ctx.fillStyle='rgba(255,94,45,.36)';ctx.beginPath();ctx.moveTo(-85,0);ctx.quadraticCurveTo(-52,-22,-22,-5);ctx.quadraticCurveTo(-55,25,-85,0);ctx.fill();return true;
+  }
 
   if(b.special==='amalgamThrownLance'){
     ctx.save();ctx.scale(.55,.55);drawAmalgamLanceModel(145,1,'#fff176');ctx.restore();ctx.strokeStyle='rgba(255,247,120,.72)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-72,-8);ctx.lineTo(-42,0);ctx.lineTo(-72,8);ctx.stroke();ctx.shadowBlur=0;return true;

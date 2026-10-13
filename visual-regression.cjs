@@ -59,9 +59,9 @@ assert(source.includes("e.stopImmediatePropagation();castAmalgamSkill(3)"),'Amal
 assert(source.includes("if(cannon==='amalgam')return amalgamSkillAimSpec(slot)"),'Every Amalgam skill slot must use its own aim preview');
 context.player.amalgamSkills=['shardVolley','gravityWell','thunderLance','worldSever'];
 assert.deepEqual([1,2,3,4].map(slot=>vm.runInContext(`skillAimSpec('amalgam',${slot}).type`,context)),['self','autoTarget','target','line'],'Amalgam Q/R/T/G need active aim previews matching their mechanics');
-assert(source.includes("b.team='player';b.owner=player")&&source.includes("b.vx*=-1.35"),'Inertia Reversal must return hostile bullets instead of spawning a radial attack');
-assert(source.includes('player.amalgamAnchor={x:player.x,y:player.y,hp:player.hp}')&&source.includes('player.x=anchor.x;player.y=anchor.y'),'Return Anchor must be a two-stage saved-position skill');
-assert(source.includes('for(let i=0;i<4;i++)if(i!==slot)player.amalgamSkillReadyAt[i]=0'),'Overload Trade must reset the other equipped skills');
+assert(source.includes("b.team='player';b.owner=player")&&source.includes("special:'amalgamShieldDisc'"),'Returning Shield must absorb hostile bullets and forge physical shield projectiles');
+assert(source.includes('player.amalgamAnchor={x:player.x,y:player.y,hp:player.hp}')&&source.includes("spawnCombatFx('amalgamRiftCut'"),'Rift Anchor must return through a damaging blade cut');
+assert(source.includes("f.type==='amalgamWeaponConstellation'")&&source.includes('for(let k=0;k<8;k++'),'Weapon Constellation must deploy eight reusable sword and lance models');
 assert(source.includes('const old=getRewindState(4000)'),'Amalgam Time Reversal must restore recorded state');
 assert(source.includes("if(player?.cannonType==='amalgam'){castAmalgamSkill(slot-1);return}"),'Amalgam HUD buttons must cast immediately without relying on pointer release');
 assert(source.includes("player.amalgamDraftQueue.shift();player.amalgamDraftChoices=[];renderAmalgamDraft()"),'Cancelling a draft must dismiss exactly one queued skill choice');
@@ -87,7 +87,9 @@ assert(source.includes("addSkillZone('amalgamWorldSweep'")&&source.includes("z.t
 assert(!source.includes("damageSkillLine(player.x,player.y,a,length,145,p.damage*3.4*tier"),'World Sever must not deal instant damage across the map');
 assert(source.includes("pierce:8,r:22,special:'amalgamFlyingBlade'"),'World Sever ranged blades must use nerfed contact projectiles');
 assert(source.includes('function drawAmalgamLanceModel(')&&source.includes('function drawAmalgamBladeModel('),'Amalgam weapon skills need reusable detailed weapon models');
+assert(source.includes('function drawAmalgamShieldModel(')&&source.includes("special==='amalgamShieldDisc'"),'Shield skills and projectiles must reuse the detailed shield model');
 assert(source.includes("drawAmalgamLanceModel(205,1.08,'#fff176')")&&source.includes("drawAmalgamBladeModel(len,1.12,'#8fdcff')"),'Held and falling weapons must render the detailed forged models');
+assert(source.includes("f.type==='amalgamStarGate'")&&source.includes("special=k%2?'amalgamThrownLance':'amalgamFlyingBlade'"),'Mythic Star Gate Arsenal must replace the old plain spatial dash with sword and lance salvos');
 assert(source.includes('playerHistory=playerHistory.filter(item=>item.t<=old.t)')&&source.includes('camera.x=player.x-innerWidth/2'),'Time Reversal must restore history and camera at the rewound position');
 assert(data.themes.includes('gojo'),'Gojo needs a dedicated tank theme');
 assert(authSource.includes("id:'gojo',name:'고죠',rarity:'singularity'"),'Gojo must be Singularity');
