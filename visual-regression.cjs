@@ -58,7 +58,11 @@ assert(source.includes("!['deku','amalgam'].includes(player?.cannonType)"),'Amal
 assert(source.includes("if(player?.cannonType==='amalgam')castAmalgamSkill(3)"),'Amalgam Y must activate directly from the keyboard');
 assert(source.includes("if(cannon==='amalgam')return amalgamSkillAimSpec(slot)"),'Every Amalgam skill slot must use its own aim preview');
 context.player.amalgamSkills=['shardVolley','gravityWell','thunderLance','worldSever'];
-assert.deepEqual([1,2,3,4].map(slot=>vm.runInContext(`skillAimSpec('amalgam',${slot}).type`,context)),['cone','target','line','line'],'Amalgam Q/R/T/Y need distinct active aim previews');
+assert.deepEqual([1,2,3,4].map(slot=>vm.runInContext(`skillAimSpec('amalgam',${slot}).type`,context)),['self','autoTarget','line','line'],'Amalgam Q/R/T/Y need active aim previews matching their mechanics');
+assert(source.includes("b.team='player';b.owner=player")&&source.includes("b.vx*=-1.35"),'Inertia Reversal must return hostile bullets instead of spawning a radial attack');
+assert(source.includes('player.amalgamAnchor={x:player.x,y:player.y,hp:player.hp}')&&source.includes('player.x=anchor.x;player.y=anchor.y'),'Return Anchor must be a two-stage saved-position skill');
+assert(source.includes('for(let i=0;i<4;i++)if(i!==slot)player.amalgamSkillReadyAt[i]=0'),'Overload Trade must reset the other equipped skills');
+assert(source.includes('const old=getRewindState(4000)'),'Amalgam Time Reversal must restore recorded state');
 assert(data.themes.includes('gojo'),'Gojo needs a dedicated tank theme');
 assert(authSource.includes("id:'gojo',name:'고죠',rarity:'singularity'"),'Gojo must be Singularity');
 assert(authSource.includes("c.id==='gojo'?'한 전투 생존 30분 해금 · 뽑기 제외'"),'Gojo must not appear as a gacha drop');
