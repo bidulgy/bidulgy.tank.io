@@ -19,6 +19,7 @@ vm.runInContext([
   section('const PROJECTILE_SHAPE=', 'function projectileShapeForCannon'),
   section('const CANNON_SKILLS=', 'const CANNON_SKILLS_2='),
   section('const CANNON_SKILLS_2=', 'const ERROR_T_SKILL='),
+  section('const AMALGAM_SKILLS=', 'const TANK_THEMES='),
   section('const TANK_THEMES=', '// V5.61: Diep.io-style evolution tree.'),
   section('const DIEP_EVOLUTION_INFO=', 'const DIEP_EVOLUTION_CHILDREN='),
   section('function evolutionBarrelSpecs(', 'function evolutionHasNoBasicGun('),
@@ -45,6 +46,13 @@ const data = vm.runInContext(`({
   barrels: Object.fromEntries(Object.keys(DIEP_EVOLUTION_INFO).map(id => [id, evolutionBarrelSpecs(id, 27)]))
 })`, context);
 assert.equal(data.themes.length, 48, 'all 48 cannon themes must remain');
+assert.equal(vm.runInContext('Object.keys(AMALGAM_SKILLS).length',context),15,'Amalgam needs fifteen draftable skills');
+assert.equal(vm.runInContext('Object.values(AMALGAM_SKILLS).every((_,i,a)=>true)&&Object.values(AMALGAM_SKILLS).filter(s=>s.rarity==="common").length',context),3,'Amalgam needs three common skills');
+for(const rarity of ['rare','epic','legendary','mythic'])assert.equal(vm.runInContext(`Object.values(AMALGAM_SKILLS).filter(s=>s.rarity===${JSON.stringify(rarity)}).length`,context),3,`Amalgam needs three ${rarity} skills`);
+assert(source.includes("if(player?.cannonType==='amalgam'){hideEvolutionPanel();return}"),'Amalgam must never open evolution choices');
+assert(source.includes('while((isAmalgam||player.level<45)'), 'Amalgam must have no level cap');
+assert(source.includes('if(isAmalgam)queueAmalgamDraft(player.level)'), 'Amalgam must draft a skill on level milestones');
+assert(source.includes("if(level<3||level%3!==0)return"),'Amalgam drafts must occur every three levels');
 assert(data.themes.includes('gojo'),'Gojo needs a dedicated tank theme');
 assert(authSource.includes("id:'gojo',name:'고죠',rarity:'singularity'"),'Gojo must be Singularity');
 assert(authSource.includes("c.id==='gojo'?'한 전투 생존 30분 해금 · 뽑기 제외'"),'Gojo must not appear as a gacha drop');

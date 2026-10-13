@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.17 · machine-gun simultaneous spread volley');
+console.info('[Sworder VS Tank] game V6.18 · Amalgam infinite adaptive skill progression');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -200,6 +200,24 @@ const CANNON_SKILLS_2=Object.freeze({
 const ERROR_T_SKILL=Object.freeze({name:'GLITCH BLADE',cooldown:7,color:'#73ff45'});
 const DEKU_T_SKILL=Object.freeze({name:'발경',cooldown:20,color:'#baff70'});
 const DEKU_Y_SKILL=Object.freeze({name:'변속',cooldown:32,color:'#e7ff76'});
+const AMALGAM_SKILLS=Object.freeze({
+  shardVolley:{name:'파편 일제사격',rarity:'common',rarityLabel:'일반',cooldown:8,color:'#b7d7ff',desc:'전방으로 서로 다른 궤도의 파편 7개를 동시에 발사'},
+  phaseDash:{name:'위상 도약',rarity:'common',rarityLabel:'일반',cooldown:9,color:'#9de8ff',desc:'조준 방향으로 순간 이동하며 출발점과 도착점에 충격파 생성'},
+  repairPulse:{name:'재생 파동',rarity:'common',rarityLabel:'일반',cooldown:14,color:'#8dffb0',desc:'체력을 회복하고 주변 적을 밀어냄'},
+  gravityWell:{name:'중력 우물',rarity:'rare',rarityLabel:'희귀',cooldown:15,color:'#8d7dff',desc:'커서 위치에 적을 끌어당기는 중력장 생성'},
+  frostNova:{name:'빙결 신성',rarity:'rare',rarityLabel:'희귀',cooldown:16,color:'#96ecff',desc:'넓은 빙결 폭발로 적의 움직임을 봉쇄'},
+  sentryRing:{name:'감시자 고리',rarity:'rare',rarityLabel:'희귀',cooldown:17,color:'#66ffd1',desc:'주위를 돌며 자동 사격하는 포탑 군집 소환'},
+  thunderLance:{name:'천뢰 창',rarity:'epic',rarityLabel:'영웅',cooldown:18,color:'#fff176',desc:'화면을 가르는 초고속 관통 번개 발사'},
+  mirrorClones:{name:'거울 분신',rarity:'epic',rarityLabel:'영웅',cooldown:20,color:'#f1c5ff',desc:'서로 다른 방향에서 집중 사격하는 분신 3체 생성'},
+  meteorBrand:{name:'유성 각인',rarity:'epic',rarityLabel:'영웅',cooldown:21,color:'#ffad68',desc:'지정 지역에 연속 유성 폭격'},
+  singularityCore:{name:'특이점 핵',rarity:'legendary',rarityLabel:'전설',cooldown:25,color:'#d277ff',desc:'거대한 특이점으로 적을 흡수하고 지속 피해'},
+  chronoBreak:{name:'시간 파쇄',rarity:'legendary',rarityLabel:'전설',cooldown:26,color:'#9fe8ff',desc:'시간장을 펼치고 내부의 적을 연속 파쇄'},
+  phoenixCore:{name:'불사조 핵',rarity:'legendary',rarityLabel:'전설',cooldown:32,color:'#ff7658',desc:'체력을 크게 회복하고 일정 시간 치명타를 한 번 무효화'},
+  worldSever:{name:'세계 절단',rarity:'mythic',rarityLabel:'신화',cooldown:31,color:'#ffffff',desc:'맵 끝까지 이어지는 거대한 차원 절단'},
+  cosmicStorm:{name:'우주 폭풍',rarity:'mythic',rarityLabel:'신화',cooldown:34,color:'#72f4ff',desc:'넓은 지역에 별과 번개가 쏟아지는 폭풍 생성'},
+  genesisShield:{name:'창세의 방패',rarity:'mythic',rarityLabel:'신화',cooldown:36,color:'#ffe99b',desc:'회복과 공격 강화를 주는 절대 보호막 전개'}
+});
+const AMALGAM_RARITY_ORDER=Object.freeze({common:0,rare:1,epic:2,legendary:3,mythic:4});
 const TANK_THEMES=Object.freeze({
   standard:{body:'#55a7ff',edge:'#2868ad',glow:'#68b8ff'},
   scout:{body:'#39bfe7',edge:'#19708b',glow:'#77ecff'},
@@ -369,7 +387,7 @@ function eligibleEvolutionChildren(type,level){
 function evolutionName(type){return DIEP_EVOLUTION_INFO[type]?.name||'탱크'}
 
 const statsDef=[['maxHealth','최대 체력'],['regen','체력 회복'],['bulletDamage','탄환 피해'],['bulletSpeed','탄환 속도'],['reload','연사 속도'],['moveSpeed','이동 속도']];
-function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',evolutionTier:0,cannonType:'standard',runId:'',survivalSeconds:0,gojoSurvivalAwarded:false,skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,skill4Cd:0,skill4Max:0,skill4ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,siegeUntil:0,stellarReviveUntil:0,stellarReviveReady:false,phantomMarkActive:false,phantomMarkUntil:0,phantomMarkOriginX:0,phantomMarkOriginY:0,phantomMarkDestX:0,phantomMarkDestY:0,cloakUntil:0,dekuSmokeUntil:0,dekuFaJinUntil:0,dekuGearshiftUntil:0,dekuWhipChainRemaining:0,dekuWhipChainUntil:0,sniperScopeUntil:0,stunUntil:0,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
+function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',evolutionTier:0,cannonType:'standard',runId:'',survivalSeconds:0,gojoSurvivalAwarded:false,amalgamSkills:[],amalgamSkillReadyAt:[0,0,0,0],amalgamDraftQueue:[],amalgamDraftChoices:[],skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,skill4Cd:0,skill4Max:0,skill4ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,siegeUntil:0,stellarReviveUntil:0,stellarReviveReady:false,phantomMarkActive:false,phantomMarkUntil:0,phantomMarkOriginX:0,phantomMarkOriginY:0,phantomMarkDestX:0,phantomMarkDestY:0,cloakUntil:0,dekuSmokeUntil:0,dekuFaJinUntil:0,dekuGearshiftUntil:0,dekuWhipChainRemaining:0,dekuWhipChainUntil:0,sniperScopeUntil:0,stunUntil:0,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
 function resize(){
   const mobileLike=innerWidth<900||matchMedia('(pointer:coarse)').matches;
   const dpr=Math.min(mobileLike?1.25:1.5,devicePixelRatio||1);
@@ -841,7 +859,7 @@ function upsertRemotePlayer(payload){
   r.targetAngle=safeRemoteNumber(payload.angle,r.targetAngle);
   r.hp=Math.max(0,safeRemoteNumber(payload.hp,r.hp));
   r.maxHp=Math.max(1,safeRemoteNumber(payload.maxHp,r.maxHp));
-  r.level=clamp(Math.floor(safeRemoteNumber(payload.level,r.level)),1,45);
+  r.level=clamp(Math.floor(safeRemoteNumber(payload.level,r.level)),1,9999);
   r.score=Math.max(0,Math.floor(safeRemoteNumber(payload.score,r.score)));
   r.kills=Math.max(0,Math.floor(safeRemoteNumber(payload.kills,r.kills)));
   r.name=String(payload.name||r.name||'PLAYER').slice(0,14);
@@ -1348,20 +1366,79 @@ async function connectOnlineArena(preserveRemotes=false){
 }
 
 const xpNeed=l=>Math.round(40+l*18+l*l*2.2);
+const amalgamXpNeed=l=>Math.round(54+Math.max(1,l)*6);
+function ensureAmalgamDraftPanel(){
+  let panel=document.querySelector('#amalgamDraftPanel');
+  if(panel)return panel;
+  panel=document.createElement('section');panel.id='amalgamDraftPanel';panel.className='amalgam-draft hidden';
+  panel.innerHTML='<div class="amalgam-draft-head"><div><small>집합체 적응 · 전투는 계속됩니다</small><strong>새 스킬 선택</strong></div><span id="amalgamDraftLevel">LV 3</span></div><div id="amalgamDraftChoices" class="amalgam-draft-choices"></div>';
+  document.querySelector('#app')?.appendChild(panel);
+  return panel;
+}
+function amalgamRarityForLevel(level){
+  const roll=Math.random(),boost=Math.min(.20,Math.max(0,level-3)*.004);
+  if(roll<.03+boost*.35)return'mythic';
+  if(roll<.11+boost*.70)return'legendary';
+  if(roll<.28+boost)return'epic';
+  if(roll<.56+boost)return'rare';
+  return'common';
+}
+function buildAmalgamDraft(level){
+  const owned=new Set(player.amalgamSkills||[]),pool=Object.keys(AMALGAM_SKILLS).filter(id=>!owned.has(id));
+  const result=[];
+  while(result.length<3&&pool.length){
+    const rarity=amalgamRarityForLevel(level);
+    let candidates=pool.filter(id=>AMALGAM_SKILLS[id].rarity===rarity);
+    if(!candidates.length)candidates=pool;
+    const id=candidates[Math.floor(Math.random()*candidates.length)];
+    result.push(id);pool.splice(pool.indexOf(id),1);
+  }
+  return result;
+}
+function renderAmalgamDraft(){
+  const panel=ensureAmalgamDraftPanel();
+  if(player?.cannonType!=='amalgam'||!player.alive||!(player.amalgamDraftQueue?.length)){panel.classList.add('hidden');return}
+  const level=player.amalgamDraftQueue[0];
+  if(!player.amalgamDraftChoices?.length)player.amalgamDraftChoices=buildAmalgamDraft(level);
+  panel.querySelector('#amalgamDraftLevel').textContent=`LV ${level}`;
+  const full=player.amalgamSkills.length>=4,keys=['Q','R','T','Y'];
+  panel.querySelector('#amalgamDraftChoices').innerHTML=player.amalgamDraftChoices.map(id=>{
+    const s=AMALGAM_SKILLS[id];
+    const actions=full
+      ? `<div class="amalgam-replace">${keys.map((key,i)=>`<button type="button" data-skill="${id}" data-slot="${i}">${key} 교체</button>`).join('')}</div>`
+      : `<button class="amalgam-learn" type="button" data-skill="${id}" data-slot="${player.amalgamSkills.length}">습득</button>`;
+    return `<article class="amalgam-choice rarity-${s.rarity}"><span>${s.rarityLabel}</span><strong>${s.name}</strong><p>${s.desc}</p>${actions}</article>`;
+  }).join('');
+  panel.querySelectorAll('[data-skill][data-slot]').forEach(button=>button.onclick=()=>{
+    const id=button.dataset.skill,slot=Number(button.dataset.slot);
+    if(!AMALGAM_SKILLS[id]||slot<0||slot>3)return;
+    player.amalgamSkills[slot]=id;player.amalgamSkillReadyAt[slot]=0;
+    player.amalgamDraftQueue.shift();player.amalgamDraftChoices=[];
+    renderAmalgamDraft();updateSkillHud();
+  });
+  panel.classList.remove('hidden');
+}
+function queueAmalgamDraft(level){
+  if(level<3||level%3!==0)return;
+  player.amalgamDraftQueue.push(level);
+  renderAmalgamDraft();
+}
 function gainXp(a){
   if(!player.alive)return;
   const gain=Math.max(0,Number(a)||0);
   player.score+=Math.round(gain*3);
-  if(player.level>=45){player.level=45;player.xp=0;updateUI();return}
+  const isAmalgam=player.cannonType==='amalgam';
+  if(!isAmalgam&&player.level>=45){player.level=45;player.xp=0;updateUI();return}
   player.xp+=gain;
-  while(player.level<45&&player.xp>=player.xpNeed){
+  while((isAmalgam||player.level<45)&&player.xp>=player.xpNeed){
     player.xp-=player.xpNeed;
     player.level++;
     player.points++;
-    player.xpNeed=xpNeed(player.level);
+    player.xpNeed=isAmalgam?amalgamXpNeed(player.level):xpNeed(player.level);
+    if(isAmalgam)queueAmalgamDraft(player.level);
   }
-  if(player.level>=45){player.level=45;player.xp=0}
-  if(player.level>=15)showClassUpgrade(player.level);
+  if(!isAmalgam&&player.level>=45){player.level=45;player.xp=0}
+  if(!isAmalgam&&player.level>=15)showClassUpgrade(player.level);
   updateUI();
 }
 // V5.62: polygon kills grant 50% XP, while score reward stays unchanged.
@@ -1374,7 +1451,7 @@ function gainPolygonXp(rawXp){
   player.score=scoreBefore+Math.round(full*3);
   updateUI();
 }
-function updateUI(){ui.level.textContent=player.level;ui.score.textContent=player.score.toLocaleString();ui.xp.style.width=player.level>=45?'100%':`${clamp(player.xp/player.xpNeed*100,0,100)}%`;ui.points.textContent=player.points;ui.upgradePanel.classList.toggle('has-points',player.points>0);renderUpgrades()}
+function updateUI(){ui.level.textContent=player.level;ui.score.textContent=player.score.toLocaleString();ui.xp.style.width=player.cannonType!=='amalgam'&&player.level>=45?'100%':`${clamp(player.xp/player.xpNeed*100,0,100)}%`;ui.points.textContent=player.points;ui.upgradePanel.classList.toggle('has-points',player.points>0);renderUpgrades()}
 function renderUpgrades(){
   // Keep the same button nodes while XP and score change. Replacing a pressed
   // button before pointerup can silently drop its click on touch devices.
@@ -1395,6 +1472,7 @@ function hideEvolutionPanel(){
   if(ui.classPanel){ui.classPanel.classList.add('hidden');ui.classPanel.dataset.upgradeKey=''}
 }
 function showClassUpgrade(level=player.level){
+  if(player?.cannonType==='amalgam'){hideEvolutionPanel();return}
   if(!player?.alive||player.level<15){hideEvolutionPanel();return}
   const current=player.classType||'basic';
   const choices=eligibleEvolutionChildren(current,Math.min(45,Math.max(15,level)));
@@ -1804,9 +1882,26 @@ function setFourthSkillVisible(visible){
   setSkillButtonVisible(ui.skill4Btn,visible);
   if(ui.skill4Btn&&!visible)ui.skill4Btn.disabled=true;
 }
+function updateAmalgamSkillHud(){
+  const ids=player.amalgamSkills||[],buttons=[ui.skillBtn,ui.skill2Btn,ui.skill3Btn,ui.skill4Btn];
+  const names=[ui.skillName,ui.skill2Name,ui.skill3Name,ui.skill4Name],cooldowns=[ui.skillCooldown,ui.skill2Cooldown,ui.skill3Cooldown,ui.skill4Cooldown],fills=[ui.skillFill,ui.skill2Fill,ui.skill3Fill,ui.skill4Fill];
+  ui.skillHud?.classList.toggle('hidden',!running||!player.alive||!ids.length);
+  if(ui.skillHud){ui.skillHud.dataset.cannon='amalgam';ui.skillHud.dataset.skillCount=String(ids.length)}
+  buttons.forEach((button,i)=>{
+    const def=AMALGAM_SKILLS[ids[i]],show=!!def;
+    setSkillButtonVisible(button,show);if(!show)return;
+    const left=Math.max(0,((player.amalgamSkillReadyAt?.[i]||0)-Date.now())/1000),ready=left<=.001;
+    button.querySelector('.skill-key').textContent=['Q','R','T','Y'][i];
+    names[i].textContent=`${def.rarityLabel} · ${def.name}`;
+    cooldowns[i].textContent=ready?'READY':`${left.toFixed(1)}s`;
+    fills[i].style.width=`${clamp((1-left/def.cooldown)*100,0,100)}%`;
+    button.disabled=!ready;button.className=`skill-button skill${i?i+1:''}-button cannon-amalgam rarity-${def.rarity} ${ready?'ready':'cooling'}`;
+  });
+}
 function updateSkillHud(){
   refreshRealTimeSkillCooldowns();
   const cannon=player?.cannonType||'';
+  if(cannon==='amalgam'){updateAmalgamSkillHud();return}
   const def=CANNON_SKILLS[cannon];
   const def2=CANNON_SKILLS_2[cannon];
   const visible=!!(running&&player?.alive&&def);
@@ -2082,11 +2177,54 @@ function activateSkill4(){
   spawnCombatFx('dekuGearshift',player.x,player.y,{angle:player.angle,color:'#80efff',life:1.55,radius:220,cannon:'deku'});burst(player.x,player.y,'#bffcff',32);sendUniqueSkill('deku','dekuGearshift',{radius:220,life:1.55});broadcastLocalState(true);updateSkillHud();
 }
 
+function castAmalgamSkill(slot){
+  if(!running||paused||!player?.alive||player.cannonType!=='amalgam')return false;
+  const id=player.amalgamSkills?.[slot],def=AMALGAM_SKILLS[id];if(!def)return false;
+  const now=Date.now();if(now<(player.amalgamSkillReadyAt?.[slot]||0))return false;
+  player.amalgamSkillReadyAt[slot]=now+def.cooldown*1000;
+  const a=player.angle,p=playerParams(),[tx,ty]=skillAimPoint(560);
+  if(id==='shardVolley'){
+    for(let i=-3;i<=3;i++)skillProjectile('amalgam',a+i*.105,{damageMul:.72,speedMul:1.18,life:2.2,pierce:2,splashRadius:28});
+  }else if(id==='phaseDash'){
+    const ox=player.x,oy=player.y,[dx,dy]=skillAimPoint(720),aa=Math.atan2(dy-oy,dx-ox),len=Math.hypot(dx-ox,dy-oy);
+    skillAreaDamage(ox,oy,120,p.damage*1.5,def.color);player.x=dx;player.y=dy;player.phaseUntil=performance.now()+520;skillAreaDamage(dx,dy,145,p.damage*2.2,def.color);spawnCombatFx('dimensionRift',ox,oy,{angle:aa,color:def.color,life:.75,radius:len,cannon:'amalgam'});broadcastLocalState(true);
+  }else if(id==='repairPulse'){
+    player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.30);skillAreaDamage(player.x,player.y,230,p.damage*1.25,def.color);burst(player.x,player.y,def.color,28);
+  }else if(id==='gravityWell'){
+    addSkillZone('gravity',{x:tx,y:ty,radius:360,life:5.2,damage:p.damage*.28,tick:0});
+  }else if(id==='frostNova'){
+    addSkillZone('frostPrison',{x:tx,y:ty,radius:350,life:5.8,damage:p.damage*.55,tick:0});
+  }else if(id==='sentryRing'){
+    addSkillZone('twinDrones',{x:player.x,y:player.y,radius:155,life:8.0,tick:0,data:{next:0}});
+  }else if(id==='thunderLance'){
+    damageSkillLine(player.x,player.y,a,1450,44,p.damage*8.0,def.color,160);spawnCombatFx('rail',player.x,player.y,{angle:a,color:def.color,life:.48,radius:1450,cannon:'amalgam'});
+  }else if(id==='mirrorClones'){
+    for(let k=-1;k<=1;k++){const side=k*95,x=player.x-Math.sin(a)*side,y=player.y+Math.cos(a)*side;for(let j=-1;j<=1;j++)spawnSkillProjectileAt('amalgam',x,y,a+j*.07,{damageMul:1.35,speedMul:1.28,life:2.7,pierce:5,r:10,special:'mirrorPacket'})}
+  }else if(id==='meteorBrand'){
+    addSkillZone('missileRain',{x:tx,y:ty,radius:390,life:6.2,damage:p.damage*2.4,tick:0,data:{next:.10,count:0}});
+  }else if(id==='singularityCore'){
+    addSkillZone('polarityCrush',{x:tx,y:ty,radius:470,life:6.0,damage:p.damage*.62,tick:0});
+  }else if(id==='chronoBreak'){
+    addSkillZone('timeField',{x:tx,y:ty,radius:420,life:6.0,damage:0,tick:0});for(let k=0;k<4;k++)addSkillZone('threeFates',{x:tx,y:ty,radius:145+k*70,life:.8+k*.55,damage:p.damage*(2.0+k*.6),data:{detonateAt:.10}});
+  }else if(id==='phoenixCore'){
+    player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.55);player.stellarReviveUntil=performance.now()+15000;player.stellarReviveReady=true;addSkillZone('secondStar',{x:player.x,y:player.y,radius:170,life:15,damage:0,tick:0});
+  }else if(id==='worldSever'){
+    const length=distanceToWorldEdge(player.x,player.y,a,60);damageSkillLine(player.x,player.y,a,length,110,p.damage*15,def.color,0);spawnCombatFx('rail',player.x,player.y,{angle:a,color:def.color,life:.72,radius:length,cannon:'amalgam'});shake=Math.max(shake,24);
+  }else if(id==='cosmicStorm'){
+    addSkillZone('einherjarRain',{x:tx,y:ty,radius:540,life:8.0,damage:p.damage*2.15,tick:0,data:{next:.05,count:0}});addSkillZone('thunderStorm',{x:tx,y:ty,radius:500,life:7.0,damage:p.damage*1.5,tick:0,data:{next:.08,strikes:0}});
+  }else if(id==='genesisShield'){
+    player.fortressUntil=performance.now()+10000;player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.35);addSkillZone('ironDome',{x:player.x,y:player.y,radius:210,life:10,damage:0,tick:0});addSkillZone('constellation',{x:player.x,y:player.y,radius:260,life:10,damage:p.damage*.65,tick:0,data:{heal:player.maxHp*.025}});
+  }
+  spawnCombatFx('uniqueSkill',id==='phaseDash'?player.x:tx,id==='phaseDash'?player.y:ty,{angle:a,color:def.color,life:1.05,radius:280,cannon:'amalgam'});
+  sendUniqueSkill('amalgam',id,{targetX:tx,targetY:ty,zoneAngle:a,radius:420,life:1.2});updateSkillHud();return true;
+}
+
 
 function skillSlotReady(slot){
   if(!running||paused||!player?.alive)return false;
   refreshRealTimeSkillCooldowns();
   const cannon=player.cannonType||'standard';
+  if(cannon==='amalgam'){const i=slot-1;return !!AMALGAM_SKILLS[player.amalgamSkills?.[i]]&&Date.now()>=(player.amalgamSkillReadyAt?.[i]||0)}
   if(slot===4&&cannon!=='deku')return false;
   if(slot===1){if(cannon==='phantom'&&phantomMarkCanReturn())return true;return !!CANNON_SKILLS[cannon]&&(player.skillCd||0)<=.001;}
   if(slot===2){
@@ -2153,6 +2291,7 @@ function releaseHeldSkillAim(slot=heldSkillAim.slot){
   const gojoTarget=cannon==='gojo'?gojoAimPoint(slot===1?480:540):null;
   if(player&&Number.isFinite(heldSkillAim.angle))player.angle=heldSkillAim.angle;
   heldSkillAim.active=false;heldSkillAim.slot=0;heldSkillAim.source='';heldSkillAim.pointerId=null;heldSkillAim.angle=null;heldSkillAim.distance=null;heldSkillAim.moved=false;
+  if(cannon==='amalgam')return castAmalgamSkill(slot-1);
   if(cannon==='gojo'&&slot===1)return finishGojoAoHold(true);
   if(cannon==='gojo'&&slot===2)return castGojoSkill('aka',gojoTarget);
   if(slot===1){if(cannon==='error'&&player?.errorSwordMode&&player?.errorQCharging)return releaseErrorQCharge();activateSkill(0,phantomTarget);return true}
@@ -3430,6 +3569,7 @@ function killPlayer(killerId=''){
   if(!player.alive)return;
   player.alive=false;
   player.hp=0;
+  document.querySelector('#amalgamDraftPanel')?.classList.add('hidden');
   broadcastLocalState(true);
   const defeatedRunId=String(player.runId||''),defeatedCannon=String(player.cannonType||'standard');
   if(killerId){
@@ -6225,6 +6365,7 @@ async function startGame(){
   runSaveBusy=false;
   player.name=(ui.nameInput.value.trim()||window.IronCellAuth.username||'PLAYER').slice(0,14);
   player.cannonType=window.IronCellAuth.getCannon?.()?.id||'standard';
+  if(player.cannonType==='amalgam')player.xpNeed=amalgamXpNeed(player.level);
   // Online players do not all spawn on exactly the same point.
   player.x=rand(420,WORLD-420);
   player.y=rand(420,WORLD-420);
@@ -6292,6 +6433,7 @@ window.IronCellGame = {
     ui.deathScreen.classList.remove('show');
     ui.skillHud?.classList.add('hidden');ui.skill2Btn?.classList.add('hidden');ui.skill3Btn?.classList.add('hidden');ui.skill4Btn?.classList.add('hidden');
     ui.classPanel.classList.add('hidden');
+    document.querySelector('#amalgamDraftPanel')?.classList.add('hidden');
     ui.startScreen.classList.remove('show');
     document.querySelector('#garageScreen')?.classList.remove('show');
     document.querySelector('#lobbyScreen')?.classList.remove('show');
