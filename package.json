@@ -1,6 +1,6 @@
 {
   "name": "sworder-vs-tank-arena-server",
-  "version": "6.16.0",
+  "version": "6.17.0",
   "private": true,
   "engines": { "node": ">=20" },
   "scripts": {

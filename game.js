@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.16 · fresh singularity admin and equip RPCs');
+console.info('[Sworder VS Tank] game V6.17 · machine-gun simultaneous spread volley');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -4473,7 +4473,17 @@ function evolutionVolleySpecs(type,r,shotNo){
   switch(type){
     case 'twin':
       return all(.72,1,1,.62);
-    case 'sniperClass':case 'machineGun':case 'assassin':case 'ranger':case 'stalker':
+    case 'machineGun': {
+      // A machine gun wobbles slightly on normal shots and fires every third
+      // cycle as one simultaneous five-round fan. Returning the whole fan
+      // from this call makes every projectile spawn in the same simulation tick.
+      if(n%3!==2){
+        const sway=(n%2===0?-1:1)*.035;
+        return[wrap({...specs[0],a:sway},.82,1,1,.68)];
+      }
+      return[-.16,-.08,0,.08,.16].map(a=>wrap({...specs[0],a},.25,.94,.98,.18));
+    }
+    case 'sniperClass':case 'assassin':case 'ranger':case 'stalker':
     case 'destroyer':case 'annihilator':case 'skimmer':case 'glider':case 'rocketeer':
     case 'trapper':case 'megaTrapper':case 'shotgun':case 'palletShot':
       return[wrap(specs[0],1,1,1,1)];
@@ -4617,6 +4627,22 @@ function drawEvolutionChassis(e,r){
     drawPlayerCannon(e.cannonType||'standard',r);
     ctx.restore();
   };
+  const drawMachineGunBarrel=(spec)=>{
+    ctx.save();ctx.rotate(spec.a||0);ctx.translate(0,spec.side||0);
+    const start=r*.20,len=r*(.92+.78*(spec.len||1))+3,w=Math.max(10,r*.39*(spec.w||1));
+    // Wide receiver, narrowing heat shield, and a flared muzzle give this
+    // evolution its own silhouette while retaining the equipped cannon glow.
+    ctx.fillStyle='rgba(105,120,134,.98)';ctx.strokeStyle='rgba(42,53,65,.98)';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(start,-w*.58);ctx.lineTo(start+len*.58,-w*.45);ctx.lineTo(start+len,w*-.32);ctx.lineTo(start+len,w*.32);ctx.lineTo(start+len*.58,w*.45);ctx.lineTo(start,w*.58);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle='rgba(189,202,213,.98)';
+    ctx.beginPath();ctx.moveTo(start+len*.12,-w*.34);ctx.lineTo(start+len*.77,-w*.27);ctx.lineTo(start+len*.77,w*.27);ctx.lineTo(start+len*.12,w*.34);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle='rgba(54,66,78,.98)';
+    for(let i=0;i<4;i++){const x=start+len*(.28+i*.12);ctx.fillRect(x,-w*.39,Math.max(3,r*.07),w*.78)}
+    ctx.fillStyle=glow;ctx.globalAlpha=.82;ctx.fillRect(start+len*.18,-2,len*.56,4);ctx.globalAlpha=1;
+    ctx.fillStyle='rgba(62,74,86,.99)';ctx.fillRect(start+len*.76,-w*.52,len*.22,w*1.04);ctx.strokeRect(start+len*.76,-w*.52,len*.22,w*1.04);
+    ctx.fillStyle=glow;ctx.globalAlpha=.72;ctx.fillRect(start+len*.91,-w*.38,4,w*.76);ctx.globalAlpha=1;
+    ctx.restore();
+  };
   const drawRimAuto=(spec,index)=>{
     const a=spec.a||0,tx=Math.cos(a)*r*.62,ty=Math.sin(a)*r*.62;
     const tracked=Number.isFinite(e.auto5AimAngles?.[index])?e.auto5AimAngles[index]-e.angle:a;
@@ -4645,7 +4671,8 @@ function drawEvolutionChassis(e,r){
       ctx.restore();
       continue;
     }
-    if(spec.kind==='rimAuto')drawRimAuto(spec,specIndex);
+    if(type==='machineGun')drawMachineGunBarrel(spec);
+    else if(spec.kind==='rimAuto')drawRimAuto(spec,specIndex);
     else if(spec.kind==='centerAuto')drawCenterAuto(spec.a||0);
     else drawInheritedBarrel(spec);
   }

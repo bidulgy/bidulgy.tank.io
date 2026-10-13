@@ -54,6 +54,9 @@ assert.equal(vm.runInContext("evolutionVolleySpecs('quadTank',27,1).length",cont
 assert.equal(vm.runInContext("evolutionVolleySpecs('quadTank',27,1).every(shot => shot.damageScale === 1)",context),true,'Quad bullets must retain full damage');
 assert.equal(vm.runInContext("evolutionVolleySpecs('twin',27,1).length",context),2,'Twin must fire both barrels together');
 assert.equal(vm.runInContext("evolutionVolleySpecs('twin',27,1).map(shot => shot.side).join(',')",context),'-10,10','Twin shots must originate from opposite barrels');
+assert.equal(vm.runInContext("evolutionVolleySpecs('machineGun',27,1).length",context),1,'Machine Gun normal cycles must fire one scattered round');
+assert.equal(vm.runInContext("evolutionVolleySpecs('machineGun',27,3).length",context),5,'Machine Gun burst cycles must spawn five rounds together');
+assert.equal(vm.runInContext("evolutionVolleySpecs('machineGun',27,3).map(shot => shot.a).join(',')",context),'-0.16,-0.08,0,0.08,0.16','Machine Gun burst must form one symmetric spread fan');
 assert(source.includes("e.code==='KeyE'&&player?.cannonType==='gojo'"),'Gojo Aka must use E');
 assert(source.includes('return tryGojoPurple()'),'simultaneous Q+E must trigger Purple');
 assert.equal(vm.runInContext("skillAimSpec('gojo',1).type",context),'target','Ao needs an area preview');
@@ -164,6 +167,12 @@ assert.deepEqual(twinOffsets,[[0,-10],[0,10]],'Twin visuals must follow both fir
 twinDraws.length=0;twinOffsets.length=0;
 vm.runInContext("drawEvolutionChassis({classType:'tripleShot',cannonType:'scout'},27)",twinContext);
 assert.deepEqual(twinDraws,[['scout',27],['scout',27],['scout',27]],'Tier 2/3 evolution barrels must retain the equipped cannon appearance');
+twinDraws.length=0;twinOffsets.length=0;
+vm.runInContext("drawEvolutionChassis({classType:'machineGun',cannonType:'scout'},27)",twinContext);
+assert.equal(twinDraws.length,0,'Machine Gun must use its dedicated evolved barrel silhouette');
+const machineGunVolley=vm.runInContext("evolutionShotsFromBase('machineGun',27,3,{angle:0,side:0,damageMul:1},0)",context);
+assert.equal(machineGunVolley.length,5,'Machine Gun spread bullets must be created in one firing call');
+assert.deepEqual(Array.from(machineGunVolley,v=>v.angle),[-.16,-.08,0,.08,.16],'Machine Gun projectile angles must match the visible fan');
 context.WORLD = 12600;
 const central = [];
 context.spawnShape = type => { const shape = {type}; central.push(shape); return shape; };
