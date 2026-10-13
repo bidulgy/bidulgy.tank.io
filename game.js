@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.24 · Amalgam fourth skill moved from Y to G');
+console.info('[Sworder VS Tank] game V6.25 · distinct Amalgam effects, ranged weapons, reliable rewind');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -1612,7 +1612,7 @@ function spawnCombatFx(type,x,y,opts={}){
     type,x,y,angle:normalizeFxAngle(opts.angle),color:opts.color||'#fff',
     life:opts.life||.35,maxLife:opts.life||.35,
     radius:opts.radius||38,size:opts.size||1,
-    ownerId:opts.ownerId||'',cannon:opts.cannon||'',variant:opts.variant||''
+    ownerId:opts.ownerId||'',cannon:opts.cannon||'',variant:opts.variant||'',skill:opts.skill||''
   });
 }
 function spawnAttackFx(cannon,x,y,angle,remote=false){
@@ -2184,7 +2184,8 @@ function activateSkill4(){
 function spawnAmalgamRarityFx(def,x=player.x,y=player.y){
   if(!def)return;
   const rank=AMALGAM_RARITY_ORDER[def.rarity]||0;
-  spawnCombatFx('amalgamRarity',x,y,{angle:player.angle,color:def.color,life:.72+rank*.18,radius:105+rank*42,cannon:'amalgam',variant:def.rarity});
+  const skill=Object.keys(AMALGAM_SKILLS).find(id=>AMALGAM_SKILLS[id]===def)||'';
+  spawnCombatFx('amalgamSkillSig',x,y,{angle:player.angle,color:def.color,life:.78+rank*.18,radius:115+rank*44,cannon:'amalgam',variant:def.rarity,skill});
 }
 function spawnAmalgamShield(def,duration=1.4){
   const rank=AMALGAM_RARITY_ORDER[def.rarity]||0;
@@ -2210,11 +2211,11 @@ function castAmalgamSkill(slot){
   }else if(id==='gravityWell'){
     const target=nearestSkillTarget(player.x,player.y,1050);if(target){const aa=Math.atan2(target.y-player.y,target.x-player.x),damage=p.damage*2.1*tier;if(target.kind==='shape'){applyShapeDamage(target.obj,damage,-Math.cos(aa)*920,-Math.sin(aa)*920)}else sendDamage(target.obj.id,damage);spawnCombatFx('harpoonCable',player.x,player.y,{angle:aa,color:def.color,life:.8,radius:Math.hypot(target.x-player.x,target.y-player.y),cannon:'amalgam'});player.vx+=Math.cos(aa)*120;player.vy+=Math.sin(aa)*120}
   }else if(id==='frostNova'){
-    let erased=0;for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];if(b.team!=='remote'||Math.hypot(b.x-player.x,b.y-player.y)>900)continue;burst(b.x,b.y,def.color,4);bullets.splice(i,1);erased++}player.fortressUntil=performance.now()+2200+erased*45;spawnAmalgamShield(def,2.1);
+    let erased=0;for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];if(b.team!=='remote'||Math.hypot(b.x-player.x,b.y-player.y)>900)continue;burst(b.x,b.y,def.color,4);bullets.splice(i,1);erased++}player.fortressUntil=performance.now()+2200+erased*45;spawnCombatFx('amalgamFrostStop',player.x,player.y,{angle:a,color:def.color,life:1.25,radius:360,cannon:'amalgam'});
   }else if(id==='sentryRing'){
-    addSkillZone('ringParry',{x:player.x,y:player.y,radius:205,life:7.5,damage:p.damage*.92*tier,tick:0});spawnAmalgamShield(def,2.4);
+    addSkillZone('ringParry',{x:player.x,y:player.y,radius:205,life:7.5,damage:p.damage*.92*tier,tick:0});spawnCombatFx('amalgamGauntlets',player.x,player.y,{angle:a,color:def.color,life:2.4,radius:118,cannon:'amalgam'});
   }else if(id==='thunderLance'){
-    const[sx,sy]=skillAimPoint(760);skillAreaDamage(sx,sy,92,p.damage*5.3*tier,def.color);spawnCombatFx('amalgamSkyLance',sx,sy,{angle:0,color:def.color,life:1.05,radius:520,cannon:'amalgam'});shake=Math.max(shake,18);
+    const[sx,sy]=skillAimPoint(760),aa=Math.atan2(sy-player.y,sx-player.x);skillAreaDamage(sx,sy,92,p.damage*5.3*tier,def.color);spawnCombatFx('amalgamSkyLance',sx,sy,{angle:0,color:def.color,life:1.05,radius:520,cannon:'amalgam'});for(const off of [-.16,0,.16])spawnSkillProjectileAt('amalgam',player.x+Math.cos(aa)*46,player.y+Math.sin(aa)*46,aa+off,{damageMul:2.25*tier,speedMul:1.55,life:3.5,pierce:6,r:11,special:'amalgamThrownLance'});shake=Math.max(shake,18);
   }else if(id==='mirrorClones'){
     player.cloakUntil=performance.now()+5000;player.phaseUntil=performance.now()+1700;player.overclockUntil=performance.now()+5000;spawnCombatFx('cloakBurst',player.x,player.y,{angle:a,color:def.color,life:.9,radius:180,cannon:'phantom'});broadcastLocalState(true);
   }else if(id==='meteorBrand'){
@@ -2222,11 +2223,11 @@ function castAmalgamSkill(slot){
   }else if(id==='singularityCore'){
     player.hp=Math.max(1,player.hp-player.maxHp*.35);for(let i=0;i<4;i++)if(i!==slot)player.amalgamSkillReadyAt[i]=0;player.overclockUntil=performance.now()+6000;spawnCombatFx('glitchDriveCast',player.x,player.y,{angle:a,color:def.color,life:1.3,radius:230,cannon:'error'});burst(player.x,player.y,def.color,38);
   }else if(id==='chronoBreak'){
-    const old=getRewindState(4000);if(old){const ox=player.x,oy=player.y;player.x=old.x;player.y=old.y;player.hp=Math.max(player.hp,Math.min(player.maxHp,old.hp));player.vx=old.vx;player.vy=old.vy;player.phaseUntil=performance.now()+900;spawnCombatFx('rewindBurst',ox,oy,{angle:Math.atan2(player.y-oy,player.x-ox),color:def.color,life:1.1,radius:Math.hypot(player.x-ox,player.y-oy),cannon:'chrono'});broadcastLocalState(true)}
+    const old=getRewindState(4000);if(old){const ox=player.x,oy=player.y;player.x=clamp(old.x,player.r,WORLD-player.r);player.y=clamp(old.y,player.r,WORLD-player.r);player.hp=clamp(old.hp,1,player.maxHp);player.vx=old.vx;player.vy=old.vy;player.phaseUntil=performance.now()+900;playerHistory=playerHistory.filter(item=>item.t<=old.t);camera.x=player.x-innerWidth/2;camera.y=player.y-innerHeight/2;spawnCombatFx('rewindBurst',ox,oy,{angle:Math.atan2(player.y-oy,player.x-ox),color:def.color,life:1.1,radius:Math.hypot(player.x-ox,player.y-oy),cannon:'chrono'});spawnCombatFx('chronoArrival',player.x,player.y,{angle:a,color:def.color,life:1.15,radius:150,cannon:'amalgam'});broadcastLocalState(true)}
   }else if(id==='phoenixCore'){
     player.hp=player.maxHp;player.stellarReviveUntil=performance.now()+20000;player.stellarReviveReady=true;player.overclockUntil=performance.now()+9000;addSkillZone('secondStar',{x:player.x,y:player.y,radius:190,life:20,damage:0,tick:0});spawnAmalgamShield(def,2.8);
   }else if(id==='worldSever'){
-    const length=distanceToWorldEdge(player.x,player.y,a,60);damageSkillLine(player.x,player.y,a,length,145,p.damage*3.4*tier,def.color,0);spawnCombatFx('amalgamWorldBlade',player.x,player.y,{angle:a,color:def.color,life:1.0,radius:Math.min(760,length),cannon:'amalgam'});spawnCombatFx('rail',player.x,player.y,{angle:a,color:def.color,life:.82,radius:length,cannon:'zero'});shake=Math.max(shake,30);
+    const length=distanceToWorldEdge(player.x,player.y,a,60);damageSkillLine(player.x,player.y,a,length,145,p.damage*3.4*tier,def.color,0);spawnCombatFx('amalgamWorldBlade',player.x,player.y,{angle:a,color:def.color,life:1.0,radius:Math.min(760,length),cannon:'amalgam'});for(const off of [-.12,0,.12])spawnSkillProjectileAt('amalgam',player.x+Math.cos(a)*58,player.y+Math.sin(a)*58,a+off,{damageMul:2.1*tier,speedMul:1.32,life:5,pierce:30,r:16,special:'amalgamFlyingBlade'});spawnCombatFx('rail',player.x,player.y,{angle:a,color:def.color,life:.82,radius:length,cannon:'zero'});shake=Math.max(shake,30);
   }else if(id==='cosmicStorm'){
     const ox=player.x,oy=player.y,[dx,dy]=skillAimPoint(1150),aa=Math.atan2(dy-oy,dx-ox),len=Math.hypot(dx-ox,dy-oy);player.x=dx;player.y=dy;player.phaseUntil=performance.now()+1300;player.cloakUntil=performance.now()+4500;player.vx=0;player.vy=0;spawnCombatFx('dimensionRift',ox,oy,{angle:aa,color:def.color,life:1.2,radius:len,cannon:'void'});broadcastLocalState(true);
   }else if(id==='genesisShield'){
@@ -3438,7 +3439,7 @@ function getRewindState(msAgo=4000){
   if(!playerHistory.length)return null;
   const target=performance.now()-msAgo;
   let best=playerHistory[0];
-  for(const item of playerHistory){if(Math.abs(item.t-target)<Math.abs(best.t-target))best=item}
+  for(const item of playerHistory){if(item.t<=target)best=item;else break}
   return best;
 }
 
@@ -5310,6 +5311,47 @@ function drawCombatEffects(layer='base'){
       ctx.rotate(q*2);ctx.strokeStyle='#e5ffff';ctx.lineWidth=4;ctx.shadowColor='#b8f9ff';ctx.shadowBlur=16;ctx.beginPath();ctx.moveTo(0,-f.radius*q);ctx.lineTo(f.radius*q*.866,f.radius*q*.5);ctx.lineTo(-f.radius*q*.866,f.radius*q*.5);ctx.closePath();ctx.stroke();ctx.shadowBlur=0;
     }else if(f.type==='portalPulse'){
       ctx.rotate(q*3);ctx.strokeStyle='#ddc7ff';ctx.lineWidth=5;ctx.beginPath();ctx.ellipse(0,0,f.radius*q,f.radius*q*.3,0,0,TAU);ctx.stroke();
+    }else if(f.type==='amalgamSkillSig'){
+      const rank=AMALGAM_RARITY_ORDER[f.variant]||0,r=f.radius*(.3+.7*q),s=f.skill;
+      ctx.shadowColor=f.color;ctx.shadowBlur=12+rank*7;ctx.strokeStyle=f.color;ctx.fillStyle=f.color;ctx.lineWidth=2.5+rank*.55;
+      if(s==='shardVolley'){
+        for(let k=-2;k<=2;k++){ctx.save();ctx.rotate(k*.25);ctx.beginPath();ctx.moveTo(r*.82,-12);ctx.lineTo(r,0);ctx.lineTo(r*.82,12);ctx.stroke();ctx.restore()}
+      }else if(s==='phaseDash'){
+        ctx.setLineDash([18,10]);ctx.beginPath();ctx.moveTo(-r,0);ctx.bezierCurveTo(-r*.3,-65,r*.3,65,r,0);ctx.stroke();ctx.setLineDash([]);ctx.strokeRect(-10,-10,20,20);
+      }else if(s==='repairPulse'){
+        for(let k=0;k<6;k++){const a=k*TAU/6,x=Math.cos(a)*r*.65,y=Math.sin(a)*r*.65;ctx.strokeRect(x-12,y-12,24,24)}ctx.fillRect(-8,-28,16,56);ctx.fillRect(-28,-8,56,16);
+      }else if(s==='gravityWell'){
+        ctx.beginPath();ctx.moveTo(-r,0);for(let k=0;k<9;k++){const x=-r+k*r*.23,y=(k%2?18:-18)*(1-k/11);ctx.lineTo(x,y)}ctx.lineTo(r,0);ctx.stroke();ctx.fillRect(r-15,-15,30,30);
+      }else if(s==='frostNova'){
+        for(let k=0;k<6;k++){ctx.save();ctx.rotate(k*TAU/6);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(r,0);ctx.moveTo(r*.55,0);ctx.lineTo(r*.72,-13);ctx.moveTo(r*.55,0);ctx.lineTo(r*.72,13);ctx.stroke();ctx.restore()}
+      }else if(s==='sentryRing'){
+        for(const side of [-1,1]){ctx.save();ctx.translate(side*r*.62,0);ctx.rotate(side*.18);ctx.strokeRect(-23,-31,46,62);for(let k=-1;k<=1;k++)ctx.strokeRect(side*18,k*18-6,28,12);ctx.restore()}
+      }else if(s==='thunderLance'){
+        for(const off of [-.24,0,.24]){ctx.save();ctx.rotate(off);ctx.beginPath();ctx.moveTo(-r*.25,0);ctx.lineTo(r*.72,0);ctx.lineTo(r,0);ctx.lineTo(r*.72,-10);ctx.moveTo(r,0);ctx.lineTo(r*.72,10);ctx.stroke();ctx.restore()}
+      }else if(s==='mirrorClones'){
+        for(let k=-2;k<=2;k++){ctx.globalAlpha=.25+Math.abs(k)*.12;ctx.strokeRect(k*34-r*.05,-38-Math.abs(k)*5,24,76+Math.abs(k)*10)}ctx.globalAlpha=1;
+      }else if(s==='meteorBrand'){
+        ctx.beginPath();ctx.moveTo(0,-r);ctx.lineTo(r*.25,-r*.2);ctx.lineTo(r,0);ctx.lineTo(r*.25,r*.2);ctx.lineTo(0,r);ctx.lineTo(-r*.25,r*.2);ctx.lineTo(-r,0);ctx.lineTo(-r*.25,-r*.2);ctx.closePath();ctx.stroke();ctx.fillRect(-9,-9,18,18);
+      }else if(s==='singularityCore'){
+        for(let k=0;k<4;k++){ctx.save();ctx.rotate(k*TAU/4+q);ctx.strokeRect(r*.35,-17,r*.4,34);ctx.restore()}ctx.beginPath();ctx.arc(0,0,22+q*12,0,TAU);ctx.fill();
+      }else if(s==='chronoBreak'){
+        ctx.setLineDash([10,7]);ctx.beginPath();ctx.arc(0,0,r*.72,-q*TAU,0);ctx.stroke();ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-r*.35,-r*.18);ctx.moveTo(0,0);ctx.lineTo(r*.12,-r*.5);ctx.stroke();
+      }else if(s==='phoenixCore'){
+        for(const side of [-1,1]){ctx.beginPath();ctx.moveTo(0,20);ctx.quadraticCurveTo(side*r*.5,-r*.55,side*r,-r*.1);ctx.quadraticCurveTo(side*r*.55,-r*.05,0,20);ctx.fill()}ctx.beginPath();ctx.moveTo(0,-r*.55);ctx.lineTo(16,18);ctx.lineTo(0,42);ctx.lineTo(-16,18);ctx.closePath();ctx.fill();
+      }else if(s==='worldSever'){
+        ctx.rotate(-.32+q*.64);ctx.fillRect(-r,-7,r*2,14);ctx.strokeStyle='#fff';for(let k=-2;k<=2;k++){ctx.beginPath();ctx.moveTo(-r,k*12);ctx.lineTo(r,-k*9);ctx.stroke()}
+      }else if(s==='cosmicStorm'){
+        for(let k=0;k<5;k++){ctx.save();ctx.rotate(k*TAU/5+q*2);ctx.beginPath();ctx.ellipse(r*.45,0,r*.48,15+k*2,0,0,TAU);ctx.stroke();ctx.restore()}
+      }else if(s==='genesisShield'){
+        ctx.beginPath();ctx.moveTo(-r*.85,-r*.25);ctx.lineTo(-r*.45,-r*.65);ctx.lineTo(0,-r*.35);ctx.lineTo(r*.45,-r*.65);ctx.lineTo(r*.85,-r*.25);ctx.lineTo(r*.65,r*.55);ctx.lineTo(0,r*.82);ctx.lineTo(-r*.65,r*.55);ctx.closePath();ctx.stroke();for(let k=-2;k<=2;k++)ctx.fillRect(k*22-4,-r*.15,8,r*.55);
+      }
+      if(rank>=3){ctx.globalAlpha=.7;for(let k=0;k<rank*2;k++){const a=k*TAU/(rank*2)+q*3;ctx.fillRect(Math.cos(a)*r-3,Math.sin(a)*r-3,6+rank,6+rank)}ctx.globalAlpha=1}ctx.shadowBlur=0;
+    }else if(f.type==='amalgamFrostStop'){
+      ctx.strokeStyle='#dffcff';ctx.fillStyle='rgba(150,236,255,.22)';ctx.shadowColor='#96ecff';ctx.shadowBlur=24;for(let k=0;k<12;k++){const a=k*TAU/12,rr=f.radius*q;ctx.save();ctx.rotate(a);ctx.beginPath();ctx.moveTo(rr*.2,-8);ctx.lineTo(rr,0);ctx.lineTo(rr*.2,8);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}ctx.shadowBlur=0;
+    }else if(f.type==='amalgamGauntlets'){
+      ctx.shadowColor='#66ffd1';ctx.shadowBlur=25;ctx.fillStyle='#1a6057';ctx.strokeStyle='#b9fff0';ctx.lineWidth=4;for(const side of [-1,1]){ctx.save();ctx.translate(side*f.radius*.72,0);ctx.rotate(side*(.35-q*.25));ctx.beginPath();ctx.roundRect(-28,-38,56,76,15);ctx.fill();ctx.stroke();for(let k=-1;k<=1;k++)ctx.strokeRect(side*22,k*19-7,32,14);ctx.restore()}ctx.shadowBlur=0;
+    }else if(f.type==='chronoArrival'){
+      ctx.strokeStyle='#d9fbff';ctx.shadowColor='#77dfff';ctx.shadowBlur=25;ctx.lineWidth=4;for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(0,0,f.radius*(.35+k*.22)*q,-Math.PI*q,TAU-Math.PI*q);ctx.stroke()}ctx.beginPath();ctx.moveTo(-f.radius*.72,0);ctx.lineTo(-f.radius*.5,-16);ctx.moveTo(-f.radius*.72,0);ctx.lineTo(-f.radius*.5,16);ctx.stroke();ctx.shadowBlur=0;
     }else if(f.type==='amalgamRarity'){
       const rank=AMALGAM_RARITY_ORDER[f.variant]||0,count=3+rank*2,reach=f.radius*(.35+.65*q);
       ctx.shadowColor=f.color;ctx.shadowBlur=10+rank*6;ctx.strokeStyle=f.color;ctx.fillStyle=f.color;ctx.lineWidth=2+rank*.55;
@@ -5806,6 +5848,17 @@ function drawUniqueProjectile(b,time,phase){
   const shape=b.shape;
   const playerColor=b.team==='player';
   const pulse=1+.10*Math.sin(time*8+(b.motionSeed||0));
+
+  if(b.special==='amalgamThrownLance'){
+    ctx.shadowColor='#fff176';ctx.shadowBlur=25;ctx.fillStyle='#fffbe0';ctx.strokeStyle='#d8ad2d';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(34,0);ctx.lineTo(12,-8);ctx.lineTo(-25,-5);ctx.lineTo(-36,0);ctx.lineTo(-25,5);ctx.lineTo(12,8);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle='#8d69e8';ctx.fillRect(-27,-10,8,20);ctx.strokeStyle='rgba(255,247,120,.65)';ctx.beginPath();ctx.moveTo(-62,-7);ctx.lineTo(-30,0);ctx.lineTo(-62,7);ctx.stroke();ctx.shadowBlur=0;return true;
+  }
+  if(b.special==='amalgamFlyingBlade'){
+    ctx.shadowColor='#dff8ff';ctx.shadowBlur=28;ctx.fillStyle='#f9fdff';ctx.strokeStyle='#83d9ff';ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(42,0);ctx.lineTo(9,-11);ctx.lineTo(-30,-7);ctx.lineTo(-42,0);ctx.lineTo(-30,7);ctx.lineTo(9,11);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.strokeStyle='#c58cff';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-36,0);ctx.lineTo(-65,0);ctx.stroke();ctx.shadowBlur=0;return true;
+  }
 
   if(shape==='standardSlug'){
     ctx.shadowColor='#55c9ff';ctx.shadowBlur=13;ctx.fillStyle='#e8fbff';ctx.strokeStyle='#3c91cf';ctx.lineWidth=2;

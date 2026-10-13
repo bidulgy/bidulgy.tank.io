@@ -76,7 +76,10 @@ assert(source.includes("if(player?.cannonType==='amalgam'){castAmalgamSkill(slot
 context.player.amalgamSkills=['repairPulse','frostNova','sentryRing','genesisShield'];
 assert.deepEqual([1,2,3,4].map(slot=>vm.runInContext(`skillAimSpec('amalgam',${slot})`,context)),[null,null,null,null],'Defensive Amalgam skills must not display attack hitbox previews');
 assert(source.includes("f.type==='amalgamShield'")&&source.includes('const rank=AMALGAM_RARITY_ORDER[f.variant]'),'Defensive skills need physical shields scaled by rarity');
-assert(source.includes("f.type==='amalgamRarity'")&&source.includes('count=3+rank*2'),'Higher rarity skills need increasingly elaborate cast effects');
+assert(source.includes("f.type==='amalgamSkillSig'")&&source.includes("s==='chronoBreak'")&&source.includes("s==='genesisShield'"),'Amalgam skills need distinct silhouettes instead of a shared recolored effect');
+assert(source.includes("f.type==='amalgamFrostStop'")&&source.includes("f.type==='amalgamGauntlets'"),'Absolute Stop and Reflective Gauntlets need different physical effects');
+assert(source.includes("special:'amalgamThrownLance'")&&source.includes("special:'amalgamFlyingBlade'"),'Lance and sword skills need multi-projectile ranged weapon attacks');
+assert(source.includes('playerHistory=playerHistory.filter(item=>item.t<=old.t)')&&source.includes('camera.x=player.x-innerWidth/2'),'Time Reversal must restore history and camera at the rewound position');
 assert(data.themes.includes('gojo'),'Gojo needs a dedicated tank theme');
 assert(authSource.includes("id:'gojo',name:'고죠',rarity:'singularity'"),'Gojo must be Singularity');
 assert(authSource.includes("c.id==='gojo'?'한 전투 생존 30분 해금 · 뽑기 제외'"),'Gojo must not appear as a gacha drop');
