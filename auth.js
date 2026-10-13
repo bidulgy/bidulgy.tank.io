@@ -1387,8 +1387,12 @@ async function equipCannon(cannonId){
     profile={...(profile||{}),equipped_cannon:'gojo'};renderProfile();setGachaMessage(`${cannon.name} 장착 완료`,'good');return;
   }
   try{
-    const {data,error}=await client.rpc('iron_cell_equip_cannon_v1',{p_cannon:cannonId});
-    if(error)throw error;try{localStorage.removeItem(`${localGojoKey()}:equipped`)}catch(_){}profile=data||profile;renderProfile();setGachaMessage(`${cannon.name} 장착 완료`,'good')
+    let response=await client.rpc('iron_cell_equip_cannon_v2',{p_cannon:cannonId});
+    if(response.error&&String(response.error.message||'').toLowerCase().includes('could not find the function'))response=await client.rpc('iron_cell_equip_cannon_v1',{p_cannon:cannonId});
+    if(response.error)throw response.error;
+    const nextProfile=response.data?.profile||response.data;
+    if(!nextProfile||String(nextProfile.equipped_cannon)!==cannonId)throw new Error('equipped_cannon_not_saved');
+    try{localStorage.removeItem(`${localGojoKey()}:equipped`)}catch(_){}profile=nextProfile;renderProfile();setGachaMessage(`${cannon.name} 장착 완료`,'good')
   }
   catch(error){console.error(error);setGachaMessage(`대포 장착에 실패했습니다: ${error?.message||'서버 오류'}`,'error')}
 }
