@@ -79,6 +79,8 @@ assert(source.includes("f.type==='amalgamShield'")&&source.includes('const rank=
 assert(source.includes("f.type==='amalgamSkillSig'")&&source.includes("s==='chronoBreak'")&&source.includes("s==='genesisShield'"),'Amalgam skills need distinct silhouettes instead of a shared recolored effect');
 assert(source.includes("f.type==='amalgamFrostStop'")&&source.includes("f.type==='amalgamGauntlets'"),'Absolute Stop and Reflective Gauntlets need different physical effects');
 assert(source.includes("special:'amalgamThrownLance'")&&source.includes("special:'amalgamFlyingBlade'"),'Lance and sword skills need multi-projectile ranged weapon attacks');
+assert(source.includes('function drawAmalgamLanceModel(')&&source.includes('function drawAmalgamBladeModel('),'Amalgam weapon skills need reusable detailed weapon models');
+assert(source.includes("drawAmalgamLanceModel(205,1.08,'#fff176')")&&source.includes("drawAmalgamBladeModel(len,1.12,'#8fdcff')"),'Held and falling weapons must render the detailed forged models');
 assert(source.includes('playerHistory=playerHistory.filter(item=>item.t<=old.t)')&&source.includes('camera.x=player.x-innerWidth/2'),'Time Reversal must restore history and camera at the rewound position');
 assert(data.themes.includes('gojo'),'Gojo needs a dedicated tank theme');
 assert(authSource.includes("id:'gojo',name:'고죠',rarity:'singularity'"),'Gojo must be Singularity');
