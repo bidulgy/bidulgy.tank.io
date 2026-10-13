@@ -74,6 +74,7 @@ assert(source.includes("const motif=(CANNON_VISUAL_INDEX[f.cannon]??0)%6"),'Gene
 assert(!source.includes("f.type==='uniqueSkill'){\n      ctx.strokeStyle=f.color;ctx.lineWidth=5*p+1"),'The old circle-and-cross-line skill effect must stay removed');
 assert(source.includes("e.code==='KeyG'||String(e.key||'').toLowerCase()==='g'"),'Desktop Amalgam fourth skill must use G');
 assert(source.includes('function suppressBasicAttack(ms=460)')&&source.includes('skillBlockingFire'),'Skill activation must suppress basic and Auto 5 fire');
+assert(source.includes("setNetworkStatus('connecting','임시 솔로 모드 · 서버 자동 재연결 중')")&&source.includes("scheduleOnlineReconnect('initial_timeout')"),'Realtime failure must start solo play and retry in the background');
 assert(source.includes("canvas.getContext('2d',{alpha:false,desynchronized:true})"),'Canvas should request the low-latency opaque rendering path');
 assert(source.includes('frameWorkMs>27')&&source.includes('frameWorkMs>18'),'Render pressure must detect expensive frames even with few effects');
 assert(source.includes("['Q','R','T','G'][i]"),'Amalgam HUD must label the fourth skill as G');
