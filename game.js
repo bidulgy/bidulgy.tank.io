@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.21 · direct skill input, cancellable drafts, physical weapon casts');
+console.info('[Sworder VS Tank] game V6.22 · Y capture fix and six distinct skill motion families');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -5346,7 +5346,24 @@ function drawCombatEffects(layer='base'){
     }else if(f.type==='fateCast'){
       ctx.strokeStyle='#fff2bd';ctx.shadowColor='#ffe178';ctx.shadowBlur=20;ctx.lineWidth=4;for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(0,0,f.radius*q*(.35+k*.25),k*.7-q*2,k*.7-q*2+Math.PI*1.5);ctx.stroke()}ctx.shadowBlur=0;
     }else if(f.type==='uniqueSkill'){
-      ctx.strokeStyle=f.color;ctx.lineWidth=5*p+1;ctx.shadowColor=f.color;ctx.shadowBlur=18;ctx.beginPath();ctx.arc(0,0,f.radius*q*.45,0,TAU);ctx.stroke();ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(f.radius*q,0);ctx.stroke();ctx.shadowBlur=0;
+      // Shared skills used to render as the same circle crossed by one line.
+      // Select a non-circular motion grammar from the cannon identity instead.
+      const motif=(CANNON_VISUAL_INDEX[f.cannon]??0)%6,reach=f.radius*(.25+.75*q);
+      ctx.strokeStyle=f.color;ctx.fillStyle=f.color;ctx.shadowColor=f.color;ctx.shadowBlur=18;ctx.lineCap='round';ctx.lineJoin='round';
+      if(motif===0){
+        for(let k=-2;k<=2;k++){ctx.save();ctx.rotate(k*.22);ctx.lineWidth=3+2*p;ctx.beginPath();ctx.moveTo(8,-18);ctx.quadraticCurveTo(reach*.52,-55*(1-q),reach,0);ctx.quadraticCurveTo(reach*.52,55*(1-q),8,18);ctx.stroke();ctx.restore()}
+      }else if(motif===1){
+        for(let k=0;k<9;k++){const a=k*2.399+t*.8,rr=reach*(.28+(k%4)*.18),sz=8+(k%3)*5;ctx.save();ctx.translate(Math.cos(a)*rr,Math.sin(a)*rr*.68);ctx.rotate(a+q*2);ctx.globalAlpha*=.45+.5*p;ctx.beginPath();ctx.moveTo(sz,0);ctx.lineTo(0,sz*.42);ctx.lineTo(-sz*.72,0);ctx.lineTo(0,-sz*.42);ctx.closePath();ctx.fill();ctx.restore()}
+      }else if(motif===2){
+        for(let k=0;k<5;k++){const x=reach*(.18+k*.17),h=18+k*4;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x-h,-h);ctx.lineTo(x,0);ctx.lineTo(x-h,h);ctx.stroke()}
+      }else if(motif===3){
+        ctx.lineWidth=3;for(let arm=0;arm<4;arm++){ctx.beginPath();for(let k=0;k<=12;k++){const u=k/12,a=arm*TAU/4+u*2.2+q*3,rr=reach*u,x=Math.cos(a)*rr,y=Math.sin(a)*rr*.55;k?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.stroke()}
+      }else if(motif===4){
+        for(let k=-2;k<=2;k++){const sy=k*18;drawElectricArc(0,sy,reach,sy+(k%2?28:-28),f.color,2.2+k%2,q+k*.31,t,2)}
+      }else{
+        ctx.lineWidth=3;for(let k=0;k<7;k++){const a=k*TAU/7+q*.7,inner=reach*.18,outer=reach*(.55+(k%3)*.16);ctx.beginPath();ctx.moveTo(Math.cos(a)*inner,Math.sin(a)*inner);ctx.lineTo(Math.cos(a+.19)*outer,Math.sin(a+.19)*outer);ctx.lineTo(Math.cos(a+.42)*outer*.68,Math.sin(a+.42)*outer*.68);ctx.stroke()}
+      }
+      ctx.shadowBlur=0;
     }else if(f.type==='lightningLink'){
       ctx.strokeStyle=f.color;ctx.lineWidth=3*p+1;ctx.shadowColor=f.color;ctx.shadowBlur=14;ctx.beginPath();let px=0,py=0;ctx.moveTo(0,0);for(let k=1;k<=7;k++){const tt=k/7,xx=f.radius*tt,yy=(k===7?0:Math.sin(k*8+f.x*.01)*12*p);ctx.lineTo(xx,yy);px=xx;py=yy}ctx.stroke();ctx.shadowBlur=0;
     }else if(f.type==='muzzle'){
@@ -6435,6 +6452,12 @@ function isEditableInputTarget(target){
   if(!(target instanceof Element))return false;
   return !!target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]');
 }
+// Capture Amalgam Y before the generic held-aim keyboard handler. This also
+// recognizes keyboard layouts that report the printable key but omit KeyY.
+addEventListener('keydown',e=>{
+  if(e.repeat||player?.cannonType!=='amalgam'||!(e.code==='KeyY'||String(e.key||'').toLowerCase()==='y')||isEditableInputTarget(e.target))return;
+  e.preventDefault();e.stopImmediatePropagation();castAmalgamSkill(3);
+},{capture:true});
 addEventListener('keydown',e=>{
   if(isEditableInputTarget(e.target))return;input.keys.add(e.code);
   if(e.code==='KeyQ'&&!e.repeat){beginHeldSkillAim(1,'keyboard');e.preventDefault()}
