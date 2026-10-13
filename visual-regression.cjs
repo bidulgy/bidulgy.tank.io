@@ -77,7 +77,8 @@ context.player.amalgamSkills=['repairPulse','frostNova','sentryRing','genesisShi
 assert.deepEqual([1,2,3,4].map(slot=>vm.runInContext(`skillAimSpec('amalgam',${slot})`,context)),[null,null,null,null],'Defensive Amalgam skills must not display attack hitbox previews');
 assert(source.includes("f.type==='amalgamShield'")&&source.includes('const rank=AMALGAM_RARITY_ORDER[f.variant]'),'Defensive skills need physical shields scaled by rarity');
 assert(source.includes("f.type==='amalgamSkillSig'")&&source.includes("s==='chronoBreak'")&&source.includes("s==='genesisShield'"),'Amalgam skills need distinct silhouettes instead of a shared recolored effect');
-assert(source.includes("f.type==='amalgamFrostStop'")&&source.includes("f.type==='amalgamGauntlets'"),'Absolute Stop and Reflective Gauntlets need different physical effects');
+assert(source.includes("f.type==='amalgamFrostStop'")&&source.includes("spawnAmalgamShield(def,2.4)"),'Reflective Gauntlet must use its restored plate shield while Absolute Stop remains distinct');
+assert(source.includes("f.type==='amalgamRepairArmor'")&&source.includes("f.type==='amalgamPhoenixAegis'")&&source.includes("f.type==='amalgamGenesisCitadel'"),'Other defensive skills must use unique armor, phoenix and citadel forms');
 assert(source.includes("special:'amalgamThrownLance'")&&source.includes("special:'amalgamFlyingBlade'"),'Lance and sword skills need multi-projectile ranged weapon attacks');
 assert(source.includes('function drawAmalgamLanceModel(')&&source.includes('function drawAmalgamBladeModel('),'Amalgam weapon skills need reusable detailed weapon models');
 assert(source.includes("drawAmalgamLanceModel(205,1.08,'#fff176')")&&source.includes("drawAmalgamBladeModel(len,1.12,'#8fdcff')"),'Held and falling weapons must render the detailed forged models');
