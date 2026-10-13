@@ -1390,7 +1390,7 @@ async function equipCannon(cannonId){
     const {data,error}=await client.rpc('iron_cell_equip_cannon_v1',{p_cannon:cannonId});
     if(error)throw error;try{localStorage.removeItem(`${localGojoKey()}:equipped`)}catch(_){}profile=data||profile;renderProfile();setGachaMessage(`${cannon.name} 장착 완료`,'good')
   }
-  catch(error){console.error(error);setGachaMessage('대포 장착에 실패했습니다.','error')}
+  catch(error){console.error(error);setGachaMessage(`대포 장착에 실패했습니다: ${error?.message||'서버 오류'}`,'error')}
 }
 
 async function enterSession(user){

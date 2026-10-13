@@ -2,7 +2,7 @@
 create or replace function public.iron_cell_equip_cannon_v1(p_cannon text)
 returns public.iron_cell_profiles
 language plpgsql
-security invoker
+security definer
 set search_path=''
 as $function$
 declare
@@ -19,7 +19,7 @@ begin
     'lancer','nova','comet','stellar','leviathan','valkyrie','error','glitch',
     'zero','berserker','oracle','deku','sniper','bloodlust','gojo','amalgam'
   ) then raise exception 'invalid_cannon'; end if;
-  select * into v_row from public.iron_cell_profiles where user_id=v_uid;
+  select * into v_row from public.iron_cell_profiles where user_id=v_uid for update;
   if not found then raise exception 'profile_not_found'; end if;
   if not coalesce(v_row.owned_cannons,'[]'::jsonb)?v_cannon then raise exception 'cannon_not_owned'; end if;
   update public.iron_cell_profiles set equipped_cannon=v_cannon,updated_at=now()
