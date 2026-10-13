@@ -55,10 +55,10 @@ assert(source.includes('while((isAmalgam||player.level<45)'), 'Amalgam must have
 assert(source.includes('if(isAmalgam)queueAmalgamDraft(player.level)'), 'Amalgam must draft a skill on level milestones');
 assert(source.includes("if(level<3||level%3!==0)return"),'Amalgam drafts must occur every three levels');
 assert(source.includes("!['deku','amalgam'].includes(player?.cannonType)"),'Amalgam Y aiming must not be cancelled by the Deku-only legacy guard');
-assert(source.includes("if(player?.cannonType==='amalgam')castAmalgamSkill(3)"),'Amalgam Y must activate directly from the keyboard');
+assert(source.includes("e.stopImmediatePropagation();castAmalgamSkill(3)"),'Amalgam G must activate directly from the keyboard');
 assert(source.includes("if(cannon==='amalgam')return amalgamSkillAimSpec(slot)"),'Every Amalgam skill slot must use its own aim preview');
 context.player.amalgamSkills=['shardVolley','gravityWell','thunderLance','worldSever'];
-assert.deepEqual([1,2,3,4].map(slot=>vm.runInContext(`skillAimSpec('amalgam',${slot}).type`,context)),['self','autoTarget','target','line'],'Amalgam Q/R/T/Y need active aim previews matching their mechanics');
+assert.deepEqual([1,2,3,4].map(slot=>vm.runInContext(`skillAimSpec('amalgam',${slot}).type`,context)),['self','autoTarget','target','line'],'Amalgam Q/R/T/G need active aim previews matching their mechanics');
 assert(source.includes("b.team='player';b.owner=player")&&source.includes("b.vx*=-1.35"),'Inertia Reversal must return hostile bullets instead of spawning a radial attack');
 assert(source.includes('player.amalgamAnchor={x:player.x,y:player.y,hp:player.hp}')&&source.includes('player.x=anchor.x;player.y=anchor.y'),'Return Anchor must be a two-stage saved-position skill');
 assert(source.includes('for(let i=0;i<4;i++)if(i!==slot)player.amalgamSkillReadyAt[i]=0'),'Overload Trade must reset the other equipped skills');
@@ -69,7 +69,9 @@ assert(source.includes("f.type==='amalgamSkyLance'")&&source.includes("drawElect
 assert(source.includes("f.type==='amalgamWorldBlade'")&&source.includes("ctx.rotate(swing)"),'World Sever must render an actual swinging blade');
 assert(source.includes("const motif=(CANNON_VISUAL_INDEX[f.cannon]??0)%6"),'Generic skill effects must split into cannon-specific motion families');
 assert(!source.includes("f.type==='uniqueSkill'){\n      ctx.strokeStyle=f.color;ctx.lineWidth=5*p+1"),'The old circle-and-cross-line skill effect must stay removed');
-assert(source.includes("e.stopImmediatePropagation();castAmalgamSkill(3)"),'Desktop Amalgam Y needs a capture-phase direct cast');
+assert(source.includes("e.code==='KeyG'||String(e.key||'').toLowerCase()==='g'"),'Desktop Amalgam fourth skill must use G');
+assert(source.includes("['Q','R','T','G'][i]"),'Amalgam HUD must label the fourth skill as G');
+assert(source.includes("keys=['Q','R','T','G']"),'Amalgam replacement choices must label the fourth slot as G');
 assert(source.includes("if(player?.cannonType==='amalgam'){castAmalgamSkill(slot-1);return}"),'Mobile Amalgam skill buttons must cast on pointer down');
 context.player.amalgamSkills=['repairPulse','frostNova','sentryRing','genesisShield'];
 assert.deepEqual([1,2,3,4].map(slot=>vm.runInContext(`skillAimSpec('amalgam',${slot})`,context)),[null,null,null,null],'Defensive Amalgam skills must not display attack hitbox previews');

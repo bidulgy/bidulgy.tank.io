@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.23 · defensive shields and rarity-scaled cast spectacle');
+console.info('[Sworder VS Tank] game V6.24 · Amalgam fourth skill moved from Y to G');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -1404,7 +1404,7 @@ function renderAmalgamDraft(){
   const level=player.amalgamDraftQueue[0];
   if(!player.amalgamDraftChoices?.length)player.amalgamDraftChoices=buildAmalgamDraft(level);
   panel.querySelector('#amalgamDraftLevel').textContent=`LV ${level}`;
-  const full=player.amalgamSkills.length>=4,keys=['Q','R','T','Y'];
+  const full=player.amalgamSkills.length>=4,keys=['Q','R','T','G'];
   panel.querySelector('#amalgamDraftChoices').innerHTML=player.amalgamDraftChoices.map(id=>{
     const s=AMALGAM_SKILLS[id];
     const actions=full
@@ -1895,7 +1895,7 @@ function updateAmalgamSkillHud(){
     const def=AMALGAM_SKILLS[ids[i]],show=!!def;
     setSkillButtonVisible(button,show);if(!show)return;
     const left=Math.max(0,((player.amalgamSkillReadyAt?.[i]||0)-Date.now())/1000),ready=left<=.001;
-    button.querySelector('.skill-key').textContent=['Q','R','T','Y'][i];
+    button.querySelector('.skill-key').textContent=['Q','R','T','G'][i];
     names[i].textContent=`${def.rarityLabel} · ${ids[i]==='phaseDash'&&player.amalgamAnchor?'귀환 준비':def.name}`;
     cooldowns[i].textContent=ready?'READY':`${left.toFixed(1)}s`;
     fills[i].style.width=`${clamp((1-left/def.cooldown)*100,0,100)}%`;
@@ -6475,10 +6475,9 @@ function isEditableInputTarget(target){
   if(!(target instanceof Element))return false;
   return !!target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]');
 }
-// Capture Amalgam Y before the generic held-aim keyboard handler. This also
-// recognizes keyboard layouts that report the printable key but omit KeyY.
+// Capture Amalgam G before the generic held-aim keyboard handler.
 addEventListener('keydown',e=>{
-  if(e.repeat||player?.cannonType!=='amalgam'||!(e.code==='KeyY'||String(e.key||'').toLowerCase()==='y')||isEditableInputTarget(e.target))return;
+  if(e.repeat||player?.cannonType!=='amalgam'||!(e.code==='KeyG'||String(e.key||'').toLowerCase()==='g')||isEditableInputTarget(e.target))return;
   e.preventDefault();e.stopImmediatePropagation();castAmalgamSkill(3);
 },{capture:true});
 addEventListener('keydown',e=>{
@@ -6487,7 +6486,8 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyE'&&player?.cannonType==='gojo'&&!e.repeat){beginHeldSkillAim(2,'keyboard');e.preventDefault()}
   if(e.code==='KeyR'&&player?.cannonType!=='gojo'&&!e.repeat){beginHeldSkillAim(2,'keyboard');e.preventDefault()}
   if(e.code==='KeyT'&&!e.repeat){beginHeldSkillAim(3,'keyboard');e.preventDefault()}
-  if(e.code==='KeyY'&&!e.repeat){if(player?.cannonType==='amalgam')castAmalgamSkill(3);else beginHeldSkillAim(4,'keyboard');e.preventDefault()}
+  if(e.code==='KeyG'&&player?.cannonType==='amalgam'&&!e.repeat){castAmalgamSkill(3);e.preventDefault()}
+  if(e.code==='KeyY'&&player?.cannonType==='deku'&&!e.repeat){beginHeldSkillAim(4,'keyboard');e.preventDefault()}
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()
 });
 addEventListener('keyup',e=>{
@@ -6496,7 +6496,7 @@ addEventListener('keyup',e=>{
   if(e.code==='KeyE'&&player?.cannonType==='gojo'){if(heldSkillAim.active&&heldSkillAim.slot===2)releaseHeldSkillAim(2);e.preventDefault()}
   if(e.code==='KeyR'&&player?.cannonType!=='gojo'){if(heldSkillAim.active&&heldSkillAim.slot===2)releaseHeldSkillAim(2);e.preventDefault()}
   if(e.code==='KeyT'){if(heldSkillAim.active&&heldSkillAim.slot===3)releaseHeldSkillAim(3);e.preventDefault()}
-  if(e.code==='KeyY'){if(heldSkillAim.active&&heldSkillAim.slot===4)releaseHeldSkillAim(4);e.preventDefault()}
+  if(e.code==='KeyY'&&player?.cannonType==='deku'){if(heldSkillAim.active&&heldSkillAim.slot===4)releaseHeldSkillAim(4);e.preventDefault()}
 });addEventListener('mousemove',e=>{input.mouseX=e.clientX;input.mouseY=e.clientY});addEventListener('mousedown',e=>{if(e.button===0)input.firing=true});addEventListener('mouseup',e=>{if(e.button===0)input.firing=false});addEventListener('blur',()=>{input.firing=false;input.mobileAimActive=false;input.keys.clear();cancelHeldSkillAim();if(player?.errorQCharging)cancelErrorQCharge()});
 const moveZone=document.querySelector('#mobileMove'),knob=moveZone.querySelector('.stick-knob');let moveTouch=null;function moveTouchUpdate(t){const r=moveZone.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=t.clientX-cx,dy=t.clientY-cy;const max=42,d=Math.hypot(dx,dy)||1;if(d>max){dx=dx/d*max;dy=dy/d*max}input.moveX=dx/max;input.moveY=dy/max;knob.style.transform=`translate(${dx}px,${dy}px)`}moveZone.addEventListener('touchstart',e=>{const t=e.changedTouches[0];moveTouch=t.identifier;moveTouchUpdate(t);e.preventDefault()},{passive:false});moveZone.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===moveTouch)moveTouchUpdate(t);e.preventDefault()},{passive:false});function endMove(e){for(const t of e.changedTouches)if(t.identifier===moveTouch){moveTouch=null;input.moveX=0;input.moveY=0;knob.style.transform='none'}}moveZone.addEventListener('touchend',endMove,{passive:false});moveZone.addEventListener('touchcancel',endMove,{passive:false});
 const aimZone=document.querySelector('#mobileAim');let aimTouch=null;function aimUpdate(t){input.mouseX=t.clientX;input.mouseY=t.clientY;input.firing=true;input.mobileAimActive=true;aimZone.classList.add('aiming')}aimZone.addEventListener('touchstart',e=>{const t=e.changedTouches[0];aimTouch=t.identifier;aimUpdate(t);e.preventDefault()},{passive:false});aimZone.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===aimTouch)aimUpdate(t);e.preventDefault()},{passive:false});function endAim(e){for(const t of e.changedTouches)if(t.identifier===aimTouch){aimTouch=null;input.firing=false;input.mobileAimActive=false;aimZone.classList.remove('aiming')}}aimZone.addEventListener('touchend',endAim,{passive:false});aimZone.addEventListener('touchcancel',endAim,{passive:false});
