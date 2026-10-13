@@ -45,7 +45,10 @@ const data = vm.runInContext(`({
   evolutions: Object.keys(DIEP_EVOLUTION_INFO),
   barrels: Object.fromEntries(Object.keys(DIEP_EVOLUTION_INFO).map(id => [id, evolutionBarrelSpecs(id, 27)]))
 })`, context);
-assert.equal(data.themes.length, 48, 'all 48 cannon themes must remain');
+assert.equal(data.themes.length, 66, 'all 48 existing and 18 new cannon themes must remain');
+for(const id of ['javelin','summoner','architect','alchemist','boomerang','trapper','puppeteer','tempest','chronoblade','demolisher','phaseweaver','parasite','starforge','cometrail','corruptor','duplicator','seraph','eventhorizon'])assert(data.themes.includes(id),`${id} must be registered`);
+assert(authSource.includes("id:'eventhorizon',name:'이벤트 호라이즌',rarity:'singularity',rarityLabel:'SINGULARITY',chance:.00005"),'the new gacha Singularity rate must be exactly 0.00005%');
+assert(source.includes("addSkillZone('starBeastPack'")&&source.includes("addSkillZone('architectTurret'")&&source.includes("addSkillZone('alchemyFlaskArc'"),'new attacks must include summon, installation and thrown flask systems');
 assert.equal(vm.runInContext('Object.keys(AMALGAM_SKILLS).length',context),15,'Amalgam needs fifteen draftable skills');
 assert.equal(vm.runInContext('Object.values(AMALGAM_SKILLS).every((_,i,a)=>true)&&Object.values(AMALGAM_SKILLS).filter(s=>s.rarity==="common").length',context),3,'Amalgam needs three common skills');
 for(const rarity of ['rare','epic','legendary','mythic'])assert.equal(vm.runInContext(`Object.values(AMALGAM_SKILLS).filter(s=>s.rarity===${JSON.stringify(rarity)}).length`,context),3,`Amalgam needs three ${rarity} skills`);

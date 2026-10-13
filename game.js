@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false,desynchronized:true});
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.31 · rebuilt Amalgam skill arsenal');
+console.info('[Sworder VS Tank] game V6.32 · four distinct combat systems');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -69,23 +69,33 @@ const CANNON_FAMILY=Object.freeze({
   blaster:'standard',ranger:'standard',ricochet:'spread',mortar:'standard',
   shredder:'piercer',seeker:'piercer',frost:'ring',magnet:'nova',
   cyclone:'piercer',juggernaut:'rocket',mirror:'ring',lancer:'piercer',
-  leviathan:'rocket',valkyrie:'nova',berserker:'rapid',oracle:'ring',gojo:'ring',amalgam:'nova'
+  leviathan:'rocket',valkyrie:'nova',berserker:'rapid',oracle:'ring',
+  javelin:'piercer',summoner:'nova',architect:'rocket',alchemist:'plasma',boomerang:'ring',trapper:'standard',
+  puppeteer:'nova',tempest:'plasma',chronoblade:'ring',demolisher:'rocket',phaseweaver:'ring',parasite:'void',
+  starforge:'nova',cometrail:'nova',corruptor:'error',duplicator:'error',seraph:'nova',eventhorizon:'void',gojo:'ring',amalgam:'nova'
 });
 const CANNON_BASE_BEHAVIOR=Object.freeze({
   blaster:'standard',ranger:'scout',ricochet:'burst',mortar:'bastion',
   shredder:'drill',seeker:'piercer',frost:'chrono',magnet:'void',
   cyclone:'laser',juggernaut:'titan',mirror:'ring',lancer:'piercer',
-  leviathan:'titan',valkyrie:'comet',berserker:'rapid',oracle:'chrono',gojo:'chrono',amalgam:'nova'
+  leviathan:'titan',valkyrie:'comet',berserker:'rapid',oracle:'chrono',
+  javelin:'piercer',summoner:'nova',architect:'bastion',alchemist:'plasma',boomerang:'ring',trapper:'needle',
+  puppeteer:'nova',tempest:'thunder',chronoblade:'chrono',demolisher:'rocket',phaseweaver:'ring',parasite:'void',
+  starforge:'stellar',cometrail:'comet',corruptor:'error',duplicator:'glitch',seraph:'stellar',eventhorizon:'void',gojo:'chrono',amalgam:'nova'
 });
 const CANNON_Q_BEHAVIOR=Object.freeze({
   blaster:'blaster',ranger:'ranger',ricochet:'ricochet',mortar:'mortar',
   shredder:'shredder',seeker:'seeker',frost:'frost',magnet:'magnet',
   cyclone:'cyclone',juggernaut:'juggernaut',mirror:'mirror',lancer:'lancer',
-  leviathan:'leviathan',valkyrie:'valkyrie',berserker:'berserker',oracle:'oracle',amalgam:'nova'
+  leviathan:'leviathan',valkyrie:'valkyrie',berserker:'berserker',oracle:'oracle',
+  javelin:'javelin',summoner:'summoner',architect:'architect',alchemist:'alchemist',boomerang:'boomerang',trapper:'trapper',
+  puppeteer:'puppeteer',tempest:'tempest',chronoblade:'chronoblade',demolisher:'demolisher',phaseweaver:'phaseweaver',parasite:'parasite',
+  starforge:'starforge',cometrail:'cometrail',corruptor:'corruptor',duplicator:'duplicator',seraph:'seraph',eventhorizon:'eventhorizon',amalgam:'nova'
 });
 const CANNON_R_BEHAVIOR=Object.freeze({
   cyclone:'cyclone',juggernaut:'juggernaut',mirror:'mirror',lancer:'lancer',
-  leviathan:'leviathan',valkyrie:'valkyrie',berserker:'berserker',oracle:'oracle'
+  leviathan:'leviathan',valkyrie:'valkyrie',berserker:'berserker',oracle:'oracle',
+  javelin:'javelin',summoner:'summoner',architect:'architect',alchemist:'alchemist',eventhorizon:'eventhorizon'
 });
 const CANNON_STAT_MODS=Object.freeze({
   blaster:{damage:1.15,reload:1.10},ranger:{damage:.92,bulletSpeed:1.10,reload:.95,move:1.08},
@@ -95,7 +105,14 @@ const CANNON_STAT_MODS=Object.freeze({
   cyclone:{damage:1.18,reload:.82,move:1.04},juggernaut:{damage:1.22,reload:1.12,move:.92},
   mirror:{damage:1.15,bulletSpeed:1.08},lancer:{damage:1.25,bulletSpeed:1.18,reload:1.15},
   leviathan:{damage:1.20,reload:1.12,move:.92},valkyrie:{damage:1.10,reload:.82,move:1.14},
-  berserker:{damage:1.20,reload:.68,move:1.08},oracle:{damage:1.32,bulletSpeed:1.12,reload:1.12},gojo:{damage:1.26,bulletSpeed:1.08,reload:1.08},amalgam:{damage:1.55,bulletSpeed:1.18,reload:.82,move:1.05}
+  berserker:{damage:1.20,reload:.68,move:1.08},oracle:{damage:1.32,bulletSpeed:1.12,reload:1.12},
+  javelin:{damage:1.20,bulletSpeed:1.18,reload:1.12,move:1.05},summoner:{damage:.92,reload:1.08,move:1.04},
+  architect:{damage:1.08,reload:1.02,move:.96},alchemist:{damage:1.05,bulletSpeed:.94,reload:.92},
+  boomerang:{damage:1.05,reload:.88,move:1.06},trapper:{damage:1.12,reload:1.08},puppeteer:{damage:1.12,reload:1.02},tempest:{damage:1.18,reload:.86,move:1.09},
+  chronoblade:{damage:1.22,reload:.92,move:1.08},demolisher:{damage:1.30,reload:1.18,move:.92},phaseweaver:{damage:1.25,reload:.90},parasite:{damage:1.18,reload:.88},
+  starforge:{damage:1.30,reload:.90},cometrail:{damage:1.24,reload:.84,move:1.13},corruptor:{damage:1.38,reload:.82},duplicator:{damage:1.25,reload:.72},
+  seraph:{damage:1.42,reload:.84,move:1.12},eventhorizon:{damage:1.60,reload:.95,move:.96},
+  gojo:{damage:1.26,bulletSpeed:1.08,reload:1.08},amalgam:{damage:1.55,bulletSpeed:1.18,reload:.82,move:1.05}
 });
 function cannonBaseBehavior(id){return CANNON_BASE_BEHAVIOR[id]||id}
 function cannonQBehavior(id){return CANNON_Q_BEHAVIOR[id]||id}
@@ -115,7 +132,10 @@ const PROJECTILE_SHAPE=Object.freeze({
   blaster:'standardSlug',ranger:'scoutArrow',ricochet:'burstDisc',mortar:'bastionShell',
   shredder:'drillBit',seeker:'piercerLance',frost:'chronoRing',magnet:'voidOrb',
   cyclone:'laserRay',juggernaut:'titanShell',mirror:'dimensionRing',lancer:'piercerLance',
-  leviathan:'titanShell',valkyrie:'cometCore',berserker:'rapidTracer',oracle:'chronoRing',gojo:'chronoRing',amalgam:'stellarStar'
+  leviathan:'titanShell',valkyrie:'cometCore',berserker:'rapidTracer',oracle:'chronoRing',
+  javelin:'javelinSpear',summoner:'summonSeed',architect:'architectBolt',alchemist:'alchemyFlask',boomerang:'dimensionRing',trapper:'needleDart',
+  puppeteer:'novaStar',tempest:'thunderOrb',chronoblade:'chronoRing',demolisher:'rocketMissile',phaseweaver:'dimensionRing',parasite:'voidOrb',
+  starforge:'stellarStar',cometrail:'cometCore',corruptor:'errorBlock',duplicator:'glitchPacket',seraph:'stellarStar',eventhorizon:'voidOrb',gojo:'chronoRing',amalgam:'stellarStar'
 });
 function projectileShapeForCannon(cannon){return PROJECTILE_SHAPE[cannon]||'standardSlug'}
 
@@ -168,6 +188,17 @@ const CANNON_SKILLS=Object.freeze({
   valkyrie:{name:'천익 돌파',cooldown:21,color:'#8deaff'},
   berserker:{name:'BLOOD CLEAVE',cooldown:18,color:'#ff8a70'},
   oracle:{name:'FUTURE EYE',cooldown:21,color:'#f4e9a8'},
+  javelin:{name:'귀환 투창',cooldown:13,color:'#f6dc82'},
+  summoner:{name:'별짐승 소환',cooldown:18,color:'#9ef7c4'},
+  architect:{name:'자동 포대 설치',cooldown:17,color:'#ffbf78'},
+  alchemist:{name:'연금 플라스크',cooldown:14,color:'#d8ff70'},
+  boomerang:{name:'월식 부메랑',cooldown:15,color:'#ff9fe6'},trapper:{name:'사냥꾼의 철망',cooldown:16,color:'#d6b07a'},
+  puppeteer:{name:'영혼 실 조종',cooldown:19,color:'#e7a4ff'},tempest:{name:'번개 걸음',cooldown:17,color:'#8df7ff'},
+  chronoblade:{name:'지연 검흔',cooldown:20,color:'#b9e9ff'},demolisher:{name:'원격 기폭',cooldown:22,color:'#ff9868'},
+  phaseweaver:{name:'쌍문 사격',cooldown:20,color:'#d7b6ff'},parasite:{name:'기생 표식',cooldown:21,color:'#a9ff7d'},
+  starforge:{name:'별 제련',cooldown:23,color:'#fff3a8'},cometrail:{name:'혜성 탑승',cooldown:20,color:'#75efff'},
+  corruptor:{name:'오염 삭제',cooldown:24,color:'#7cff45'},duplicator:{name:'행동 복제',cooldown:23,color:'#ff67e6'},
+  seraph:{name:'천상의 판결',cooldown:26,color:'#fffbd0'},eventhorizon:{name:'사건의 지평선',cooldown:31,color:'#c78cff'},
   gojo:{name:'아오',cooldown:15,color:'#54aaff'},
   amalgam:{name:'집합 붕괴',cooldown:18,color:'#ff4fe1'}
 });
@@ -195,6 +226,11 @@ const CANNON_SKILLS_2=Object.freeze({
   valkyrie:{name:'EINHERJAR RAIN',cooldown:29,color:'#b9ecff',kind:'spearRain'},
   berserker:{name:'LAST BLOOD',cooldown:30,color:'#ffaf7a',kind:'lastBlood'},
   oracle:{name:'THREE FATES',cooldown:30,color:'#fff2c2',kind:'threeFates'},
+  javelin:{name:'무기 회수',cooldown:22,color:'#fff0a8',kind:'weaponRecall'},
+  summoner:{name:'군주의 명령',cooldown:27,color:'#72ffd1',kind:'grandConjuration'},
+  architect:{name:'이동 요새',cooldown:28,color:'#ffd19a',kind:'mobileFortress'},
+  alchemist:{name:'대연성',cooldown:25,color:'#f0ff8a',kind:'grandCatalyst'},
+  eventhorizon:{name:'특이점 붕괴',cooldown:38,color:'#ffffff',kind:'singularityCollapse'},
   gojo:{name:'아카',cooldown:18,color:'#ff667d',kind:'repulse'}
 });
 const ERROR_T_SKILL=Object.freeze({name:'GLITCH BLADE',cooldown:7,color:'#73ff45'});
@@ -267,6 +303,17 @@ const TANK_THEMES=Object.freeze({
   mirror:{body:'#8065a8',edge:'#443661',glow:'#f0d0ff'},lancer:{body:'#667ca7',edge:'#354563',glow:'#dae7ff'},
   leviathan:{body:'#385f77',edge:'#1d3648',glow:'#9feaff'},valkyrie:{body:'#477d8f',edge:'#27505e',glow:'#a2f2ff'},
   berserker:{body:'#8d3e34',edge:'#4e201b',glow:'#ff9a78'},oracle:{body:'#8a8151',edge:'#4d472b',glow:'#fff2ae'},
+  javelin:{body:'#8f7842',edge:'#4b391b',glow:'#ffe58d'},
+  summoner:{body:'#347561',edge:'#173e34',glow:'#83ffd0'},
+  architect:{body:'#8a6043',edge:'#4a3020',glow:'#ffc27d'},
+  alchemist:{body:'#647d35',edge:'#34451a',glow:'#d9ff6e'},
+  boomerang:{body:'#8a4d77',edge:'#48263e',glow:'#ff9fe6'},trapper:{body:'#80694d',edge:'#463824',glow:'#e8c38e'},
+  puppeteer:{body:'#75498b',edge:'#3d254d',glow:'#e7a4ff'},tempest:{body:'#3f8192',edge:'#214a58',glow:'#8df7ff'},
+  chronoblade:{body:'#527b91',edge:'#2b4655',glow:'#b9e9ff'},demolisher:{body:'#8e4d39',edge:'#4e281d',glow:'#ff9868'},
+  phaseweaver:{body:'#725992',edge:'#3d3151',glow:'#d7b6ff'},parasite:{body:'#526f36',edge:'#293b19',glow:'#a9ff7d'},
+  starforge:{body:'#8d7640',edge:'#4d3f20',glow:'#fff3a8'},cometrail:{body:'#36788e',edge:'#1c4250',glow:'#75efff'},
+  corruptor:{body:'#172119',edge:'#55a932',glow:'#7cff45'},duplicator:{body:'#301832',edge:'#9e3191',glow:'#ff67e6'},
+  seraph:{body:'#e9e5bd',edge:'#8d8548',glow:'#fffbd0'},eventhorizon:{body:'#17101f',edge:'#7a46a5',glow:'#c78cff'},
   gojo:{body:'#eaf3ff',edge:'#5571a8',glow:'#a596ff'},
   amalgam:{body:'#34223f',edge:'#ff4fd8',glow:'#7cf7ff'}
 });
@@ -2581,7 +2628,45 @@ function activateSkill(errorChargeRatio=0,aimOverride=null){
   player.skillCd=def.cooldown;player.skillMax=def.cooldown;player.skillReadyAt=Date.now()+def.cooldown*1000;
   const p=playerParams(),a=player.angle,now=performance.now();
 
-  if(skillCannon==='bloodlust'){
+  if(skillCannon==='javelin'){
+    const[tx,ty]=skillAimPoint(900),aa=Math.atan2(ty-player.y,tx-player.x);
+    for(const off of [-.10,0,.10]){const b=spawnSkillProjectileAt(cannon,player.x+Math.cos(aa)*46,player.y+Math.sin(aa)*46,aa+off,{damageMul:2.15,speedMul:1.18,life:4.2,pierce:8,r:13,shape:'javelinSpear',special:'returningJavelin'});b.returnAt=.62+Math.abs(off);b.throwOrigin=onlineSelfId;}
+    spawnCombatFx('javelinThrow',player.x,player.y,{angle:aa,color:def.color,life:.58,radius:220,cannon});sendUniqueSkill(cannon,'javelinThrow',{targetX:tx,targetY:ty,length:900,radius:220});
+  }else if(skillCannon==='summoner'){
+    const[tx,ty]=skillAimPoint(420);addSkillZone('starBeastPack',{x:tx,y:ty,radius:145,life:12,damage:p.damage*.72,tick:0,data:{next:.12,count:3}});spawnCombatFx('summonGate',tx,ty,{angle:a,color:def.color,life:1.1,radius:180,cannon});sendUniqueSkill(cannon,'starBeastPack',{targetX:tx,targetY:ty,radius:145,life:12});
+  }else if(skillCannon==='architect'){
+    const[tx,ty]=skillAimPoint(460);addSkillZone('architectTurret',{x:tx,y:ty,radius:76,life:14,damage:p.damage*.92,tick:0,data:{next:.1,barrel:a}});spawnCombatFx('turretBuild',tx,ty,{angle:a,color:def.color,life:.9,radius:120,cannon});sendUniqueSkill(cannon,'architectTurret',{targetX:tx,targetY:ty,radius:76,life:14});
+  }else if(skillCannon==='alchemist'){
+    const[tx,ty]=skillAimPoint(560),aa=Math.atan2(ty-player.y,tx-player.x);addSkillZone('alchemyFlaskArc',{x:player.x,y:player.y,radius:185,life:.82,damage:p.damage*.55,angle:aa,length:Math.hypot(tx-player.x,ty-player.y),data:{targetX:tx,targetY:ty,poolLife:7.2}});spawnCombatFx('flaskThrow',player.x,player.y,{angle:aa,color:def.color,life:.62,radius:180,cannon});sendUniqueSkill(cannon,'alchemyFlaskArc',{targetX:tx,targetY:ty,length:Math.hypot(tx-player.x,ty-player.y),radius:185,life:.82});
+  }else if(skillCannon==='boomerang'){
+    for(const off of [-.28,0,.28]){const b=spawnSkillProjectileAt(cannon,player.x,player.y,a+off,{damageMul:2.0,speedMul:1.20,life:4.5,pierce:9,r:14,shape:'dimensionRing',special:'eclipseBoomerang'});b.returnAt=.48;b.curve=off<0?-1:1}spawnCombatFx('boomerangFan',player.x,player.y,{angle:a,color:def.color,life:.72,radius:520,cannon});sendUniqueSkill(cannon,'boomerangFan',{targetX:player.x+Math.cos(a)*700,targetY:player.y+Math.sin(a)*700,length:700});
+  }else if(skillCannon==='trapper'){
+    const[tx,ty]=skillAimPoint(480);for(let k=0;k<5;k++){const q=k*TAU/5;addSkillZone('hunterTrap',{x:tx+Math.cos(q)*115,y:ty+Math.sin(q)*115,radius:58,life:11,damage:p.damage*2.1,tick:0,data:{armedAt:.65}})}spawnCombatFx('trapCast',tx,ty,{angle:a,color:def.color,life:.75,radius:190,cannon});sendUniqueSkill(cannon,'hunterTrap',{targetX:tx,targetY:ty,radius:190,life:11});
+  }else if(skillCannon==='puppeteer'){
+    const target=nearestSkillTarget(player.x,player.y,850),tx=target?.x||player.x+Math.cos(a)*520,ty=target?.y||player.y+Math.sin(a)*520;addSkillZone('puppetThread',{x:player.x,y:player.y,angle:Math.atan2(ty-player.y,tx-player.x),length:Math.hypot(tx-player.x,ty-player.y),radius:38,life:5.5,damage:p.damage*.52,tick:0,data:{targetId:target?.kind==='player'?target.obj.id:'',targetShape:target?.kind==='shape'?target.obj:null}});sendUniqueSkill(cannon,'puppetThread',{targetX:tx,targetY:ty,length:Math.hypot(tx-player.x,ty-player.y),life:5.5});
+  }else if(skillCannon==='tempest'){
+    const ox=player.x,oy=player.y,[tx,ty]=skillAimPoint(760),aa=Math.atan2(ty-oy,tx-ox),len=Math.hypot(tx-ox,ty-oy);player.x=tx;player.y=ty;player.phaseUntil=now+500;for(let k=0;k<7;k++){const d=len*k/6;skillAreaDamage(ox+Math.cos(aa)*d,oy+Math.sin(aa)*d,72,p.damage*1.15,'#8df7ff');spawnCombatFx('skyLightning',ox+Math.cos(aa)*d,oy+Math.sin(aa)*d-220,{angle:Math.PI/2,color:def.color,life:.28,radius:220,cannon})}broadcastLocalState(true);sendUniqueSkill(cannon,'lightningStep',{targetX:tx,targetY:ty,length:len});
+  }else if(skillCannon==='chronoblade'){
+    addSkillZone('delayedBladeEcho',{x:player.x,y:player.y,angle:a,length:920,width:42,radius:460,life:2.4,damage:p.damage*4.6,pulses:4,interval:.52,data:{next:.25,index:0}});spawnCombatFx('chronoBlade',player.x,player.y,{angle:a,color:def.color,life:.8,radius:920,cannon});sendUniqueSkill(cannon,'delayedBladeEcho',{targetX:player.x+Math.cos(a)*920,targetY:player.y+Math.sin(a)*920,length:920,life:2.4});
+  }else if(skillCannon==='demolisher'){
+    const[tx,ty]=skillAimPoint(620);for(let k=0;k<6;k++){const q=k*TAU/6,rr=k%2?95:185;addSkillZone('remoteCharge',{x:tx+Math.cos(q)*rr,y:ty+Math.sin(q)*rr,radius:110,life:.75+k*.13,damage:p.damage*2.9,data:{detonateAt:.08}})}spawnCombatFx('demolitionCast',tx,ty,{angle:a,color:def.color,life:.85,radius:260,cannon});sendUniqueSkill(cannon,'remoteCharge',{targetX:tx,targetY:ty,radius:260});
+  }else if(skillCannon==='phaseweaver'){
+    const[tx,ty]=skillAimPoint(560);addSkillZone('phaseGatePair',{x:tx,y:ty,radius:105,life:8,damage:p.damage*.8,tick:0,data:{next:.12,angle:a}});spawnCombatFx('phaseGate',tx,ty,{angle:a,color:def.color,life:.9,radius:150,cannon});sendUniqueSkill(cannon,'phaseGatePair',{targetX:tx,targetY:ty,radius:105,life:8});
+  }else if(skillCannon==='parasite'){
+    const target=nearestSkillTarget(player.x,player.y,1000),tx=target?.x||player.x+Math.cos(a)*620,ty=target?.y||player.y+Math.sin(a)*620;addSkillZone('parasiteMark',{x:tx,y:ty,radius:92,life:7,damage:p.damage*.62,tick:0,data:{targetId:target?.kind==='player'?target.obj.id:'',targetShape:target?.kind==='shape'?target.obj:null}});spawnCombatFx('parasiteCast',tx,ty,{angle:a,color:def.color,life:.7,radius:120,cannon});sendUniqueSkill(cannon,'parasiteMark',{targetX:tx,targetY:ty,radius:92,life:7});
+  }else if(skillCannon==='starforge'){
+    addSkillZone('forgedStars',{x:player.x,y:player.y,radius:210,life:10,damage:p.damage*1.05,tick:0,data:{next:.1,count:6}});spawnCombatFx('starForge',player.x,player.y,{angle:a,color:def.color,life:1.0,radius:250,cannon});sendUniqueSkill(cannon,'forgedStars',{targetX:player.x,targetY:player.y,radius:210,life:10});
+  }else if(skillCannon==='cometrail'){
+    const ox=player.x,oy=player.y,[tx,ty]=skillAimPoint(1050),aa=Math.atan2(ty-oy,tx-ox),len=Math.hypot(tx-ox,ty-oy);damageSkillLine(ox,oy,aa,len,66,p.damage*4.8,'#75efff',520);player.x=tx;player.y=ty;player.vx=Math.cos(aa)*780;player.vy=Math.sin(aa)*780;player.phaseUntil=now+700;addSkillZone('cometWake',{x:(ox+tx)/2,y:(oy+ty)/2,angle:aa,length:len,width:92,radius:len/2,life:5,damage:p.damage*.55,tick:0});broadcastLocalState(true);sendUniqueSkill(cannon,'cometRide',{targetX:tx,targetY:ty,length:len});
+  }else if(skillCannon==='corruptor'){
+    const lanes=[-.22,0,.22];for(const off of lanes)damageSkillLine(player.x,player.y,a+off,1100,31,p.damage*6.1,'#7cff45',0);spawnCombatFx('corruptDelete',player.x,player.y,{angle:a,color:def.color,life:.72,radius:1100,cannon});sendUniqueSkill(cannon,'corruptDelete',{targetX:player.x+Math.cos(a)*1100,targetY:player.y+Math.sin(a)*1100,length:1100});
+  }else if(skillCannon==='duplicator'){
+    addSkillZone('actionClone',{x:player.x,y:player.y,radius:150,life:8,damage:p.damage*.72,tick:0,data:{next:.1,count:4}});spawnCombatFx('cloneCast',player.x,player.y,{angle:a,color:def.color,life:.9,radius:190,cannon});sendUniqueSkill(cannon,'actionClone',{targetX:player.x,targetY:player.y,radius:150,life:8});
+  }else if(skillCannon==='seraph'){
+    const[tx,ty]=skillAimPoint(680);player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.25);for(let k=0;k<9;k++){const aa=a+(k-4)*.11;spawnSkillProjectileAt(cannon,player.x,player.y,aa,{damageMul:1.8,speedMul:1.45,life:3.2,pierce:7,r:10,shape:'stellarStar',special:'seraphFeather'})}addSkillZone('seraphSanctuary',{x:tx,y:ty,radius:280,life:7,damage:p.damage*.45,tick:0,data:{heal:player.maxHp*.015}});sendUniqueSkill(cannon,'seraphJudgment',{targetX:tx,targetY:ty,radius:280,life:7});
+  }else if(skillCannon==='eventhorizon'){
+    const[tx,ty]=skillAimPoint(620);addSkillZone('eventHorizon',{x:tx,y:ty,radius:460,life:6.5,damage:p.damage*.72,tick:0,data:{collapseAt:.35}});spawnCombatFx('eventHorizonCast',tx,ty,{angle:0,color:def.color,life:1.2,radius:480,cannon});sendUniqueSkill(cannon,'eventHorizon',{targetX:tx,targetY:ty,radius:460,life:6.5});
+  }else if(skillCannon==='bloodlust'){
     player.bloodlustFrenzyUntil=now+8000;
     player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.12);
     spawnCombatFx('uniqueSkill',player.x,player.y,{angle:a,color:'#ff5368',life:1.05,radius:155,cannon:'bloodlust'});
@@ -2831,7 +2916,18 @@ function activateSkill2(){
   if(player.skill2Cd>0&&!dekuWhipChainCast)return;
   if(!dekuWhipChainCast){player.skill2Cd=def.cooldown;player.skill2Max=def.cooldown;player.skill2ReadyAt=wallNow+def.cooldown*1000}
 
-  if(skill2Cannon==='bloodlust'){
+  if(skill2Cannon==='javelin'){
+    let recalled=0;for(const b of bullets){if(b.team!=='player'||b.cannon!=='javelin')continue;const aa=Math.atan2(player.y-b.y,player.x-b.x),speed=Math.max(900,Math.hypot(b.vx,b.vy)*1.35);b.vx=Math.cos(aa)*speed;b.vy=Math.sin(aa)*speed;b.damage*=1.65;b.pierce=Math.max(10,b.pierce||1);b.life=Math.max(b.life,1.8);b.special='recalledJavelin';recalled++;}
+    damageSkillLine(player.x,player.y,a,850,34,p.damage*(recalled?3.2:5.8),'#fff0a8',110);spawnCombatFx('weaponRecall',player.x,player.y,{angle:a,color:def.color,life:.82,radius:850,cannon});sendUniqueSkill(cannon,'weaponRecall',{targetX:player.x+Math.cos(a)*850,targetY:player.y+Math.sin(a)*850,length:850,radius:850});
+  }else if(skill2Cannon==='summoner'){
+    const[tx,ty]=skillAimPoint(520);addSkillZone('grandFamiliar',{x:tx,y:ty,radius:118,life:11,damage:p.damage*1.35,tick:0,data:{next:.1,charge:.8}});spawnCombatFx('summonGate',tx,ty,{angle:a,color:def.color,life:1.25,radius:250,cannon});sendUniqueSkill(cannon,'grandFamiliar',{targetX:tx,targetY:ty,radius:118,life:11});
+  }else if(skill2Cannon==='architect'){
+    addSkillZone('mobileFortress',{x:player.x,y:player.y,radius:175,life:10,damage:p.damage*.78,tick:0,data:{next:.05,barrel:a}});player.fortressUntil=now+10000;spawnCombatFx('fortressBuild',player.x,player.y,{angle:a,color:def.color,life:1.15,radius:230,cannon});sendUniqueSkill(cannon,'mobileFortress',{targetX:player.x,targetY:player.y,radius:175,life:10});
+  }else if(skill2Cannon==='alchemist'){
+    for(const z of skillZones){if(z.networkRemote||z.type!=='alchemyPool')continue;z.data.catalyst=true;z.damage*=1.8;z.radius*=1.22;z.life=Math.max(z.life,4.5);}const[tx,ty]=skillAimPoint(430);addSkillZone('alchemyPool',{x:tx,y:ty,radius:260,life:8.5,damage:p.damage*.78,tick:0,data:{phase:2,catalyst:true}});spawnCombatFx('grandCatalyst',tx,ty,{angle:0,color:def.color,life:1.2,radius:300,cannon});sendUniqueSkill(cannon,'grandCatalyst',{targetX:tx,targetY:ty,radius:260,life:8.5});
+  }else if(skill2Cannon==='eventhorizon'){
+    const[tx,ty]=skillAimPoint(720);addSkillZone('eventHorizon',{x:tx,y:ty,radius:680,life:8.5,damage:p.damage*1.05,tick:0,data:{collapseAt:.42}});spawnCombatFx('eventHorizonCast',tx,ty,{angle:0,color:'#ffffff',life:1.5,radius:700,cannon});sendUniqueSkill(cannon,'singularityCollapse',{targetX:tx,targetY:ty,radius:680,life:8.5});
+  }else if(skill2Cannon==='bloodlust'){
     const radius=520,damage=p.damage*2.8,r2=radius*radius;let drained=0;
     for(let i=shapes.length-1;i>=0;i--){
       const s=shapes[i],dx=s.x-player.x,dy=s.y-player.y,d2=dx*dx+dy*dy;if(d2>r2||s.hp<=0)continue;
@@ -3704,6 +3800,12 @@ function applyUniqueProjectileMotion(b,dt){
     if(target){const desired=Math.atan2(target.y-b.y,target.x-b.x),current=Math.atan2(b.vy,b.vx),turn=clamp(angleDifference(desired,current),-4.2*dt,4.2*dt);bendProjectileVelocity(b,turn);const k=1+.16*dt;b.vx*=k;b.vy*=k}
     return;
   }
+  if(b.cannon==='javelin'&&String(b.special||'')==='returningJavelin'&&t>=(b.returnAt||.65)){
+    const desired=Math.atan2(player.y-b.y,player.x-b.x),current=Math.atan2(b.vy,b.vx),turn=clamp(angleDifference(desired,current),-5.4*dt,5.4*dt);bendProjectileVelocity(b,turn);const k=1+.48*dt;b.vx*=k;b.vy*=k;return;
+  }
+  if(b.cannon==='boomerang'&&String(b.special||'')==='eclipseBoomerang'&&t>=(b.returnAt||.48)){
+    const desired=Math.atan2(player.y-b.y,player.x-b.x),current=Math.atan2(b.vy,b.vx);bendProjectileVelocity(b,clamp(angleDifference(desired,current),-4.7*dt,4.7*dt));return;
+  }
 
   switch(cannonBaseBehavior(b.cannon)){
     case 'standard': break; // 완전 직선 기준탄
@@ -3946,6 +4048,52 @@ function updateSkillZones(dt){
     }
     if(z.type==='amalgamPhoenixVolley'){
       z.x=player.x;z.y=player.y;z.data.next=(z.data.next||0)-dt;if(z.data.next<=0){z.data.next=.62;const target=nearestSkillTarget(z.x,z.y,1200),base=target?Math.atan2(target.y-z.y,target.x-z.x):player.angle;for(const off of [-.11,.11])spawnSkillProjectileAt('amalgam',z.x+Math.cos(base)*42,z.y+Math.sin(base)*42,base+off,{damageMul:z.damage/Math.max(1,playerParams().damage),speedMul:1.38,life:3,pierce:5,r:18,special:'amalgamPhoenixBlade'})}continue;
+    }
+
+    if(z.type==='starBeastPack'){
+      z.data.next=(z.data.next||0)-dt;const target=nearestSkillTarget(z.x,z.y,1050);if(target){const chase=Math.atan2(target.y-z.y,target.x-z.x);z.x+=Math.cos(chase)*80*dt;z.y+=Math.sin(chase)*80*dt}if(z.data.next<=0){z.data.next=.48;const count=z.data.count||3;for(let k=0;k<count;k++){const q=now*.0022+k*TAU/count,x=z.x+Math.cos(q)*z.radius,y=z.y+Math.sin(q)*z.radius,aa=target?Math.atan2(target.y-y,target.x-x):q;spawnSkillProjectileAt('summoner',x,y,aa,{damageMul:z.damage/Math.max(1,playerParams().damage),speedMul:1.22,life:2.4,pierce:2,r:7,shape:'summonSeed',special:'familiarBolt',curve:k%2?1:-1})}}continue;
+    }
+    if(z.type==='grandFamiliar'){
+      z.data.next=(z.data.next||0)-dt;const target=nearestSkillTarget(z.x,z.y,1250);if(target){const chase=Math.atan2(target.y-z.y,target.x-z.x),d=Math.hypot(target.x-z.x,target.y-z.y);z.x+=Math.cos(chase)*Math.min(230,d)*dt;z.y+=Math.sin(chase)*Math.min(230,d)*dt;if(d<z.radius+70&&z.data.next<=0){z.data.next=.34;skillAreaDamage(z.x,z.y,z.radius+55,z.damage,'#72ffd1');spawnCombatFx('familiarClaw',z.x,z.y,{angle:chase,color:'#72ffd1',life:.35,radius:180,cannon:'summoner'})}}continue;
+    }
+    if(z.type==='architectTurret'||z.type==='mobileFortress'){
+      if(z.type==='mobileFortress'){z.x=player.x;z.y=player.y}z.data.next=(z.data.next||0)-dt;const target=nearestSkillTarget(z.x,z.y,z.type==='mobileFortress'?1200:950);if(target){z.data.barrel=Math.atan2(target.y-z.y,target.x-z.x);if(z.data.next<=0){z.data.next=z.type==='mobileFortress'?.24:.42;const barrels=z.type==='mobileFortress'?[-.11,0,.11]:[0];for(const off of barrels)spawnSkillProjectileAt('architect',z.x+Math.cos(z.data.barrel)*58,z.y+Math.sin(z.data.barrel)*58,z.data.barrel+off,{damageMul:z.damage/Math.max(1,playerParams().damage),speedMul:1.35,life:2.8,pierce:3,r:8,shape:'architectBolt',special:'turretBolt'})}}continue;
+    }
+    if(z.type==='alchemyFlaskArc'){
+      const progress=clamp(elapsed/z.maxLife,0,1),tx=z.data.targetX,ty=z.data.targetY;z.x=player.x+(tx-player.x)*progress;z.y=player.y+(ty-player.y)*progress-Math.sin(progress*Math.PI)*190;if(!z.triggered&&z.life<.05){z.triggered=true;addSkillZone('alchemyPool',{x:tx,y:ty,radius:z.radius,life:z.data.poolLife||7.2,damage:z.damage,tick:0,data:{phase:Math.floor(Math.random()*3),catalyst:false}});skillAreaDamage(tx,ty,z.radius,z.damage*2.4,'#d8ff70');burst(tx,ty,'#eaff93',30)}continue;
+    }
+    if(z.type==='alchemyPool'){
+      z.tick=(z.tick||0)-dt;if(z.tick<=0){z.tick=z.data.catalyst?.12:.22;const phase=z.data.phase||0;for(const s of shapes){const dx=s.x-z.x,dy=s.y-z.y,d=Math.hypot(dx,dy)||1;if(d>z.radius)continue;if(phase===0)reportShapeImpulse(s,dx/d*-48,dy/d*-48);else if(phase===1)reportShapeImpulse(s,dx/d*58,dy/d*58);applyShapeDamage(s,z.damage*(z.data.catalyst?1.3:1))}if(phase===2&&Math.hypot(player.x-z.x,player.y-z.y)<z.radius)player.hp=Math.min(player.maxHp,player.hp+player.maxHp*.006)}continue;
+    }
+    if(z.type==='hunterTrap'){
+      if(elapsed<(z.data.armedAt||.65))continue;let hit=false;for(const s of shapes){if(Math.hypot(s.x-z.x,s.y-z.y)<z.radius+s.r){s.vx*=.05;s.vy*=.05;applyShapeDamage(s,z.damage);hit=true}}if(hit){burst(z.x,z.y,'#e8c38e',18);z.life=.05}continue;
+    }
+    if(z.type==='puppetThread'){
+      const target=z.data.targetShape&&z.data.targetShape.hp>0?z.data.targetShape:(z.data.targetId?remotePlayers.get(z.data.targetId):null);if(!target){z.life=.05;continue}z.angle=Math.atan2(target.y-player.y,target.x-player.x);z.length=Math.hypot(target.x-player.x,target.y-player.y);z.x=player.x;z.y=player.y;z.tick=(z.tick||0)-dt;if(z.tick<=0){z.tick=.16;const dx=player.x-target.x,dy=player.y-target.y,d=Math.hypot(dx,dy)||1;if(z.data.targetShape){reportShapeImpulse(target,dx/d*88,dy/d*88);applyShapeDamage(target,z.damage)}else if(target.alive)sendDamage(target.id,z.damage*.75)}continue;
+    }
+    if(z.type==='delayedBladeEcho'){
+      z.data.next=(z.data.next||0)-dt;if((z.data.index||0)<z.pulses&&z.data.next<=0){const i=z.data.index++;z.data.next=z.interval;const aa=z.angle+(i-1.5)*.08;damageSkillLine(z.x,z.y,aa,z.length,z.width,z.damage*(1+i*.12),'#b9e9ff',80);spawnCombatFx('chronoBlade',z.x,z.y,{angle:aa,color:'#b9e9ff',life:.38,radius:z.length,cannon:'chronoblade'})}continue;
+    }
+    if(z.type==='remoteCharge'){
+      if(!z.triggered&&z.life<(z.data.detonateAt||.08)){z.triggered=true;skillAreaDamage(z.x,z.y,z.radius,z.damage,'#ff9868');burst(z.x,z.y,'#ffb07c',30);shake=Math.max(shake,8)}continue;
+    }
+    if(z.type==='phaseGatePair'){
+      z.data.next=(z.data.next||0)-dt;if(z.data.next<=0){z.data.next=.44;const target=nearestSkillTarget(z.x,z.y,1100),aa=target?Math.atan2(target.y-z.y,target.x-z.x):z.data.angle;for(const side of [-1,1]){const x=z.x+Math.cos(aa+Math.PI/2)*z.radius*side,y=z.y+Math.sin(aa+Math.PI/2)*z.radius*side;spawnSkillProjectileAt('phaseweaver',x,y,aa,{damageMul:z.damage/Math.max(1,playerParams().damage),speedMul:1.32,life:2.6,pierce:5,r:9,shape:'dimensionRing',special:'phaseGateShot',curve:side*.5})}}continue;
+    }
+    if(z.type==='parasiteMark'){
+      const target=z.data.targetShape&&z.data.targetShape.hp>0?z.data.targetShape:(z.data.targetId?remotePlayers.get(z.data.targetId):null);if(!target){z.life=.05;continue}z.x=target.x;z.y=target.y;z.tick=(z.tick||0)-dt;if(z.tick<=0){z.tick=.28;if(z.data.targetShape)applyShapeDamage(target,z.damage);else if(target.alive)sendDamage(target.id,z.damage*.72);player.hp=Math.min(player.maxHp,player.hp+z.damage*.22)}continue;
+    }
+    if(z.type==='forgedStars'||z.type==='actionClone'){
+      z.x=player.x;z.y=player.y;z.data.next=(z.data.next||0)-dt;if(z.data.next<=0){z.data.next=z.type==='forgedStars'?.38:.30;const count=z.data.count||4,target=nearestSkillTarget(z.x,z.y,1150);for(let k=0;k<count;k++){const q=now*.0024+k*TAU/count,x=z.x+Math.cos(q)*z.radius,y=z.y+Math.sin(q)*z.radius,aa=target?Math.atan2(target.y-y,target.x-x):player.angle;if(z.type==='forgedStars'&&k!==Math.floor((elapsed/.38)%count))continue;spawnSkillProjectileAt(z.type==='forgedStars'?'starforge':'duplicator',x,y,aa,{damageMul:z.damage/Math.max(1,playerParams().damage),speedMul:1.28,life:2.7,pierce:4,r:9,shape:z.type==='forgedStars'?'stellarStar':'glitchPacket',special:z.type})}}continue;
+    }
+    if(z.type==='cometWake'){
+      z.tick=(z.tick||0)-dt;if(z.tick<=0){z.tick=.18;const x1=z.x-Math.cos(z.angle)*z.length/2,y1=z.y-Math.sin(z.angle)*z.length/2;damageSkillLine(x1,y1,z.angle,z.length,z.width/2,z.damage,'#75efff')}continue;
+    }
+    if(z.type==='seraphSanctuary'){
+      z.tick=(z.tick||0)-dt;if(z.tick<=0){z.tick=.28;if(Math.hypot(player.x-z.x,player.y-z.y)<z.radius)player.hp=Math.min(player.maxHp,player.hp+(z.data.heal||0));skillAreaDamage(z.x,z.y,z.radius,z.damage,'#fffbd0')}continue;
+    }
+    if(z.type==='eventHorizon'){
+      z.tick=(z.tick||0)-dt;if(z.tick<=0){z.tick=.12;for(const s of shapes){const dx=z.x-s.x,dy=z.y-s.y,d=Math.hypot(dx,dy)||1;if(d>z.radius)continue;const force=(1-d/z.radius)*115;reportShapeImpulse(s,dx/d*force,dy/d*force);applyShapeDamage(s,z.damage)}for(const b of bullets){if(b.team==='remote'&&Math.hypot(b.x-z.x,b.y-z.y)<z.radius){b.vx*=.72;b.vy*=.72}}}if(!z.triggered&&z.life<(z.data.collapseAt||.35)){z.triggered=true;skillAreaDamage(z.x,z.y,z.radius*.62,z.damage*8,'#ffffff');burst(z.x,z.y,'#c78cff',70);shake=Math.max(shake,24)}continue;
     }
 
     if(z.type==='gojoAo'){
@@ -5224,6 +5372,36 @@ function drawSkillZones(){
         ctx.fillStyle=g;ctx.beginPath();ctx.arc(bx,by,br,0,TAU);ctx.fill();
       }
       ctx.strokeStyle='rgba(221,232,225,.34)';ctx.lineWidth=2.2;ctx.setLineDash([18,13]);ctx.beginPath();ctx.arc(0,0,z.radius*(.96+.025*Math.sin(t*2)),0,TAU);ctx.stroke();ctx.setLineDash([]);
+    }else if(z.type==='starBeastPack'){
+      const count=z.data.count||3;for(let k=0;k<count;k++){const a=t*2.2+k*TAU/count,ox=Math.cos(a)*z.radius,oy=Math.sin(a)*z.radius;ctx.save();ctx.translate(ox,oy);ctx.rotate(a+Math.PI/2);ctx.fillStyle='#163f35';ctx.strokeStyle='#9effd4';ctx.lineWidth=3;ctx.shadowColor='#72ffd1';ctx.shadowBlur=14;ctx.beginPath();ctx.moveTo(18,0);ctx.lineTo(3,-13);ctx.lineTo(-17,-9);ctx.lineTo(-9,0);ctx.lineTo(-17,9);ctx.lineTo(3,13);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}ctx.shadowBlur=0;
+    }else if(z.type==='grandFamiliar'){
+      ctx.rotate(Math.atan2(player.y-z.y,player.x-z.x));ctx.fillStyle='#173d34';ctx.strokeStyle='#9effd4';ctx.lineWidth=5;ctx.shadowColor='#72ffd1';ctx.shadowBlur=22;ctx.beginPath();ctx.moveTo(55,0);ctx.lineTo(18,-42);ctx.lineTo(-20,-29);ctx.lineTo(-52,-48);ctx.lineTo(-38,0);ctx.lineTo(-52,48);ctx.lineTo(-20,29);ctx.lineTo(18,42);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(18,0,7,0,TAU);ctx.fill();ctx.shadowBlur=0;
+    }else if(z.type==='architectTurret'||z.type==='mobileFortress'){
+      const fortress=z.type==='mobileFortress',rr=fortress?z.radius:55;ctx.fillStyle=fortress?'#554437':'#684c35';ctx.strokeStyle='#ffd19a';ctx.lineWidth=4;ctx.shadowColor='#ffb45c';ctx.shadowBlur=14;ctx.beginPath();for(let k=0;k<8;k++){const a=k*TAU/8,r=k%2?rr*.78:rr;k?ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r):ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fill();ctx.stroke();ctx.save();ctx.rotate(z.data.barrel||0);ctx.fillStyle='#806047';ctx.fillRect(0,-11,fortress?110:78,22);ctx.strokeRect(0,-11,fortress?110:78,22);ctx.restore();ctx.shadowBlur=0;
+    }else if(z.type==='alchemyFlaskArc'){
+      ctx.rotate(t*8);ctx.fillStyle='rgba(216,255,112,.72)';ctx.strokeStyle='#f4ffc7';ctx.lineWidth=3;ctx.shadowColor='#d8ff70';ctx.shadowBlur=18;ctx.beginPath();ctx.arc(0,5,18,0,TAU);ctx.fill();ctx.stroke();ctx.fillStyle='#4d5b29';ctx.fillRect(-7,-22,14,18);ctx.shadowBlur=0;
+    }else if(z.type==='alchemyPool'){
+      const colors=['#b76cff','#ff9e55','#7dff9b'],color=colors[z.data.phase||0];ctx.fillStyle=z.data.catalyst?'rgba(228,255,112,.20)':'rgba(120,255,150,.13)';ctx.beginPath();for(let k=0;k<18;k++){const a=k*TAU/18,r=z.radius*(.88+.10*Math.sin(k*4.7+z.x*.01));k?ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r):ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=z.data.catalyst?5:3;ctx.shadowColor=color;ctx.shadowBlur=18;ctx.stroke();for(let k=0;k<7;k++){const a=k*2.4+t*(k%2?1:-1),r=z.radius*(.18+(k%3)*.22);ctx.beginPath();ctx.arc(Math.cos(a)*r,Math.sin(a)*r,5+(k%3)*3,0,TAU);ctx.stroke()}ctx.shadowBlur=0;
+    }else if(z.type==='hunterTrap'){
+      ctx.rotate(t*.3);ctx.strokeStyle='#e8c38e';ctx.lineWidth=4;for(let k=0;k<8;k++){const a=k*TAU/8;ctx.beginPath();ctx.moveTo(Math.cos(a)*12,Math.sin(a)*12);ctx.lineTo(Math.cos(a)*z.radius,Math.sin(a)*z.radius);ctx.stroke()}ctx.strokeRect(-18,-18,36,36);
+    }else if(z.type==='puppetThread'){
+      ctx.rotate(z.angle);ctx.strokeStyle='#e7a4ff';ctx.lineWidth=5;ctx.setLineDash([18,7]);ctx.beginPath();ctx.moveTo(0,0);ctx.bezierCurveTo(z.length*.3,-35,z.length*.7,35,z.length,0);ctx.stroke();ctx.setLineDash([]);
+    }else if(z.type==='delayedBladeEcho'){
+      ctx.rotate(z.angle);ctx.strokeStyle='#b9e9ff';ctx.lineWidth=4;for(let k=0;k<4;k++){ctx.globalAlpha=.22+k*.16;ctx.beginPath();ctx.moveTo(0,(k-1.5)*16);ctx.lineTo(z.length,(k-1.5)*16);ctx.stroke()}ctx.globalAlpha=1;
+    }else if(z.type==='remoteCharge'){
+      ctx.rotate(t*2);ctx.fillStyle='#5a3326';ctx.strokeStyle='#ff9868';ctx.lineWidth=4;ctx.fillRect(-22,-22,44,44);ctx.strokeRect(-22,-22,44,44);ctx.beginPath();ctx.moveTo(-22,0);ctx.lineTo(22,0);ctx.moveTo(0,-22);ctx.lineTo(0,22);ctx.stroke();
+    }else if(z.type==='phaseGatePair'){
+      ctx.strokeStyle='#e6d2ff';ctx.lineWidth=7;ctx.shadowColor='#d7b6ff';ctx.shadowBlur=20;for(const side of [-1,1]){ctx.beginPath();ctx.ellipse(side*z.radius,0,34,72,side*.25,0,TAU);ctx.stroke()}ctx.shadowBlur=0;
+    }else if(z.type==='parasiteMark'){
+      ctx.rotate(t*1.8);ctx.strokeStyle='#a9ff7d';ctx.lineWidth=4;for(let k=0;k<6;k++){const a=k*TAU/6;ctx.beginPath();ctx.moveTo(10,0);ctx.quadraticCurveTo(Math.cos(a)*z.radius*.65,Math.sin(a)*z.radius*.65,Math.cos(a)*z.radius,Math.sin(a)*z.radius);ctx.stroke()}
+    }else if(z.type==='forgedStars'||z.type==='actionClone'){
+      const count=z.data.count||4;for(let k=0;k<count;k++){const a=t*2.4+k*TAU/count,x=Math.cos(a)*z.radius,y=Math.sin(a)*z.radius;ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.fillStyle=z.type==='forgedStars'?'#fff3a8':'#ff67e6';if(z.type==='forgedStars'){ctx.beginPath();for(let j=0;j<10;j++){const aa=j*TAU/10,r=j%2?5:13;j?ctx.lineTo(Math.cos(aa)*r,Math.sin(aa)*r):ctx.moveTo(Math.cos(aa)*r,Math.sin(aa)*r)}ctx.closePath();ctx.fill()}else ctx.fillRect(-12,-9,24,18);ctx.restore()}
+    }else if(z.type==='cometWake'){
+      ctx.rotate(z.angle);ctx.fillStyle='rgba(117,239,255,.18)';ctx.strokeStyle='#75efff';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-z.length/2,-z.width/2);ctx.quadraticCurveTo(0,z.width*.25,z.length/2,-z.width/3);ctx.lineTo(z.length/2,z.width/3);ctx.quadraticCurveTo(0,-z.width*.25,-z.length/2,z.width/2);ctx.closePath();ctx.fill();ctx.stroke();
+    }else if(z.type==='seraphSanctuary'){
+      ctx.strokeStyle='#fffbd0';ctx.shadowColor='#fff6a8';ctx.shadowBlur=22;ctx.lineWidth=5;for(let k=0;k<6;k++){const a=k*TAU/6+t*.12;ctx.beginPath();ctx.moveTo(Math.cos(a)*z.radius*.35,Math.sin(a)*z.radius*.35);ctx.quadraticCurveTo(Math.cos(a+.3)*z.radius*.75,Math.sin(a+.3)*z.radius*.75,Math.cos(a)*z.radius,Math.sin(a)*z.radius);ctx.stroke()}ctx.shadowBlur=0;
+    }else if(z.type==='eventHorizon'){
+      const shrink=.55+.45*(z.life/z.maxLife);ctx.fillStyle='#050208';ctx.shadowColor='#c78cff';ctx.shadowBlur=32;ctx.beginPath();ctx.arc(0,0,z.radius*.24,0,TAU);ctx.fill();ctx.strokeStyle='#ffffff';ctx.lineWidth=5;for(let k=0;k<3;k++){ctx.beginPath();ctx.ellipse(0,0,z.radius*(.38+k*.18)*shrink,z.radius*(.10+k*.045),t*(k%2?-.7:.7)+k,0,TAU);ctx.stroke()}ctx.shadowBlur=0;
     }else if(z.type==='artillery'){
       ctx.strokeStyle='#8ed6ff';ctx.lineWidth=3;ctx.setLineDash([10,8]);ctx.beginPath();ctx.arc(0,0,z.radius*(.82+.18*q),0,TAU);ctx.stroke();ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(-25,0);ctx.lineTo(25,0);ctx.moveTo(0,-25);ctx.lineTo(0,25);ctx.stroke();
     }else if(z.type==='barrier'){
@@ -5911,6 +6089,42 @@ function drawVariantProjectile(b,time){
     case 'oracle':
       ctx.fillStyle='#fff2b5';ctx.ellipse(0,0,17,9,0,0,TAU);ctx.fill();ctx.stroke();
       ctx.fillStyle='#9b7937';ctx.beginPath();ctx.arc(2,0,6,0,TAU);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(3,-2,2,0,TAU);ctx.fill();break;
+    case 'javelin':
+      ctx.strokeStyle='#fff2ae';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-34,0);ctx.lineTo(22,0);ctx.stroke();ctx.fillStyle='#ffe58d';ctx.beginPath();ctx.moveTo(31,0);ctx.lineTo(14,-8);ctx.lineTo(17,0);ctx.lineTo(14,8);ctx.closePath();ctx.fill();ctx.stroke();break;
+    case 'summoner':
+      ctx.rotate(spin);ctx.fillStyle='#9effd4';for(let k=0;k<5;k++){const a=k*TAU/5;ctx.beginPath();ctx.arc(Math.cos(a)*9,Math.sin(a)*9,4,0,TAU);ctx.fill()}ctx.strokeStyle='#eafff6';ctx.beginPath();ctx.arc(0,0,15,0,TAU);ctx.stroke();break;
+    case 'architect':
+      ctx.fillStyle='#65472f';ctx.fillRect(-14,-9,24,18);ctx.strokeRect(-14,-9,24,18);ctx.fillStyle='#ffd19a';ctx.fillRect(4,-4,22,8);break;
+    case 'alchemist':
+      ctx.rotate(spin*1.5);ctx.fillStyle='#d8ff70';ctx.beginPath();ctx.arc(2,4,11,0,TAU);ctx.fill();ctx.stroke();ctx.fillStyle='#4e6128';ctx.fillRect(-4,-15,10,10);break;
+    case 'boomerang':
+      ctx.rotate(spin*2);ctx.lineWidth=7;ctx.beginPath();ctx.arc(0,0,15,-2.4,.55);ctx.stroke();ctx.beginPath();ctx.arc(0,0,15,.75,2.25);ctx.stroke();break;
+    case 'trapper':
+      ctx.rotate(spin);ctx.fillStyle='#d6b07a';ctx.beginPath();for(let k=0;k<8;k++){const a=k*TAU/8,r=k%2?7:17;k?ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r):ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fill();ctx.stroke();break;
+    case 'puppeteer':
+      ctx.fillStyle='#e7a4ff';ctx.beginPath();ctx.arc(9,0,8,0,TAU);ctx.fill();ctx.strokeStyle='#fff';ctx.beginPath();ctx.moveTo(-30,-9);ctx.quadraticCurveTo(-4,-18,9,0);ctx.quadraticCurveTo(-4,18,-30,9);ctx.stroke();break;
+    case 'tempest':
+      ctx.strokeStyle='#eaffff';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-22,-8);ctx.lineTo(-4,-2);ctx.lineTo(-12,5);ctx.lineTo(21,0);ctx.stroke();break;
+    case 'chronoblade':
+      ctx.fillStyle='#dff8ff';ctx.beginPath();ctx.moveTo(25,0);ctx.lineTo(-7,-6);ctx.lineTo(-22,0);ctx.lineTo(-7,6);ctx.closePath();ctx.fill();ctx.stroke();ctx.globalAlpha*=.45;ctx.strokeRect(-31,-8,18,16);break;
+    case 'demolisher':
+      ctx.fillStyle='#5e3a2d';ctx.beginPath();ctx.arc(0,0,14,0,TAU);ctx.fill();ctx.stroke();ctx.strokeStyle='#ffdc86';ctx.beginPath();ctx.moveTo(3,-14);ctx.quadraticCurveTo(12,-24,20,-12);ctx.stroke();break;
+    case 'phaseweaver':
+      ctx.rotate(spin);ctx.strokeStyle='#f1dcff';ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(-7,0,10,17,.5,0,TAU);ctx.stroke();ctx.beginPath();ctx.ellipse(9,0,10,17,-.5,0,TAU);ctx.stroke();break;
+    case 'parasite':
+      ctx.fillStyle='#a9ff7d';ctx.beginPath();ctx.arc(4,0,9,0,TAU);ctx.fill();for(let k=0;k<4;k++){const a=-1.8+k*1.2;ctx.beginPath();ctx.moveTo(-2,0);ctx.lineTo(-20,Math.sin(a)*13);ctx.stroke()}break;
+    case 'starforge':
+      ctx.rotate(spin);ctx.fillStyle='#fff3a8';ctx.beginPath();for(let k=0;k<10;k++){const a=-Math.PI/2+k*TAU/10,r=k%2?7:18;k?ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r):ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r)}ctx.closePath();ctx.fill();ctx.stroke();break;
+    case 'cometrail':
+      ctx.fillStyle='#e9ffff';ctx.beginPath();ctx.arc(7,0,10,0,TAU);ctx.fill();ctx.stroke();ctx.globalAlpha*=.55;ctx.beginPath();ctx.moveTo(-38,-12);ctx.quadraticCurveTo(-16,0,0,-7);ctx.lineTo(0,7);ctx.quadraticCurveTo(-16,0,-38,12);ctx.fill();break;
+    case 'corruptor':
+      ctx.fillStyle='#101711';ctx.fillRect(-14,-12,28,24);ctx.strokeStyle='#7cff45';ctx.strokeRect(-16,-10,28,24);ctx.strokeStyle='#ff4be1';ctx.beginPath();ctx.moveTo(-28,-5);ctx.lineTo(18,7);ctx.stroke();break;
+    case 'duplicator':
+      ctx.fillStyle='#ff67e6';ctx.fillRect(-6,-9,18,18);ctx.globalAlpha*=.55;ctx.fillRect(-18,-14,18,18);ctx.fillRect(-25,3,18,18);break;
+    case 'seraph':
+      ctx.fillStyle='#fffbd0';ctx.beginPath();ctx.moveTo(22,0);ctx.lineTo(-8,-5);ctx.lineTo(-24,-18);ctx.lineTo(-17,0);ctx.lineTo(-24,18);ctx.lineTo(-8,5);ctx.closePath();ctx.fill();ctx.stroke();break;
+    case 'eventhorizon':
+      ctx.fillStyle='#07030b';ctx.shadowBlur=30;ctx.beginPath();ctx.arc(0,0,14,0,TAU);ctx.fill();ctx.strokeStyle='#ffffff';ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,0,27,9,spin,0,TAU);ctx.stroke();ctx.strokeStyle='#c78cff';ctx.beginPath();ctx.ellipse(0,0,9,27,-spin*.8,0,TAU);ctx.stroke();break;
     case 'gojo':
       ctx.shadowBlur=25;ctx.strokeStyle='#7abaff';ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(0,0,19,10,time*4,0,TAU);ctx.stroke();
       ctx.strokeStyle='#ff829d';ctx.beginPath();ctx.ellipse(0,0,10,19,-time*4.5,0,TAU);ctx.stroke();
@@ -6402,12 +6616,17 @@ function skillAimSpec(cannon,slot){
       blaster:{type:'target',distance:760,radius:185},ranger:{type:'dash',distance:720,width:72,end:72},ricochet:{type:'cone',distance:500,half:.30},mortar:{type:'barrage',distance:650,radius:125,spacing:105,count:5},
       shredder:{type:'cone',distance:700,half:.20},seeker:{type:'line',distance:900,width:25},frost:{type:'target',distance:470,radius:280},magnet:{type:'target',distance:500,radius:330},
       cyclone:{type:'cone',distance:720,half:.24},juggernaut:{type:'dash',distance:580,width:72,end:150},mirror:{type:'cone',distance:520,half:.34},lancer:{type:'line',distance:1180,width:28},
-      leviathan:{type:'cone',distance:650,half:.66},valkyrie:{type:'dash',distance:700,width:58,end:105},berserker:{type:'cone',distance:520,half:.50},oracle:{type:'autoTarget',distance:1350,radius:90},gojo:{type:'target',distance:480,radius:210},amalgam:{type:'target',distance:520,radius:420}
+      leviathan:{type:'cone',distance:650,half:.66},valkyrie:{type:'dash',distance:700,width:58,end:105},berserker:{type:'cone',distance:520,half:.50},oracle:{type:'autoTarget',distance:1350,radius:90},
+      javelin:{type:'cone',distance:900,half:.10},summoner:{type:'target',distance:420,radius:145},architect:{type:'target',distance:460,radius:76},alchemist:{type:'target',distance:560,radius:185},
+      boomerang:{type:'cone',distance:700,half:.28},trapper:{type:'target',distance:480,radius:190},puppeteer:{type:'autoTarget',distance:850,radius:70},tempest:{type:'dash',distance:760,width:72,end:72},
+      chronoblade:{type:'line',distance:920,width:42},demolisher:{type:'target',distance:620,radius:260},phaseweaver:{type:'target',distance:560,radius:105},parasite:{type:'autoTarget',distance:1000,radius:92},
+      starforge:{type:'self',radius:210},cometrail:{type:'dash',distance:1050,width:92,end:120},corruptor:{type:'cone',distance:1100,half:.22},duplicator:{type:'self',radius:150},seraph:{type:'target',distance:680,radius:280},eventhorizon:{type:'target',distance:620,radius:460},
+      gojo:{type:'target',distance:480,radius:210},amalgam:{type:'target',distance:520,radius:420}
     }[cannon]||null;
   }
   if(slot===2){
     if(cannon==='error'&&performance.now()<(player.overclockUntil||0))return{type:'dash',distance:460,width:55,end:92};
-    return{rocket:{type:'self',radius:148},titan:{type:'self',radius:132},phantom:{type:'self',radius:105},ring:{type:'self',radius:175},chrono:{type:'self',radius:185},void:{type:'self',radius:430},nova:{type:'self',radius:185},comet:{type:'target',distance:620,radius:370},stellar:{type:'self',radius:145},error:{type:'self',radius:125},glitch:{type:'dash',distance:900,width:96,end:96},zero:{type:'self',radius:560},deku:{type:'line',distance:800,width:58},sniper:{type:'cone',distance:1800,half:.48},bloodlust:{type:'self',radius:520},cyclone:{type:'self',radius:260},juggernaut:{type:'self',radius:150},mirror:{type:'self',radius:190},lancer:{type:'dash',distance:980,width:58,end:130},leviathan:{type:'self',radius:520},valkyrie:{type:'target',distance:560,radius:360},berserker:{type:'self',radius:190},oracle:{type:'target',distance:600,radius:340},gojo:{type:'target',distance:540,radius:225}}[cannon]||null;
+    return{rocket:{type:'self',radius:148},titan:{type:'self',radius:132},phantom:{type:'self',radius:105},ring:{type:'self',radius:175},chrono:{type:'self',radius:185},void:{type:'self',radius:430},nova:{type:'self',radius:185},comet:{type:'target',distance:620,radius:370},stellar:{type:'self',radius:145},error:{type:'self',radius:125},glitch:{type:'dash',distance:900,width:96,end:96},zero:{type:'self',radius:560},deku:{type:'line',distance:800,width:58},sniper:{type:'cone',distance:1800,half:.48},bloodlust:{type:'self',radius:520},cyclone:{type:'self',radius:260},juggernaut:{type:'self',radius:150},mirror:{type:'self',radius:190},lancer:{type:'dash',distance:980,width:58,end:130},leviathan:{type:'self',radius:520},valkyrie:{type:'target',distance:560,radius:360},berserker:{type:'self',radius:190},oracle:{type:'target',distance:600,radius:340},javelin:{type:'line',distance:850,width:34},summoner:{type:'target',distance:520,radius:118},architect:{type:'self',radius:175},alchemist:{type:'target',distance:430,radius:260},eventhorizon:{type:'target',distance:720,radius:680},gojo:{type:'target',distance:540,radius:225}}[cannon]||null;
   }
   if(slot===3){if(cannon==='error')return{type:'dash',distance:360,width:80,end:235};if(cannon==='deku')return{type:'self',radius:140}}
   if(slot===4&&cannon==='deku')return{type:'self',radius:170};

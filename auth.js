@@ -334,6 +334,26 @@ const CANNONS=Object.freeze({
     skill2:'R EINHERJAR RAIN · 지정 지역에 18회의 빛의 창 낙하'
   },
 
+  // V6.32 신규 전 등급 전투 방식. 기존 전용 해금 탱크는 뽑기 풀에 넣지 않는다.
+  javelin:{id:'javelin',name:'투창병',rarity:'common',rarityLabel:'일반',chance:8.76385,desc:'던진 창이 적을 관통한 뒤 손으로 되돌아옵니다.',passive:'평타 · 직선 투창',skill:'Q 귀환 투창 · 세 자루를 던지고 자동 회수',skill2:'R 무기 회수 · 전장의 창을 강화해 즉시 회수'},
+  summoner:{id:'summoner',name:'소환사',rarity:'common',rarityLabel:'일반',chance:8.76385,desc:'직접 탄막 대신 전장을 따라다니는 별짐승을 지휘합니다.',passive:'평타 · 소환 씨앗',skill:'Q 별짐승 소환 · 세 마리의 지속 전투 소환수',skill2:'R 군주의 명령 · 거대 소환수 돌격'},
+  architect:{id:'architect',name:'설계자',rarity:'rare',rarityLabel:'희귀',chance:3.66142,desc:'지정 위치에 자동 조준 구조물을 설치합니다.',passive:'평타 · 건축 볼트',skill:'Q 자동 포대 설치 · 14초 독립 포탑',skill2:'R 이동 요새 · 플레이어를 따라오는 삼연장 요새'},
+  alchemist:{id:'alchemist',name:'연금술사',rarity:'rare',rarityLabel:'희귀',chance:3.66142,desc:'포물선 플라스크와 서로 다른 반응 지대를 사용합니다.',passive:'평타 · 연금 코어',skill:'Q 연금 플라스크 · 투척 후 무작위 반응 지대',skill2:'R 대연성 · 모든 반응 지대 강화'},
+  boomerang:{id:'boomerang',name:'월식 부메랑',rarity:'epic',rarityLabel:'에픽',chance:1.465,desc:'휘어진 칼날이 왕복하며 같은 적을 다시 벱니다.',passive:'평타 · 월식 원반',skill:'Q 월식 부메랑 · 세 갈래 왕복 칼날'},
+  trapper:{id:'trapper',name:'트래퍼',rarity:'epic',rarityLabel:'에픽',chance:1.465,desc:'적이 밟을 때만 작동하는 포획 장치를 배치합니다.',passive:'평타 · 못 탄환',skill:'Q 사냥꾼의 철망 · 다섯 개의 감속 덫 설치'},
+  puppeteer:{id:'puppeteer',name:'퍼핏 마스터',rarity:'legendary',rarityLabel:'전설',chance:.285714,desc:'영혼 실을 연결해 적을 끌고 지속 피해를 줍니다.',passive:'평타 · 영혼 바늘',skill:'Q 영혼 실 조종 · 한 대상을 결박해 끌어당김'},
+  tempest:{id:'tempest',name:'템페스트',rarity:'legendary',rarityLabel:'전설',chance:.285714,desc:'번개가 된 채 이동 경로 전체를 타격합니다.',passive:'평타 · 폭풍 코어',skill:'Q 번개 걸음 · 순간 돌진 경로에 연속 낙뢰'},
+  chronoblade:{id:'chronoblade',name:'크로노 블레이드',rarity:'mythic',rarityLabel:'신화',chance:.071428,desc:'한 번 휘두른 검격이 시간차를 두고 반복됩니다.',passive:'평타 · 시간 검편',skill:'Q 지연 검흔 · 같은 경로를 네 번 재절단'},
+  demolisher:{id:'demolisher',name:'데몰리셔',rarity:'mythic',rarityLabel:'신화',chance:.071428,desc:'원격 폭약을 배치해 순서대로 기폭합니다.',passive:'평타 · 파쇄 로켓',skill:'Q 원격 기폭 · 육각 폭약 연쇄 폭발'},
+  phaseweaver:{id:'phaseweaver',name:'페이즈 위버',rarity:'secret',rarityLabel:'시크릿',chance:.014285,desc:'공간문 두 곳에서 교차 사격합니다.',passive:'평타 · 위상 링',skill:'Q 쌍문 사격 · 두 포탈이 자동으로 교차탄 발사'},
+  parasite:{id:'parasite',name:'패러사이트',rarity:'secret',rarityLabel:'시크릿',chance:.014285,desc:'적에게 기생해 체력을 빼앗습니다.',passive:'평타 · 기생 포자',skill:'Q 기생 표식 · 대상 추적 피해와 흡혈'},
+  starforge:{id:'starforge',name:'스타 포지',rarity:'galaxy',rarityLabel:'갤럭시',chance:.001428,desc:'궤도에서 별을 제련해 한 발씩 발사합니다.',passive:'평타 · 제련성',skill:'Q 별 제련 · 여섯 별이 공전하며 차례로 사격'},
+  cometrail:{id:'cometrail',name:'코멧 라이더',rarity:'galaxy',rarityLabel:'갤럭시',chance:.001428,desc:'혜성에 올라타 전장을 가르며 불타는 항적을 남깁니다.',passive:'평타 · 혜성 조각',skill:'Q 혜성 탑승 · 초장거리 돌진과 지속 항적'},
+  corruptor:{id:'corruptor',name:'코럽터',rarity:'error',rarityLabel:'ERROR',chance:.000714,desc:'공간 데이터 세 줄을 즉시 삭제합니다.',passive:'평타 · 오염 블록',skill:'Q 오염 삭제 · 평행한 세 개의 삭제선'},
+  duplicator:{id:'duplicator',name:'듀플리케이터',rarity:'error',rarityLabel:'ERROR',chance:.000714,desc:'분신이 플레이어의 방향을 복제해 독립 사격합니다.',passive:'평타 · 복제 패킷',skill:'Q 행동 복제 · 네 분신 자동 사격'},
+  seraph:{id:'seraph',name:'세라프',rarity:'divine',rarityLabel:'디바인',chance:.00075,desc:'빛의 날개탄과 회복 성역을 동시에 전개합니다.',passive:'평타 · 성광 깃털',skill:'Q 천상의 판결 · 아홉 날개탄과 치유 성역'},
+  eventhorizon:{id:'eventhorizon',name:'이벤트 호라이즌',rarity:'singularity',rarityLabel:'SINGULARITY',chance:.00005,desc:'뽑기에서만 발견되는 신규 특이점 탱크입니다.',passive:'평타 · 중력 렌즈 코어',skill:'Q 사건의 지평선 · 적과 탄환을 흡수하는 블랙홀',skill2:'R 특이점 붕괴 · 훨씬 거대한 블랙홀과 종말 폭발'},
+
   // ERROR .005% / 5캐릭터
   error:{
     id:'error',name:'ERROR 캐논',rarity:'error',rarityLabel:'ERROR',chance:.001,
@@ -409,23 +429,23 @@ const CANNONS=Object.freeze({
   }
 });
 
-const AUTH_BUILD='V6.06';
-console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · hidden boss reward registry`);
+const AUTH_BUILD='V6.32';
+console.info(`[Sworder VS Tank] auth ${AUTH_BUILD} · 18 new gacha tanks`);
 const CANNON_DISPLAY_ORDER=Object.freeze([
   'standard','scout','bastion',
-  'rapid','dual','needle','blaster','ranger',
-  'spread','burst','crystal','ricochet','mortar',
-  'piercer','laser','drill','shredder','seeker',
-  'plasma','thunder','inferno','frost','magnet',
-  'rocket','titan','phantom','cyclone','juggernaut',
-  'ring','chrono','void','mirror','lancer',
-  'nova','comet','stellar','leviathan','valkyrie',
-  'error','glitch','zero','berserker','oracle',
-  'deku','gojo','sniper','bloodlust','amalgam'
+  'rapid','dual','needle','blaster','ranger','javelin','summoner',
+  'spread','burst','crystal','ricochet','mortar','architect','alchemist',
+  'piercer','laser','drill','shredder','seeker','boomerang','trapper',
+  'plasma','thunder','inferno','frost','magnet','puppeteer','tempest',
+  'rocket','titan','phantom','cyclone','juggernaut','chronoblade','demolisher',
+  'ring','chrono','void','mirror','lancer','phaseweaver','parasite',
+  'nova','comet','stellar','leviathan','valkyrie','starforge','cometrail',
+  'error','glitch','zero','berserker','oracle','corruptor','duplicator',
+  'deku','sniper','bloodlust','seraph','gojo','amalgam','eventhorizon'
 ]);
 const MISSING_CANNONS=CANNON_DISPLAY_ORDER.filter(id=>!CANNONS[id]);
 if(MISSING_CANNONS.length)console.error('[Sworder VS Tank] missing cannon definitions:',MISSING_CANNONS);
-if(Object.keys(CANNONS).length!==48)console.warn('[Sworder VS Tank] expected 48 cannons, got',Object.keys(CANNONS).length);
+if(Object.keys(CANNONS).length!==66)console.warn('[Sworder VS Tank] expected 66 cannons, got',Object.keys(CANNONS).length);
 function displayCannons(){return CANNON_DISPLAY_ORDER.map(id=>CANNONS[id]).filter(Boolean)}
 
 window.IronCellCannons=CANNONS;
