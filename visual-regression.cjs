@@ -83,6 +83,9 @@ assert(source.includes("f.type==='amalgamSkillSig'")&&source.includes("s==='chro
 assert(source.includes("f.type==='amalgamFrostStop'")&&source.includes("spawnAmalgamShield(def,2.4)"),'Reflective Gauntlet must use its restored plate shield while Absolute Stop remains distinct');
 assert(source.includes("f.type==='amalgamRepairArmor'")&&source.includes("f.type==='amalgamPhoenixAegis'")&&source.includes("f.type==='amalgamGenesisCitadel'"),'Other defensive skills must use unique armor, phoenix and citadel forms');
 assert(source.includes("special:'amalgamThrownLance'")&&source.includes("special:'amalgamFlyingBlade'"),'Lance and sword skills need multi-projectile ranged weapon attacks');
+assert(source.includes("addSkillZone('amalgamWorldSweep'")&&source.includes("z.type==='amalgamWorldSweep'"),'World Sever melee damage must follow the animated blade sweep');
+assert(!source.includes("damageSkillLine(player.x,player.y,a,length,145,p.damage*3.4*tier"),'World Sever must not deal instant damage across the map');
+assert(source.includes("pierce:8,r:22,special:'amalgamFlyingBlade'"),'World Sever ranged blades must use nerfed contact projectiles');
 assert(source.includes('function drawAmalgamLanceModel(')&&source.includes('function drawAmalgamBladeModel('),'Amalgam weapon skills need reusable detailed weapon models');
 assert(source.includes("drawAmalgamLanceModel(205,1.08,'#fff176')")&&source.includes("drawAmalgamBladeModel(len,1.12,'#8fdcff')"),'Held and falling weapons must render the detailed forged models');
 assert(source.includes('playerHistory=playerHistory.filter(item=>item.t<=old.t)')&&source.includes('camera.x=player.x-innerWidth/2'),'Time Reversal must restore history and camera at the rewound position');

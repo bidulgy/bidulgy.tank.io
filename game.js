@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false,desynchronized:true});
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.29 · skill fire isolation and low-latency canvas');
+console.info('[Sworder VS Tank] game V6.30 · contact-only World Sever and readable weapon silhouettes');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -213,7 +213,7 @@ const AMALGAM_SKILLS=Object.freeze({
   singularityCore:{name:'과부하 거래',rarity:'legendary',rarityLabel:'전설',cooldown:28,color:'#d277ff',desc:'현재 체력 35%를 대가로 나머지 세 스킬의 대기시간 초기화'},
   chronoBreak:{name:'시간 역행',rarity:'legendary',rarityLabel:'전설',cooldown:27,color:'#9fe8ff',desc:'4초 전 위치·체력·속도로 되돌아감'},
   phoenixCore:{name:'불사조 핵',rarity:'legendary',rarityLabel:'전설',cooldown:32,color:'#ff7658',desc:'체력을 크게 회복하고 일정 시간 치명타를 한 번 무효화'},
-  worldSever:{name:'세계 절단',rarity:'mythic',rarityLabel:'신화',cooldown:31,color:'#ffffff',desc:'맵 끝까지 이어지는 거대한 차원 절단'},
+  worldSever:{name:'세계 절단',rarity:'mythic',rarityLabel:'신화',cooldown:31,color:'#ffffff',desc:'휘두르는 대검과 날아가는 검날에 직접 닿은 적만 절단'},
   cosmicStorm:{name:'공간 도약',rarity:'mythic',rarityLabel:'신화',cooldown:24,color:'#72f4ff',desc:'장애와 공격을 무시하고 조준 위치로 즉시 이동한 뒤 은신'},
   genesisShield:{name:'창세의 방패',rarity:'mythic',rarityLabel:'신화',cooldown:36,color:'#ffe99b',desc:'회복과 공격 강화를 주는 절대 보호막 전개'}
 });
@@ -2235,7 +2235,7 @@ function castAmalgamSkill(slot){
   }else if(id==='phoenixCore'){
     player.hp=player.maxHp;player.stellarReviveUntil=performance.now()+20000;player.stellarReviveReady=true;player.overclockUntil=performance.now()+9000;addSkillZone('secondStar',{x:player.x,y:player.y,radius:190,life:20,damage:0,tick:0});spawnCombatFx('amalgamPhoenixAegis',player.x,player.y,{angle:a,color:def.color,life:2.8,radius:215,cannon:'amalgam'});
   }else if(id==='worldSever'){
-    const length=distanceToWorldEdge(player.x,player.y,a,60);damageSkillLine(player.x,player.y,a,length,145,p.damage*3.4*tier,def.color,0);spawnCombatFx('amalgamWorldBlade',player.x,player.y,{angle:a,color:def.color,life:1.0,radius:Math.min(760,length),cannon:'amalgam'});for(const off of [-.12,0,.12])spawnSkillProjectileAt('amalgam',player.x+Math.cos(a)*58,player.y+Math.sin(a)*58,a+off,{damageMul:2.1*tier,speedMul:1.32,life:5,pierce:30,r:16,special:'amalgamFlyingBlade'});spawnCombatFx('rail',player.x,player.y,{angle:a,color:def.color,life:.82,radius:length,cannon:'zero'});shake=Math.max(shake,30);
+    const bladeLength=470;addSkillZone('amalgamWorldSweep',{x:player.x,y:player.y,angle:a,length:bladeLength,width:25,life:1.0,damage:p.damage*1.8*tier,data:{hitShapes:new Set(),hitPlayers:new Set()}});spawnCombatFx('amalgamWorldBlade',player.x,player.y,{angle:a,color:def.color,life:1.0,radius:bladeLength,cannon:'amalgam'});for(const off of [-.12,0,.12])spawnSkillProjectileAt('amalgam',player.x+Math.cos(a)*58,player.y+Math.sin(a)*58,a+off,{damageMul:1.15*tier,speedMul:1.32,life:4.2,pierce:8,r:22,special:'amalgamFlyingBlade'});shake=Math.max(shake,18);
   }else if(id==='cosmicStorm'){
     const ox=player.x,oy=player.y,[dx,dy]=skillAimPoint(1150),aa=Math.atan2(dy-oy,dx-ox),len=Math.hypot(dx-ox,dy-oy);player.x=dx;player.y=dy;player.phaseUntil=performance.now()+1300;player.cloakUntil=performance.now()+4500;player.vx=0;player.vy=0;spawnCombatFx('dimensionRift',ox,oy,{angle:aa,color:def.color,life:1.2,radius:len,cannon:'void'});broadcastLocalState(true);
   }else if(id==='genesisShield'){
@@ -3932,6 +3932,15 @@ function updateSkillZones(dt){
     if(z.networkRemote)continue;
     const elapsed=z.maxLife-z.life;
 
+    if(z.type==='amalgamWorldSweep'){
+      const progress=clamp(elapsed/z.maxLife,0,1),swing=-1.05+progress*2.1,bladeAngle=z.angle+swing,bladeLength=z.length*(.35+.65*progress);
+      const x2=z.x+Math.cos(bladeAngle)*bladeLength,y2=z.y+Math.sin(bladeAngle)*bladeLength,width=z.width||25;
+      const hitShapes=z.data.hitShapes||(z.data.hitShapes=new Set()),hitPlayers=z.data.hitPlayers||(z.data.hitPlayers=new Set());
+      for(let i=shapes.length-1;i>=0;i--){const s=shapes[i];if(hitShapes.has(s))continue;const hit=pointToLineInfo(s.x,s.y,z.x,z.y,x2,y2);if(hit.d2>(width+s.r)**2)continue;hitShapes.add(s);applyShapeDamage(s,z.damage,Math.cos(bladeAngle)*160,Math.sin(bladeAngle)*160);burst(hit.x,hit.y,'#dff8ff',7);if(s.hp<=0){gainPolygonXp(s.xp);burst(s.x,s.y,colorForShape(s.type),10);shapes.splice(i,1)}}
+      for(const enemy of remotePlayers.values()){if(!enemy.alive||hitPlayers.has(enemy.id))continue;const hit=pointToLineInfo(enemy.x,enemy.y,z.x,z.y,x2,y2);if(hit.d2>(width+(enemy.r||27))**2)continue;hitPlayers.add(enemy.id);sendDamage(enemy.id,z.damage);burst(hit.x,hit.y,'#dff8ff',7)}
+      continue;
+    }
+
     if(z.type==='gojoAo'){
       if(z.data?.held&&player?.gojoAoHolding){
         const [tx,ty]=gojoAimPoint(480);z.x=tx;z.y=ty;z.life=z.maxLife=999;
@@ -5274,6 +5283,7 @@ function drawAmalgamBladeModel(length=240,scale=1,accent='#8fdcff'){
   ctx.fillStyle='#d6a84f';ctx.strokeStyle='#fff1a6';ctx.lineWidth=2*scale;ctx.beginPath();ctx.moveTo(30*scale,-42*scale);ctx.lineTo(43*scale,-13*scale);ctx.lineTo(43*scale,13*scale);ctx.lineTo(30*scale,42*scale);ctx.lineTo(15*scale,31*scale);ctx.lineTo(22*scale,0);ctx.lineTo(15*scale,-31*scale);ctx.closePath();ctx.fill();ctx.stroke();
   const handle=ctx.createLinearGradient(-grip,0,18*scale,0);handle.addColorStop(0,'#171021');handle.addColorStop(.5,'#68438e');handle.addColorStop(1,'#24152f');ctx.fillStyle=handle;ctx.strokeStyle='#d9adff';ctx.beginPath();ctx.roundRect(-grip,-10*scale,grip+25*scale,20*scale,7*scale);ctx.fill();ctx.stroke();
   ctx.strokeStyle='#efc9ff';ctx.lineWidth=2*scale;for(let x=-grip+8*scale;x<5*scale;x+=10*scale){ctx.beginPath();ctx.moveTo(x,-9*scale);ctx.lineTo(x+8*scale,9*scale);ctx.stroke()}
+  ctx.fillStyle='#6e3f91';ctx.strokeStyle='#ffe7ff';ctx.lineWidth=2.4*scale;ctx.beginPath();ctx.arc(-grip-5*scale,0,13*scale,0,TAU);ctx.fill();ctx.stroke();ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(-grip-8*scale,-3*scale,3*scale,0,TAU);ctx.fill();
   ctx.fillStyle='#bd75ff';ctx.strokeStyle='#ffffff';ctx.beginPath();ctx.moveTo(31*scale,-10*scale);ctx.lineTo(42*scale,0);ctx.lineTo(31*scale,10*scale);ctx.lineTo(20*scale,0);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
 }
 function drawCombatEffects(layer='base'){
@@ -5416,7 +5426,7 @@ function drawCombatEffects(layer='base'){
     }else if(f.type==='amalgamShield'){
       const rank=AMALGAM_RARITY_ORDER[f.variant]||0,plates=3+rank,rr=f.radius*(.78+.12*Math.sin(q*Math.PI));
       ctx.shadowColor=f.color;ctx.shadowBlur=15+rank*6;ctx.lineWidth=3+rank*.45;
-      for(let k=0;k<plates;k++){const a=(-.72+k*(1.44/Math.max(1,plates-1))),cx=Math.cos(a)*rr,cy=Math.sin(a)*rr,w=34+rank*5,h=50+rank*7;ctx.save();ctx.translate(cx,cy);ctx.rotate(a);const g=ctx.createLinearGradient(-w/2,0,w/2,0);g.addColorStop(0,'rgba(35,48,70,.94)');g.addColorStop(.48,'rgba(225,245,255,.96)');g.addColorStop(1,f.color);ctx.fillStyle=g;ctx.strokeStyle=f.color;ctx.beginPath();ctx.moveTo(-w*.48,-h*.42);ctx.lineTo(w*.34,-h*.52);ctx.lineTo(w*.55,0);ctx.lineTo(w*.34,h*.52);ctx.lineTo(-w*.48,h*.42);ctx.lineTo(-w*.62,0);ctx.closePath();ctx.fill();ctx.stroke();if(rank>=2){ctx.fillStyle='rgba(255,255,255,.82)';ctx.fillRect(-3,-h*.34,6,h*.68)}ctx.restore()}
+      for(let k=0;k<plates;k++){const a=(-.72+k*(1.44/Math.max(1,plates-1))),cx=Math.cos(a)*rr,cy=Math.sin(a)*rr,w=42+rank*5,h=58+rank*7;ctx.save();ctx.translate(cx,cy);ctx.rotate(a);const g=ctx.createLinearGradient(-w/2,-h/2,w/2,h/2);g.addColorStop(0,'#162333');g.addColorStop(.38,'#d9f7ff');g.addColorStop(.62,f.color);g.addColorStop(1,'#20394a');ctx.fillStyle=g;ctx.strokeStyle='#eaffff';ctx.beginPath();ctx.moveTo(0,-h*.55);ctx.bezierCurveTo(w*.48,-h*.52,w*.60,-h*.25,w*.52,h*.04);ctx.quadraticCurveTo(w*.38,h*.42,0,h*.62);ctx.quadraticCurveTo(-w*.38,h*.42,-w*.52,h*.04);ctx.bezierCurveTo(-w*.60,-h*.25,-w*.48,-h*.52,0,-h*.55);ctx.closePath();ctx.fill();ctx.stroke();ctx.strokeStyle=f.color;ctx.lineWidth=2.2;ctx.beginPath();ctx.moveTo(0,-h*.39);ctx.lineTo(w*.30,-h*.12);ctx.lineTo(w*.20,h*.22);ctx.lineTo(0,h*.43);ctx.lineTo(-w*.20,h*.22);ctx.lineTo(-w*.30,-h*.12);ctx.closePath();ctx.stroke();ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(0,-h*.03,5+rank,0,TAU);ctx.fill();ctx.restore()}
       if(rank>=3){ctx.strokeStyle='#ffffff';ctx.lineWidth=2;for(let k=0;k<rank;k++){const y=(k-(rank-1)/2)*15;ctx.beginPath();ctx.moveTo(rr*.30,y);ctx.lineTo(rr*.80,y*.55);ctx.stroke()}}ctx.shadowBlur=0;
     }else if(f.type==='amalgamSkyLance'){
       const fall=1-Math.pow(p,2.2),topX=-f.radius*.34,topY=-f.radius*1.18,tipY=-f.radius*(1-fall)*.82;
