@@ -89,6 +89,8 @@ assert.equal(vm.runInContext("evolutionVolleySpecs('quadTank',27,1).length",cont
 assert.equal(vm.runInContext("evolutionVolleySpecs('quadTank',27,1).every(shot => shot.damageScale === 1)",context),true,'Quad bullets must retain full damage');
 assert.equal(vm.runInContext("evolutionVolleySpecs('twin',27,1).length",context),2,'Twin must fire both barrels together');
 assert.equal(vm.runInContext("evolutionVolleySpecs('twin',27,1).map(shot => shot.side).join(',')",context),'-10,10','Twin shots must originate from opposite barrels');
+assert.equal(vm.runInContext("evolutionVolleySpecs('triplet',27,1).length",context),3,'Triplet must fire all three barrels together');
+assert.equal(vm.runInContext("evolutionVolleySpecs('triplet',27,1).map(shot => shot.side).join(',')",context),'-8,0,8','Triplet shots must originate from all three firing lanes');
 assert.equal(vm.runInContext("evolutionVolleySpecs('machineGun',27,1).length",context),1,'Machine Gun normal cycles must fire one scattered round');
 assert.equal(vm.runInContext("evolutionVolleySpecs('machineGun',27,3).length",context),5,'Machine Gun burst cycles must spawn five rounds together');
 assert.equal(vm.runInContext("evolutionVolleySpecs('machineGun',27,3).map(shot => shot.a).join(',')",context),'-0.16,-0.08,0,0.08,0.16','Machine Gun burst must form one symmetric spread fan');

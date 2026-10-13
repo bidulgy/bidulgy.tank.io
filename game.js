@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.25 · distinct Amalgam effects, ranged weapons, reliable rewind');
+console.info('[Sworder VS Tank] game V6.26 · Triplet triple volley and polished Amalgam skill FX');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -4696,7 +4696,7 @@ function evolutionVolleySpecs(type,r,shotNo){
     case 'auto3':
       return all(.42,1,1,.28);
     case 'triplet':
-      return[wrap(specs[n%3],.66,1,1,.25)];
+      return all(.44,1,1,.22);
     // 2020 이후 Diep.io와 같이 Penta/Spread는 모든 포신을 동시에 발사.
     case 'pentaShot':
       return all(.31,1,1,.18);
@@ -5313,7 +5313,12 @@ function drawCombatEffects(layer='base'){
       ctx.rotate(q*3);ctx.strokeStyle='#ddc7ff';ctx.lineWidth=5;ctx.beginPath();ctx.ellipse(0,0,f.radius*q,f.radius*q*.3,0,0,TAU);ctx.stroke();
     }else if(f.type==='amalgamSkillSig'){
       const rank=AMALGAM_RARITY_ORDER[f.variant]||0,r=f.radius*(.3+.7*q),s=f.skill;
-      ctx.shadowColor=f.color;ctx.shadowBlur=12+rank*7;ctx.strokeStyle=f.color;ctx.fillStyle=f.color;ctx.lineWidth=2.5+rank*.55;
+      const sigIds=['shardVolley','phaseDash','repairPulse','gravityWell','frostNova','sentryRing','thunderLance','mirrorClones','meteorBrand','singularityCore','chronoBreak','phoenixCore','worldSever','cosmicStorm','genesisShield'],sigIndex=Math.max(0,sigIds.indexOf(s));
+      const grad=ctx.createLinearGradient(-r,-r*.45,r,r*.45);grad.addColorStop(0,'rgba(255,255,255,.18)');grad.addColorStop(.32,f.color);grad.addColorStop(.68,'#ffffff');grad.addColorStop(1,f.color);
+      ctx.globalCompositeOperation='lighter';ctx.shadowColor=f.color;ctx.shadowBlur=18+rank*9;ctx.strokeStyle=grad;ctx.fillStyle=grad;ctx.lineWidth=3.2+rank*.65;
+      // Every skill gets a different moving atmosphere: direction, density and
+      // shard shape are derived from its own stable index, not merely its color.
+      const motes=4+rank*2+(sigIndex%4);for(let k=0;k<motes;k++){const phase=(k/motes+q*(.18+(sigIndex%5)*.035))%1,a=sigIndex*.71+k*2.399,radius=r*(.28+phase*.82),mx=Math.cos(a+q*(sigIndex%2?2:-2))*radius,my=Math.sin(a*.73+q*(1+sigIndex%3))*radius*.62,sz=2.5+rank+((k+sigIndex)%3)*1.7;ctx.save();ctx.translate(mx,my);ctx.rotate(a+q*5);ctx.globalAlpha=(1-phase)*(.45+rank*.08);ctx.beginPath();if(sigIndex%3===0){ctx.moveTo(sz*2,0);ctx.lineTo(-sz,-sz*.7);ctx.lineTo(-sz,sz*.7)}else if(sigIndex%3===1){ctx.rect(-sz,-sz,sz*2,sz*2)}else{ctx.moveTo(0,-sz*1.7);ctx.lineTo(sz,0);ctx.lineTo(0,sz*1.7);ctx.lineTo(-sz,0)}ctx.closePath();rank>=2?ctx.fill():ctx.stroke();ctx.restore()}ctx.globalAlpha=1;
       if(s==='shardVolley'){
         for(let k=-2;k<=2;k++){ctx.save();ctx.rotate(k*.25);ctx.beginPath();ctx.moveTo(r*.82,-12);ctx.lineTo(r,0);ctx.lineTo(r*.82,12);ctx.stroke();ctx.restore()}
       }else if(s==='phaseDash'){
@@ -5345,11 +5350,14 @@ function drawCombatEffects(layer='base'){
       }else if(s==='genesisShield'){
         ctx.beginPath();ctx.moveTo(-r*.85,-r*.25);ctx.lineTo(-r*.45,-r*.65);ctx.lineTo(0,-r*.35);ctx.lineTo(r*.45,-r*.65);ctx.lineTo(r*.85,-r*.25);ctx.lineTo(r*.65,r*.55);ctx.lineTo(0,r*.82);ctx.lineTo(-r*.65,r*.55);ctx.closePath();ctx.stroke();for(let k=-2;k<=2;k++)ctx.fillRect(k*22-4,-r*.15,8,r*.55);
       }
-      if(rank>=3){ctx.globalAlpha=.7;for(let k=0;k<rank*2;k++){const a=k*TAU/(rank*2)+q*3;ctx.fillRect(Math.cos(a)*r-3,Math.sin(a)*r-3,6+rank,6+rank)}ctx.globalAlpha=1}ctx.shadowBlur=0;
+      if(rank>=2){const bolts=rank-1;for(let k=0;k<bolts;k++){const side=k%2?1:-1,y=side*(24+k*13);drawElectricArc(-r*.9,y,r*.9,-y*.45,f.color,1.5+rank*.42,sigIndex*3+k,t,rank)}}
+      if(rank>=3){ctx.globalAlpha=.72;for(let k=0;k<rank*2;k++){const a=k*TAU/(rank*2)+q*(2.2+sigIndex*.07),sz=7+rank*2;ctx.save();ctx.translate(Math.cos(a)*r,Math.sin(a)*r*.76);ctx.rotate(a+q*4);ctx.beginPath();ctx.moveTo(sz,0);ctx.lineTo(0,sz*.45);ctx.lineTo(-sz,0);ctx.lineTo(0,-sz*.45);ctx.closePath();ctx.fill();ctx.restore()}ctx.globalAlpha=1}
+      if(rank===4){ctx.strokeStyle='rgba(255,255,255,.86)';ctx.lineWidth=2.4;for(let k=0;k<5;k++){const a=-1.25+k*.62+Math.sin(q*Math.PI)*.18;ctx.save();ctx.rotate(a);ctx.beginPath();ctx.moveTo(r*.55,-9);ctx.lineTo(r*.95,0);ctx.lineTo(r*.55,9);ctx.stroke();ctx.restore()}}
+      ctx.globalCompositeOperation='source-over';ctx.shadowBlur=0;
     }else if(f.type==='amalgamFrostStop'){
-      ctx.strokeStyle='#dffcff';ctx.fillStyle='rgba(150,236,255,.22)';ctx.shadowColor='#96ecff';ctx.shadowBlur=24;for(let k=0;k<12;k++){const a=k*TAU/12,rr=f.radius*q;ctx.save();ctx.rotate(a);ctx.beginPath();ctx.moveTo(rr*.2,-8);ctx.lineTo(rr,0);ctx.lineTo(rr*.2,8);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}ctx.shadowBlur=0;
+      const ice=ctx.createLinearGradient(0,-f.radius,0,f.radius);ice.addColorStop(0,'rgba(255,255,255,.96)');ice.addColorStop(.45,'rgba(112,231,255,.65)');ice.addColorStop(1,'rgba(66,117,255,.12)');ctx.globalCompositeOperation='lighter';ctx.strokeStyle='#dffcff';ctx.fillStyle=ice;ctx.shadowColor='#96ecff';ctx.shadowBlur=30;for(let k=0;k<12;k++){const a=k*TAU/12+(k%2?q*.12:-q*.08),rr=f.radius*q,wide=7+(k%3)*3;ctx.save();ctx.rotate(a);ctx.beginPath();ctx.moveTo(rr*.12,-wide);ctx.lineTo(rr,0);ctx.lineTo(rr*.12,wide);ctx.closePath();ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(rr*.44,0);ctx.lineTo(rr*.58,-18);ctx.moveTo(rr*.44,0);ctx.lineTo(rr*.58,18);ctx.stroke();ctx.restore()}ctx.globalCompositeOperation='source-over';ctx.shadowBlur=0;
     }else if(f.type==='amalgamGauntlets'){
-      ctx.shadowColor='#66ffd1';ctx.shadowBlur=25;ctx.fillStyle='#1a6057';ctx.strokeStyle='#b9fff0';ctx.lineWidth=4;for(const side of [-1,1]){ctx.save();ctx.translate(side*f.radius*.72,0);ctx.rotate(side*(.35-q*.25));ctx.beginPath();ctx.roundRect(-28,-38,56,76,15);ctx.fill();ctx.stroke();for(let k=-1;k<=1;k++)ctx.strokeRect(side*22,k*19-7,32,14);ctx.restore()}ctx.shadowBlur=0;
+      const metal=ctx.createLinearGradient(-35,-35,35,35);metal.addColorStop(0,'#082a2a');metal.addColorStop(.42,'#38b89c');metal.addColorStop(.7,'#d9fff7');metal.addColorStop(1,'#176458');ctx.globalCompositeOperation='lighter';ctx.shadowColor='#66ffd1';ctx.shadowBlur=32;ctx.fillStyle=metal;ctx.strokeStyle='#d9fff7';ctx.lineWidth=4;for(const side of [-1,1]){ctx.save();ctx.translate(side*f.radius*.72,0);ctx.rotate(side*(.48-q*.34));ctx.beginPath();ctx.roundRect(-30,-40,60,80,16);ctx.fill();ctx.stroke();for(let k=-1;k<=1;k++){ctx.beginPath();ctx.roundRect(side*20,k*20-8,34,16,6);ctx.fill();ctx.stroke()}ctx.strokeStyle='rgba(255,255,255,.8)';ctx.beginPath();ctx.moveTo(-18,-24);ctx.lineTo(18,24);ctx.stroke();ctx.restore()}ctx.globalCompositeOperation='source-over';ctx.shadowBlur=0;
     }else if(f.type==='chronoArrival'){
       ctx.strokeStyle='#d9fbff';ctx.shadowColor='#77dfff';ctx.shadowBlur=25;ctx.lineWidth=4;for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(0,0,f.radius*(.35+k*.22)*q,-Math.PI*q,TAU-Math.PI*q);ctx.stroke()}ctx.beginPath();ctx.moveTo(-f.radius*.72,0);ctx.lineTo(-f.radius*.5,-16);ctx.moveTo(-f.radius*.72,0);ctx.lineTo(-f.radius*.5,16);ctx.stroke();ctx.shadowBlur=0;
     }else if(f.type==='amalgamRarity'){
