@@ -134,8 +134,8 @@ assert(authSource.includes("adminEnabled&&String(currentUsername).toLowerCase()=
 assert(authSource.includes('setAdminButtonVisible(true);\n        renderProfile();'),'Garage must rerender as soon as owner admin verification finishes');
 assert(!authSource.includes('const singularityPriority='),'Singularity tanks must remain at the bottom of the garage');
 assert(fs.readFileSync(__dirname + '/singularity_selection_v611.sql','utf8').includes('security definer'),'Owned singularity equip RPC must have permission to update the caller profile');
-assert(authSource.includes("client.rpc('iron_cell_equip_cannon_v2'")&&authSource.includes("equipped_cannon_not_saved"),'Cannon equip must use the verified V2 RPC and confirm persistence');
-assert(authSource.includes("client.rpc('iron_cell_admin_set_cannon_v2'"),'admin grants must use the verified Gojo-aware RPC');
+assert(authSource.includes("client.rpc('iron_cell_equip_cannon_v3'")&&authSource.includes("equipped_cannon_not_saved"),'Cannon equip must use the verified V3 RPC and confirm persistence');
+assert(authSource.includes("client.rpc('iron_cell_admin_set_cannon_v3'"),'admin grants must use the verified singularity-aware V3 RPC');
 assert(authSource.includes('async function reportGojoDeath(')&&authSource.includes('async function confirmGojoKill('),'Gojo kill attestation client hooks are missing');
 assert(source.includes("victimCannon:defeatedCannon")&&source.includes('confirmGojoKill?.'),'Gojo PvP reward handshake is missing');
 assert(source.includes('player.survivalSeconds>=1800')&&authSource.includes('function unlockLocalGojo()'),'30-minute survival unlock is missing');

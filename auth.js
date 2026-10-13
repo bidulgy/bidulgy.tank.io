@@ -1154,8 +1154,7 @@ async function adminSetCannon(cannon,owned){
   }
   setAdminMessage(`${CANNONS[cannon]?.name||cannon} ${owned?'지급':'회수'} 중...`,'busy');
   const args={p_username:adminTargetUsername,p_cannon:cannon,p_owned:owned};
-  let response=await client.rpc('iron_cell_admin_set_cannon_v2',args);
-  if(response.error&&String(response.error.message||'').toLowerCase().includes('could not find the function'))response=await client.rpc('iron_cell_admin_set_cannon',args);
+  const response=await client.rpc('iron_cell_admin_set_cannon_v3',args);
   if(response.error){setAdminMessage(adminFriendlyError(response.error),'error');return}
   const returnedProfile=response.data?.profile||response.data||{};
   renderAdminTarget({username:adminTargetUsername,profile:returnedProfile});
@@ -1387,8 +1386,7 @@ async function equipCannon(cannonId){
     profile={...(profile||{}),equipped_cannon:'gojo'};renderProfile();setGachaMessage(`${cannon.name} 장착 완료`,'good');return;
   }
   try{
-    let response=await client.rpc('iron_cell_equip_cannon_v2',{p_cannon:cannonId});
-    if(response.error&&String(response.error.message||'').toLowerCase().includes('could not find the function'))response=await client.rpc('iron_cell_equip_cannon_v1',{p_cannon:cannonId});
+    const response=await client.rpc('iron_cell_equip_cannon_v3',{p_cannon:cannonId});
     if(response.error)throw response.error;
     const nextProfile=response.data?.profile||response.data;
     if(!nextProfile||String(nextProfile.equipped_cannon)!==cannonId)throw new Error('equipped_cannon_not_saved');
