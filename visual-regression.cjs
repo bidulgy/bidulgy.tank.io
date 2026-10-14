@@ -75,6 +75,7 @@ assert(!source.includes("f.type==='uniqueSkill'){\n      ctx.strokeStyle=f.color
 assert(source.includes("e.code==='KeyG'||String(e.key||'').toLowerCase()==='g'"),'Desktop Amalgam fourth skill must use G');
 assert(source.includes('function suppressBasicAttack(ms=460)')&&source.includes('skillBlockingFire'),'Skill activation must suppress basic and Auto 5 fire');
 assert(source.includes("setNetworkStatus('connecting','임시 솔로 모드 · 서버 자동 재연결 중')")&&source.includes("scheduleOnlineReconnect('initial_timeout')"),'Realtime failure must start solo play and retry in the background');
+assert(source.includes("if(e.code==='Space'){input.spaceFiring=true")&&source.includes('input.firing||input.spaceFiring||auto5Hunting'),'Space must continuously fire toward the cursor without a mouse click');
 assert(source.includes("canvas.getContext('2d',{alpha:false,desynchronized:true})"),'Canvas should request the low-latency opaque rendering path');
 assert(source.includes('frameWorkMs>27')&&source.includes('frameWorkMs>18'),'Render pressure must detect expensive frames even with few effects');
 assert(source.includes("['Q','R','T','G'][i]"),'Amalgam HUD must label the fourth skill as G');
@@ -243,7 +244,7 @@ assert.deepEqual(Array.from(auto5Volley,v=>v.angle),[.1,.2,.3,.4,.5],'Auto 5 tur
 assert(auto5Volley.every(v=>Number.isFinite(v.evoTurretOffsetX)&&Number.isFinite(v.evoTurretOffsetY)),'Auto 5 bullets must originate at turret mounts');
 const auto5AlignedVolley=vm.runInContext("evolutionShotsFromBase('auto5',27,1,{angle:0,side:0,damageMul:1,autoAimAngles:[.1,.2,.3,.4,.5],autoAimReady:[true,false,false,false,false]},0)",context);
 assert.equal(auto5AlignedVolley.length,1,'Auto 5 must only fire turrets that have turned onto their target');
-assert(source.includes("input.keys.has('Space')||auto5Hunting"),'Auto 5 must fire without manual input while a target exists');
+assert(source.includes('input.firing||input.spaceFiring||auto5Hunting'),'Space autofire and Auto 5 hunting must share the normal fire path');
 assert(source.includes('angleLerp(current,desired')&&source.includes('updateAuto5Aim(player,dt)'),'Auto 5 turrets must rotate gradually instead of snapping');
 assert(source.includes('angles.push(current);ready.push(false)'),'Auto 5 turrets must hold position while no target is nearby');
 assert(source.includes("auto5AimAngles:player.classType==='auto5'"),'Auto 5 turret directions must sync to other players');

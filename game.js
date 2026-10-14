@@ -3,7 +3,7 @@
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false,desynchronized:true});
 const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.33 · resilient Realtime fallback');
+console.info('[Sworder VS Tank] game V6.34 · dedicated Space autofire');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -53,7 +53,7 @@ let localRebalanceTimer=0,normalSpawnAnchorCursor=0;
 let worldHostId='',worldSnapshotSeq=0,lastWorldSnapshotSend=0,lastWorldSnapshotReceive=0,shapeSerial=0;
 let lastBossSpawnSlot=-1;
 const processedDamageIds=new Set();
-const input={keys:new Set(),mouseX:innerWidth/2,mouseY:innerHeight/2,firing:false,moveX:0,moveY:0,mobileAimActive:false};
+const input={keys:new Set(),mouseX:innerWidth/2,mouseY:innerHeight/2,firing:false,spaceFiring:false,moveX:0,moveY:0,mobileAimActive:false};
 const heldSkillAim={active:false,slot:0,source:'',pointerId:null,startX:0,startY:0,angle:null,distance:null,moved:false};
 
 const CANNON_FAMILY=Object.freeze({
@@ -3551,7 +3551,7 @@ function getRewindState(msAgo=4000){
 }
 
 function updatePlayer(dt){if(!player.alive)return;player.survivalSeconds=(player.survivalSeconds||0)+dt;if(!player.gojoSurvivalAwarded&&player.survivalSeconds>=1800){player.gojoSurvivalAwarded=true;window.IronCellAuth?.unlockLocalGojo?.()}refreshRealTimeSkillCooldowns();player.shapeContactCd=Math.max(0,(player.shapeContactCd||0)-dt);const p=playerParams(),stunned=performance.now()<(player.stunUntil||0);let mx=stunned?0:input.moveX,my=stunned?0:input.moveY;if(input.keys.has('KeyA')||input.keys.has('ArrowLeft'))mx-=1;if(input.keys.has('KeyD')||input.keys.has('ArrowRight'))mx+=1;if(input.keys.has('KeyW')||input.keys.has('ArrowUp'))my-=1;if(input.keys.has('KeyS')||input.keys.has('ArrowDown'))my+=1;if(mx||my){[mx,my]=norm(mx,my);player.vx+=mx*p.move*dt*5.2;player.vy+=my*p.move*dt*5.2}const aimWorld=screenToWorldPoint(input.mouseX,input.mouseY),normalAimAngle=Math.atan2(aimWorld[1]-player.y,aimWorld[0]-player.x);
-player.angle=heldSkillAim.active&&Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:normalAimAngle;let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);if(!heldSkillAim.active){const postMoveAim=screenToWorldPoint(input.mouseX,input.mouseY);player.angle=Math.atan2(postMoveAim[1]-player.y,postMoveAim[0]-player.x)}player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);const skillBlockingFire=performance.now()<(player.basicAttackSuppressedUntil||0),auto5Hunting=!stunned&&!skillBlockingFire&&updateAuto5Aim(player,dt);if(!stunned&&!skillBlockingFire&&(input.firing||input.keys.has('Space')||auto5Hunting))fire(player);handleShapeContact();if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}recordPlayerHistory()
+player.angle=heldSkillAim.active&&Number.isFinite(heldSkillAim.angle)?heldSkillAim.angle:normalAimAngle;let sp=Math.hypot(player.vx,player.vy);if(sp>p.move){player.vx=player.vx/sp*p.move;player.vy=player.vy/sp*p.move}player.x=clamp(player.x+player.vx*dt,player.r,WORLD-player.r);player.y=clamp(player.y+player.vy*dt,player.r,WORLD-player.r);if(!heldSkillAim.active){const postMoveAim=screenToWorldPoint(input.mouseX,input.mouseY);player.angle=Math.atan2(postMoveAim[1]-player.y,postMoveAim[0]-player.x)}player.vx*=Math.pow(.0006,dt);player.vy*=Math.pow(.0006,dt);player.fireCd=Math.max(0,player.fireCd-dt);const skillBlockingFire=performance.now()<(player.basicAttackSuppressedUntil||0),auto5Hunting=!stunned&&!skillBlockingFire&&updateAuto5Aim(player,dt);if(!stunned&&!skillBlockingFire&&(input.firing||input.spaceFiring||auto5Hunting))fire(player);handleShapeContact();if(player.hp<player.maxHp){player.regenTimer+=dt;if(player.regenTimer>3.8)player.hp=Math.min(player.maxHp,player.hp+(1.4+player.stats.regen*1.1)*dt)}else player.regenTimer=0}recordPlayerHistory()
 function updateShapes(dt){
   const host=isWorldHost();
 
@@ -3635,6 +3635,7 @@ async function leaveBattleToLobby(){
   const wasAlive=!!player?.alive;
   running=false;
   input.firing=false;
+  input.spaceFiring=false;
   input.mobileAimActive=false;
   cancelHeldSkillAim();
   input.keys.clear();
@@ -6846,6 +6847,7 @@ addEventListener('keydown',e=>{
 },{capture:true});
 addEventListener('keydown',e=>{
   if(isEditableInputTarget(e.target))return;input.keys.add(e.code);
+  if(e.code==='Space'){input.spaceFiring=true;e.preventDefault()}
   if(e.code==='KeyQ'&&!e.repeat){beginHeldSkillAim(1,'keyboard');e.preventDefault()}
   if(e.code==='KeyE'&&player?.cannonType==='gojo'&&!e.repeat){beginHeldSkillAim(2,'keyboard');e.preventDefault()}
   if(e.code==='KeyR'&&player?.cannonType!=='gojo'&&!e.repeat){beginHeldSkillAim(2,'keyboard');e.preventDefault()}
@@ -6855,13 +6857,15 @@ addEventListener('keydown',e=>{
   if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault()
 });
 addEventListener('keyup',e=>{
-  if(isEditableInputTarget(e.target))return;input.keys.delete(e.code);
+  input.keys.delete(e.code);
+  if(e.code==='Space'){input.spaceFiring=false;if(!isEditableInputTarget(e.target))e.preventDefault()}
+  if(isEditableInputTarget(e.target))return;
   if(e.code==='KeyQ'){if(heldSkillAim.active&&heldSkillAim.slot===1)releaseHeldSkillAim(1);else if(player?.errorQCharging)releaseErrorQCharge();e.preventDefault()}
   if(e.code==='KeyE'&&player?.cannonType==='gojo'){if(heldSkillAim.active&&heldSkillAim.slot===2)releaseHeldSkillAim(2);e.preventDefault()}
   if(e.code==='KeyR'&&player?.cannonType!=='gojo'){if(heldSkillAim.active&&heldSkillAim.slot===2)releaseHeldSkillAim(2);e.preventDefault()}
   if(e.code==='KeyT'){if(heldSkillAim.active&&heldSkillAim.slot===3)releaseHeldSkillAim(3);e.preventDefault()}
   if(e.code==='KeyY'&&player?.cannonType==='deku'){if(heldSkillAim.active&&heldSkillAim.slot===4)releaseHeldSkillAim(4);e.preventDefault()}
-});addEventListener('mousemove',e=>{input.mouseX=e.clientX;input.mouseY=e.clientY});addEventListener('mousedown',e=>{if(e.button===0)input.firing=true});addEventListener('mouseup',e=>{if(e.button===0)input.firing=false});addEventListener('blur',()=>{input.firing=false;input.mobileAimActive=false;input.keys.clear();cancelHeldSkillAim();if(player?.errorQCharging)cancelErrorQCharge()});
+});addEventListener('mousemove',e=>{input.mouseX=e.clientX;input.mouseY=e.clientY});addEventListener('mousedown',e=>{if(e.button===0)input.firing=true});addEventListener('mouseup',e=>{if(e.button===0)input.firing=false});addEventListener('blur',()=>{input.firing=false;input.spaceFiring=false;input.mobileAimActive=false;input.keys.clear();cancelHeldSkillAim();if(player?.errorQCharging)cancelErrorQCharge()});
 const moveZone=document.querySelector('#mobileMove'),knob=moveZone.querySelector('.stick-knob');let moveTouch=null;function moveTouchUpdate(t){const r=moveZone.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=t.clientX-cx,dy=t.clientY-cy;const max=42,d=Math.hypot(dx,dy)||1;if(d>max){dx=dx/d*max;dy=dy/d*max}input.moveX=dx/max;input.moveY=dy/max;knob.style.transform=`translate(${dx}px,${dy}px)`}moveZone.addEventListener('touchstart',e=>{const t=e.changedTouches[0];moveTouch=t.identifier;moveTouchUpdate(t);e.preventDefault()},{passive:false});moveZone.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===moveTouch)moveTouchUpdate(t);e.preventDefault()},{passive:false});function endMove(e){for(const t of e.changedTouches)if(t.identifier===moveTouch){moveTouch=null;input.moveX=0;input.moveY=0;knob.style.transform='none'}}moveZone.addEventListener('touchend',endMove,{passive:false});moveZone.addEventListener('touchcancel',endMove,{passive:false});
 const aimZone=document.querySelector('#mobileAim');let aimTouch=null;function aimUpdate(t){input.mouseX=t.clientX;input.mouseY=t.clientY;input.firing=true;input.mobileAimActive=true;aimZone.classList.add('aiming')}aimZone.addEventListener('touchstart',e=>{const t=e.changedTouches[0];aimTouch=t.identifier;aimUpdate(t);e.preventDefault()},{passive:false});aimZone.addEventListener('touchmove',e=>{for(const t of e.changedTouches)if(t.identifier===aimTouch)aimUpdate(t);e.preventDefault()},{passive:false});function endAim(e){for(const t of e.changedTouches)if(t.identifier===aimTouch){aimTouch=null;input.firing=false;input.mobileAimActive=false;aimZone.classList.remove('aiming')}}aimZone.addEventListener('touchend',endAim,{passive:false});aimZone.addEventListener('touchcancel',endAim,{passive:false});
 
@@ -6870,6 +6874,7 @@ window.IronCellGame = {
     running=false;
     paused=false;
     input.firing=false;
+    input.spaceFiring=false;
     input.mobileAimActive=false;
     cancelHeldSkillAim();
     input.keys.clear();
