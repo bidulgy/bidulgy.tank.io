@@ -19,11 +19,11 @@ begin
     insert into public.iron_cell_run_claims(user_id,run_id,level,score,kills,finished)
       values(v_uid,v_run,v_level,v_score,v_kills,coalesce(p_finish,false)) returning * into v_old;
     v_delta_kills:=v_kills;
-    if p_finish then v_award:=v_score*5; end if;
+    if p_finish then v_award:=v_score*36; end if;
   else
     v_delta_kills:=greatest(0,v_kills-v_old.kills);
     if p_finish and not v_old.finished then
-      v_award:=v_score*5;
+      v_award:=v_score*36;
     end if;
     update public.iron_cell_run_claims set level=greatest(level,v_level),score=greatest(score,v_score),
       kills=greatest(kills,v_kills),finished=finished or coalesce(p_finish,false),

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <meta name="theme-color" content="#101827" />
   <title>sworder VS tank</title>
-  <link rel="stylesheet" href="./style.css?v=631" />
+  <link rel="stylesheet" href="./style.css?v=637" />
 </head>
 <body>
   <div id="app">
@@ -18,6 +18,10 @@
       </div>
       <div class="top-actions">
         <button id="leaveBattleBtn" class="leave-battle-button" type="button" title="현재 점수를 보석으로 정산하고 로비로 나갑니다">나가기</button>
+        <aside id="serverRanking" class="server-ranking" aria-label="현재 서버 랭킹">
+          <strong>SERVER RANKING</strong>
+          <ol id="serverRankingList"><li><span>1. PLAYER</span><b>0</b></li></ol>
+        </aside>
       </div>
     </header>
     <aside id="upgradePanel" class="upgrade-panel">
@@ -247,7 +251,7 @@
                 <button class="gacha-button multi-pull" data-pull-count="500" type="button"><b>500회</b><small>◆ 50,000</small></button>
                 <button class="gacha-button multi-pull wide" data-pull-count="1000" type="button"><b>1000회</b><small>◆ 100,000</small></button>
               </div>
-              <small>전투 EXP 1당 보석 5개 획득 · 여러 번 뽑기도 서버에서 한 번에 처리</small>
+              <small>전투 점수 1당 보석 36개 획득 · 여러 번 뽑기도 서버에서 한 번에 처리</small>
               <div class="gacha-rates">
                 <span class="common">일반 <b>61.4999%</b></span>
                 <span class="rare">희귀 <b>25.63%</b></span>
@@ -291,7 +295,7 @@
           <strong id="deployCannonName">기본포</strong>
           <small id="deployCannonDesc">균형 잡힌 기본 단발포입니다.</small>
         </div>
-        <div class="deploy-reward">점수 <b>1</b> = 보석 <b>5</b></div>
+        <div class="deploy-reward">점수 <b>1</b> = 보석 <b>36</b></div>
         <div id="networkStatus" class="network-status waiting"><span></span>온라인 서버 대기</div>
         <button id="startBtn" class="primary" type="button">전투 시작</button>
         <button id="backLobbyBtn" class="secondary-action" type="button">로비로 돌아가기</button>
@@ -302,7 +306,8 @@
       <div class="start-card compact">
         <small>전투 종료</small><h2>탱크가 파괴되었습니다</h2>
         <div class="death-stats four"><span>레벨 <b id="deathLevel">1</b></span><span>점수 <b id="deathScore">0</b></span><span>처치 <b id="deathKills">0</b></span><span>획득 보석 <b id="deathGems">0</b></span></div>
-        <button id="respawnBtn" class="primary" type="button">로비로</button>
+        <button id="respawnBtn" class="primary" type="button">같은 서버에서 부활</button>
+        <button id="deathLobbyBtn" class="secondary-action death-lobby-button" type="button">로비로 나가기</button>
       </div>
     </section>
 
@@ -344,7 +349,7 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./arena-config.js?v=602"></script>
-  <script src="./auth.js?v=631"></script>
-  <script src="./game.js?v=631"></script>
+  <script src="./auth.js?v=637"></script>
+  <script src="./game.js?v=637"></script>
 </body>
 </html>

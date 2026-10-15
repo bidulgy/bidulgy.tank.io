@@ -1,9 +1,10 @@
 (() => {
 'use strict';
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d',{alpha:false,desynchronized:true});
-const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
+const ui={level:document.querySelector('#levelText'),score:document.querySelector('#scoreText'),xp:document.querySelector('#xpBar'),points:document.querySelector('#pointText'),upgrades:document.querySelector('#upgradeList'),upgradePanel:document.querySelector('#upgradePanel'),startScreen:document.querySelector('#startScreen'),deathScreen:document.querySelector('#deathScreen'),startBtn:document.querySelector('#startBtn'),respawnBtn:document.querySelector('#respawnBtn'),deathLobbyBtn:document.querySelector('#deathLobbyBtn'),leaveBattleBtn:document.querySelector('#leaveBattleBtn'),serverRanking:document.querySelector('#serverRanking'),serverRankingList:document.querySelector('#serverRankingList'),nameInput:document.querySelector('#nameInput'),deathLevel:document.querySelector('#deathLevel'),deathScore:document.querySelector('#deathScore'),deathKills:document.querySelector('#deathKills'),deathGems:document.querySelector('#deathGems'),classPanel:document.querySelector('#classPanel'),classChoices:document.querySelector('#classChoices'),onlineCount:document.querySelector('#onlineCount'),networkStatus:document.querySelector('#networkStatus'),skillHud:document.querySelector('#skillHud'),skillBtn:document.querySelector('#skillBtn'),skillName:document.querySelector('#skillName'),skillCooldown:document.querySelector('#skillCooldown'),skillFill:document.querySelector('#skillFill'),skill2Btn:document.querySelector('#skill2Btn'),skill2Name:document.querySelector('#skill2Name'),skill2Cooldown:document.querySelector('#skill2Cooldown'),skill2Fill:document.querySelector('#skill2Fill'),skill3Btn:document.querySelector('#skill3Btn'),skill3Name:document.querySelector('#skill3Name'),skill3Cooldown:document.querySelector('#skill3Cooldown'),skill3Fill:document.querySelector('#skill3Fill'),skill4Btn:document.querySelector('#skill4Btn'),skill4Name:document.querySelector('#skill4Name'),skill4Cooldown:document.querySelector('#skill4Cooldown'),skill4Fill:document.querySelector('#skill4Fill')};
 const TAU=Math.PI*2,WORLD=12600,GRID=56;
-console.info('[Sworder VS Tank] game V6.34 · dedicated Space autofire');
+const RUN_GEM_MULTIPLIER=36;
+console.info('[Sworder VS Tank] game V6.37 · retained respawn progression');
 // V5.34: 9배 맵에 맞춘 적 밀도/스폰 강화.
 const NORMAL_SHAPE_TARGET=220;
 const NORMAL_SHAPE_HARD_CAP=260;
@@ -30,7 +31,7 @@ const LOCAL_REBALANCE_INTERVAL=.28;
 const LOCAL_REBALANCE_BATCH=4;
 let running=false,paused=false,last=performance.now(),camera={x:0,y:0},shapes=[],bullets=[],particles=[],combatFx=[],skillZones=[],shake=0,classUpgradeShown=false,player,playerHistory=[];
 const remotePlayers=new Map();
-let onlineChannel=null,onlineTransport='none',onlineReady=false,onlineSelfId='',lastStateSend=0,networkSerial=0,lastRunAutosave=0,runSaveBusy=false,normalSpawnTimer=0,centerPentagonTimer=0;
+let onlineChannel=null,onlineTransport='none',onlineReady=false,onlineSelfId='',lastStateSend=0,networkSerial=0,lastRunAutosave=0,runSaveBusy=false,normalSpawnTimer=0,centerPentagonTimer=0,lastRankingRender=0,sessionRespawnCount=0;
 let onlinePresenceIds=new Set(),onlinePingTimer=0,onlineLatencyMs=0;
 let onlineReconnectTimer=0,onlineReconnectBusy=false,lastNetworkStateReceive=0;
 let localStateSeq=0,lastSkillHudFrameUpdate=0;
@@ -436,7 +437,7 @@ function eligibleEvolutionChildren(type,level){
 function evolutionName(type){return DIEP_EVOLUTION_INFO[type]?.name||'탱크'}
 
 const statsDef=[['maxHealth','최대 체력'],['regen','체력 회복'],['bulletDamage','탄환 피해'],['bulletSpeed','탄환 속도'],['reload','연사 속도'],['moveSpeed','이동 속도']];
-function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:42,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',evolutionTier:0,cannonType:'standard',runId:'',survivalSeconds:0,gojoSurvivalAwarded:false,amalgamSkills:[],amalgamSkillReadyAt:[0,0,0,0],amalgamDraftQueue:[],amalgamDraftChoices:[],skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,skill4Cd:0,skill4Max:0,skill4ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,siegeUntil:0,stellarReviveUntil:0,stellarReviveReady:false,phantomMarkActive:false,phantomMarkUntil:0,phantomMarkOriginX:0,phantomMarkOriginY:0,phantomMarkDestX:0,phantomMarkDestY:0,cloakUntil:0,dekuSmokeUntil:0,dekuFaJinUntil:0,dekuGearshiftUntil:0,dekuWhipChainRemaining:0,dekuWhipChainUntil:0,sniperScopeUntil:0,stunUntil:0,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
+function defaultPlayer(){return{x:WORLD/2,y:WORLD/2,vx:0,vy:0,r:27,angle:0,hp:120,maxHp:120,regenTimer:0,level:1,xp:0,xpNeed:4,score:0,kills:0,points:0,fireCd:0,basicShotCount:0,name:'PLAYER',alive:true,classType:'basic',evolutionTier:0,cannonType:'standard',runId:'',survivalSeconds:0,gojoSurvivalAwarded:false,amalgamSkills:[],amalgamSkillReadyAt:[0,0,0,0],amalgamDraftQueue:[],amalgamDraftChoices:[],skillCd:0,skillMax:0,skillReadyAt:0,skill2Cd:0,skill2Max:0,skill2ReadyAt:0,skill3Cd:0,skill3Max:0,skill3ReadyAt:0,skill4Cd:0,skill4Max:0,skill4ReadyAt:0,errorQCharging:false,errorQChargeStartAt:0,fortressUntil:0,overclockUntil:0,errorDashReadyAt:0,errorSwordMode:false,siegeUntil:0,stellarReviveUntil:0,stellarReviveReady:false,phantomMarkActive:false,phantomMarkUntil:0,phantomMarkOriginX:0,phantomMarkOriginY:0,phantomMarkDestX:0,phantomMarkDestY:0,cloakUntil:0,dekuSmokeUntil:0,dekuFaJinUntil:0,dekuGearshiftUntil:0,dekuWhipChainRemaining:0,dekuWhipChainUntil:0,sniperScopeUntil:0,stunUntil:0,swordSwingStartedAt:0,swordSwingUntil:0,swordSwingDir:1,swordSwingPower:0,phaseUntil:0,shapeContactCd:0,stats:{maxHealth:0,regen:0,bulletDamage:0,bulletSpeed:0,reload:0,moveSpeed:0}}}
 function resize(){
   const mobileLike=innerWidth<900||matchMedia('(pointer:coarse)').matches;
   const dpr=Math.min(mobileLike?1.25:1.5,devicePixelRatio||1);
@@ -495,7 +496,7 @@ function chooseNormalSpawnPoint(preferLocal=true,forcedAnchor=null){
 }
 function spawnShape(type=null,preferLocal=true,forcedAnchor=null){
   const t=type||(Math.random()<.57?'square':Math.random()<.78?'triangle':'pentagon');
-  const c=t==='square'?{r:20,hp:36,xp:12,sides:4}:t==='triangle'?{r:24,hp:58,xp:22,sides:3}:{r:34,hp:145,xp:56,sides:5};
+  const c=t==='square'?{r:20,hp:36,xp:10,sides:4}:t==='triangle'?{r:24,hp:58,xp:25,sides:3}:{r:34,hp:145,xp:130,sides:5};
   const pos=chooseNormalSpawnPoint(preferLocal,forcedAnchor);
   const shape={
     id:makeShapeId(),
@@ -604,7 +605,7 @@ function recycleFarNormalShape(anchor,anchors){
 
   const pos=localShapePoint(anchor);
   const type=Math.random()<.57?'square':Math.random()<.78?'triangle':'pentagon';
-  const c=type==='square'?{r:20,hp:36,xp:12,sides:4}:type==='triangle'?{r:24,hp:58,xp:22,sides:3}:{r:34,hp:145,xp:56,sides:5};
+  const c=type==='square'?{r:20,hp:36,xp:10,sides:4}:type==='triangle'?{r:24,hp:58,xp:25,sides:3}:{r:34,hp:145,xp:130,sides:5};
 
   candidate.type=type;
   candidate.x=pos.x;candidate.y=pos.y;
@@ -677,6 +678,26 @@ function updateOnlineCount(){
     if(ids.size)count=ids.size;
   }catch(_){}
   ui.onlineCount.textContent=String(Math.max(0,count));
+}
+function renderServerRanking(force=false){
+  if(!ui.serverRankingList)return;
+  const now=performance.now();
+  if(!force&&now-lastRankingRender<350)return;
+  lastRankingRender=now;
+  const entries=[];
+  if(player)entries.push({id:onlineSelfId||'local',name:player.name||'PLAYER',score:Math.max(0,player.score||0),level:player.level||1,alive:player.alive!==false,self:true});
+  for(const remote of remotePlayers.values())entries.push({id:remote.id,name:remote.name||'PLAYER',score:Math.max(0,remote.score||0),level:remote.level||1,alive:remote.alive!==false,self:false});
+  entries.sort((a,b)=>b.score-a.score||b.level-a.level||a.name.localeCompare(b.name));
+  ui.serverRankingList.replaceChildren(...entries.slice(0,10).map((entry,index)=>{
+    const li=document.createElement('li');
+    if(entry.self)li.classList.add('self');
+    if(!entry.alive)li.classList.add('defeated');
+    const name=document.createElement('span'),score=document.createElement('b');
+    name.textContent=`${index+1}. ${entry.name}${entry.alive?'':' · 파괴됨'}`;
+    score.textContent=entry.score.toLocaleString();
+    li.append(name,score);
+    return li;
+  }));
 }
 function safeRemoteNumber(v,fallback=0){
   v=Number(v);
@@ -1414,8 +1435,28 @@ async function connectOnlineArena(preserveRemotes=false){
   });
 }
 
-const xpNeed=l=>Math.round(40+l*18+l*l*2.2);
+// Diep.io FFA level 1→45 score curve. Index 0 is the EXP needed at level 1.
+const DIEP_LEVEL_XP=Object.freeze([4,9,15,22,28,35,44,54,64,75,87,101,117,132,161,161,192,215,251,259,299,322,388,398,450,496,546,600,659,723,791,839,889,942,999,1059,1123,1190,1261,1337,1417,1502,1593,1687]);
+const xpNeed=l=>DIEP_LEVEL_XP[clamp(Math.floor(Number(l)||1),1,44)-1];
 const amalgamXpNeed=l=>Math.round(54+Math.max(1,l)*6);
+function totalProgressXp(p){
+  if(!p)return 0;
+  let total=Math.max(0,Number(p.xp)||0),level=Math.max(1,Math.floor(Number(p.level)||1));
+  if(p.cannonType==='amalgam')for(let l=1;l<level;l++)total+=amalgamXpNeed(l);
+  else for(let l=1;l<Math.min(level,45);l++)total+=xpNeed(l);
+  return Math.max(0,Math.floor(total));
+}
+function restoreProgressXp(target,total){
+  const isAmalgam=target.cannonType==='amalgam';
+  let remaining=Math.max(0,Math.floor(Number(total)||0));
+  target.level=1;target.xp=0;target.points=0;
+  target.xpNeed=isAmalgam?amalgamXpNeed(1):xpNeed(1);
+  while((isAmalgam||target.level<45)&&remaining>=target.xpNeed){
+    remaining-=target.xpNeed;target.level++;target.points++;
+    target.xpNeed=isAmalgam?amalgamXpNeed(target.level):xpNeed(target.level);
+  }
+  target.xp=(!isAmalgam&&target.level>=45)?0:remaining;
+}
 function ensureAmalgamDraftPanel(){
   let panel=document.querySelector('#amalgamDraftPanel');
   if(panel)return panel;
@@ -1492,12 +1533,12 @@ function gainXp(a){
   if(!isAmalgam&&player.level>=15)showClassUpgrade(player.level);
   updateUI();
 }
-// V5.62: polygon kills grant 50% XP, while score reward stays unchanged.
+// Match Diep.io polygon progression rewards: square 10, triangle 25, pentagon 130.
 function gainPolygonXp(rawXp){
   const full=Math.max(0,Number(rawXp)||0);
   if(!player.alive)return;
   const scoreBefore=player.score;
-  gainXp(full*.5);
+  gainXp(full);
   // gainXp couples score to XP; restore polygon score to its original full value.
   player.score=scoreBefore+Math.round(full*3);
   updateUI();
@@ -1507,17 +1548,18 @@ function renderUpgrades(){
   // Keep the same button nodes while XP and score change. Replacing a pressed
   // button before pointerup can silently drop its click on touch devices.
   if(!ui.upgrades.dataset.ready){
-    ui.upgrades.innerHTML=statsDef.map(([k,l])=>`<div class="stat"><span class="stat-name">${l}</span><span class="stat-bars">${Array.from({length:7},()=>'<i></i>').join('')}</span><button type="button" data-stat="${k}" aria-label="${l} 강화">+</button></div>`).join('');
-    ui.upgrades.addEventListener('click',event=>{const button=event.target.closest('button[data-stat]');if(button&&!button.disabled)upgrade(button.dataset.stat)});
+    ui.upgrades.innerHTML=statsDef.map(([k,l])=>`<div class="stat"><span class="stat-name">${l}</span><span class="stat-bars">${Array.from({length:7},()=>'<i></i>').join('')}</span><button class="stat-arrow stat-minus" type="button" data-stat="${k}" data-action="remove" aria-label="${l} 1포인트 회수">‹</button><button class="stat-arrow stat-plus" type="button" data-stat="${k}" data-action="add" aria-label="${l} 1포인트 강화">›</button></div>`).join('');
+    ui.upgrades.addEventListener('click',event=>{const button=event.target.closest('button[data-stat]');if(!button||button.disabled)return;if(button.dataset.action==='remove')downgrade(button.dataset.stat);else upgrade(button.dataset.stat)});
     ui.upgrades.dataset.ready='1';
   }
   for(const button of ui.upgrades.querySelectorAll('button[data-stat]')){
     const n=player.stats[button.dataset.stat]||0;
-    button.disabled=player.points<=0||n>=7;
+    button.disabled=button.dataset.action==='remove'?n<=0:player.points<=0||n>=7;
     button.closest('.stat').querySelectorAll('.stat-bars i').forEach((bar,i)=>bar.classList.toggle('on',i<n));
   }
 }
 function upgrade(k){if(player.points<=0||player.stats[k]>=7)return;player.points--;player.stats[k]++;if(k==='maxHealth'){const old=player.maxHp;player.maxHp=120+player.stats.maxHealth*18;player.hp+=player.maxHp-old}updateUI()}
+function downgrade(k){if(!player?.stats||player.stats[k]<=0)return;player.stats[k]--;player.points++;if(k==='maxHealth'){player.maxHp=120+player.stats.maxHealth*18;player.hp=Math.min(player.hp,player.maxHp)}updateUI()}
 function hideEvolutionPanel(){
   classUpgradeShown=false;
   if(ui.classPanel){ui.classPanel.classList.add('hidden');ui.classPanel.dataset.upgradeKey=''}
@@ -3710,7 +3752,8 @@ function killPlayer(killerId=''){
   ui.deathLevel.textContent=player.level;
   ui.deathScore.textContent=player.score.toLocaleString();
   ui.deathKills.textContent=player.kills;
-  if(ui.deathGems)ui.deathGems.textContent=(player.score*5).toLocaleString();
+  if(ui.deathGems)ui.deathGems.textContent=(player.score*RUN_GEM_MULTIPLIER).toLocaleString();
+  if(ui.respawnBtn)ui.respawnBtn.textContent=sessionRespawnCount===0?'EXP 100% 유지하고 부활':'EXP 60% 유지하고 부활';
   ui.deathScreen.classList.add('show');
   void (async()=>{
     const saved=await saveCurrentRun(true);
@@ -6718,6 +6761,7 @@ function update(dt){
   updatePhantomMarkState();
   const hudNow=performance.now();
   if(hudNow-lastSkillHudFrameUpdate>90){lastSkillHudFrameUpdate=hudNow;updateSkillHud()}
+  renderServerRanking();
   broadcastLocalState();
   maintainWorldSync();
 
@@ -6794,6 +6838,7 @@ async function startGame(){
   const connected=await connectOnlineArena();
 
   player=defaultPlayer();
+  sessionRespawnCount=0;
   player.runId=makeRunId();
   lastRunAutosave=performance.now();
   runSaveBusy=false;
@@ -6823,7 +6868,44 @@ async function startGame(){
   ui.startBtn.disabled=false;ui.startBtn.textContent=originalText;
   updateUI();
   updateSkillHud();
+  renderServerRanking(true);
   broadcastLocalState(true);
+}
+function respawnInSameServer(){
+  if(player?.alive)return;
+  const previous=player;
+  const name=(previous?.name||ui.nameInput.value.trim()||window.IronCellAuth?.username||'PLAYER').slice(0,14);
+  const cannon=previous?.cannonType||window.IronCellAuth?.getCannon?.()?.id||'standard';
+  const retention=sessionRespawnCount===0?1:.6;
+  const retainedXp=Math.floor(totalProgressXp(previous)*retention);
+  player=defaultPlayer();
+  player.runId=makeRunId();
+  player.name=name;
+  player.cannonType=cannon;
+  player.classType=previous.classType||'basic';player.evolutionTier=previous.evolutionTier||0;
+  player.amalgamSkills=Array.isArray(previous.amalgamSkills)?previous.amalgamSkills.slice(0,4):[];
+  player.amalgamSkillReadyAt=[0,0,0,0];
+  restoreProgressXp(player,retainedXp);
+  if(retention===1){
+    player.stats={...previous.stats};player.points=Math.max(0,previous.points||0);
+  }else{
+    let budget=Math.max(0,player.level-1);
+    for(const [key] of statsDef){const kept=Math.min(Math.max(0,previous.stats?.[key]||0),7,budget);player.stats[key]=kept;budget-=kept}
+    player.points=budget;
+  }
+  player.maxHp=120+player.stats.maxHealth*18;player.hp=player.maxHp;
+  sessionRespawnCount++;
+  player.x=rand(420,WORLD-420);player.y=rand(420,WORLD-420);
+  bullets=bullets.filter(b=>b.networkRemote===true);
+  particles=[];combatFx=[];skillZones=[];playerHistory=[];
+  classUpgradeShown=false;hideEvolutionPanel();cancelHeldSkillAim();
+  input.firing=false;input.spaceFiring=false;input.keys.clear();
+  camera.x=player.x-innerWidth/2;camera.y=player.y-innerHeight/2;
+  lastRunAutosave=performance.now();runSaveBusy=false;lastStateSend=-Infinity;
+  ui.deathScreen.classList.remove('show');
+  running=true;paused=false;
+  updateUI();updateSkillHud();renderServerRanking(true);broadcastLocalState(true);
+  if(!onlineReady)scheduleOnlineReconnect('same_server_respawn');
 }
 ui.startBtn.onclick=()=>void startGame();
 function bindHeldSkillButton(button,slot){
@@ -6835,7 +6917,9 @@ function bindHeldSkillButton(button,slot){
   button.addEventListener('contextmenu',e=>e.preventDefault());
 }
 bindHeldSkillButton(ui.skillBtn,1);bindHeldSkillButton(ui.skill2Btn,2);bindHeldSkillButton(ui.skill3Btn,3);bindHeldSkillButton(ui.skill4Btn,4);
-ui.leaveBattleBtn.onclick=()=>void leaveBattleToLobby();ui.respawnBtn.onclick=()=>{ui.deathScreen.classList.remove('show');running=false;void disconnectOnlineArena();window.IronCellAuth?.showLobby?.();};
+ui.leaveBattleBtn.onclick=()=>void leaveBattleToLobby();
+ui.respawnBtn.onclick=respawnInSameServer;
+if(ui.deathLobbyBtn)ui.deathLobbyBtn.onclick=()=>void leaveBattleToLobby();
 function isEditableInputTarget(target){
   if(!(target instanceof Element))return false;
   return !!target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]');

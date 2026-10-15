@@ -311,9 +311,28 @@
 /* ===== V5.7 EXIT-ONLY BATTLE CONTROL ===== */
 .top-actions{
   display:flex;
+  flex-direction:column;
   align-items:center;
+  gap:8px;
   pointer-events:auto;
 }
+.server-ranking{
+  width:220px;padding:10px 11px;border-radius:13px;
+  background:rgba(5,12,22,.72);border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 9px 28px rgba(0,0,0,.2);backdrop-filter:blur(9px);
+  color:#dcecff;text-align:left;
+}
+.server-ranking>strong{display:block;margin-bottom:6px;color:#8fc8ff;font-size:9px;letter-spacing:.13em}
+.server-ranking ol{display:grid;gap:3px;margin:0;padding:0;list-style:none}
+.server-ranking li{display:flex;justify-content:space-between;gap:8px;padding:3px 5px;border-radius:6px;font-size:10px}
+.server-ranking li.self{background:rgba(76,168,255,.17);color:#aee0ff}
+.server-ranking li.defeated{opacity:.48}
+.server-ranking li span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.server-ranking li b{flex:none;color:#fff;font-variant-numeric:tabular-nums}
+.stat{grid-template-columns:1fr auto auto}
+.stat .stat-minus{grid-column:2;grid-row:1 / span 2;background:#38485c}
+.stat .stat-plus{grid-column:3;grid-row:1 / span 2;background:#2b77ee}
+.death-lobby-button{width:100%;margin-top:9px}
 .leave-battle-button{
   min-width:78px;
   height:38px;
@@ -342,6 +361,10 @@
     padding:0 12px;
     font-size:11px;
   }
+  .server-ranking{width:154px;padding:7px 8px}
+  .server-ranking>strong{font-size:8px;margin-bottom:4px}
+  .server-ranking li{font-size:8px;padding:2px 3px}
+  .server-ranking li:nth-child(n+6){display:none}
 }
 
 
@@ -1045,6 +1068,9 @@
 
 /* V5.85: keep stat controls above play-field touch layers and easy to hit. */
 .upgrade-panel{z-index:40}
+@media (min-width:761px) and (pointer:fine){
+  .skill-hud{right:250px!important}
+}
 .stat button{width:38px;height:38px;min-width:38px;touch-action:manipulation}
 .stat button:focus-visible{outline:2px solid #c9edff;outline-offset:2px}
 @media (max-width:760px),(pointer:coarse){
